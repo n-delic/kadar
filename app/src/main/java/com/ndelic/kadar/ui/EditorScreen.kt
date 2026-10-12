@@ -160,7 +160,15 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     if (player != null && video != null) {
         val layers by rememberUpdatedState(project.layers)
         // Video layers' placement reaches the compositor live, so a drag doesn't rebuild the composition; anything else does.
+        val freshPlayer = remember(player) { booleanArrayOf(true) }
         LaunchedEffect(player, video, videoLayers.map { it.withTransform(Transform(0f, 0f)) }) {
+            // Same Media3 limit as below: a paused multi-input player won't repaint a new composition, so use a new player.
+            if (!freshPlayer[0] && videoLayers.isNotEmpty() && !player.isPlaying) {
+                resumeAt[0] = player.currentPosition
+                playerGeneration++
+                return@LaunchedEffect
+            }
+            freshPlayer[0] = false
             val start = resumeAt[0].also { resumeAt[0] = 0 }
             player.setComposition(video.composition(null, videos = videoLayers, placed = { v -> (layers.firstOrNull { it.id == v.id } ?: v).t }), start)
             player.prepare()

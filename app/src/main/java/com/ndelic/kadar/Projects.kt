@@ -17,6 +17,8 @@ data class Project(
     val background: Int = Color.WHITE,
     val layers: List<Layer> = emptyList(),
     val video: VideoClip? = null,
+    /** Export size for this project, or null to use the app-wide default from Settings. */
+    val exportSize: ExportSize? = null,
 )
 
 data class SavedProject(val dir: File, val modified: Long, val thumb: Bitmap?, val isVideo: Boolean)
@@ -79,6 +81,7 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
             layers = layers,
             // Projects from before the video canvas existed: the canvas was the video's own size.
             video = j.optJSONObject("video")?.let { clipFromJson(it, j.getInt("width"), j.getInt("height")) },
+            exportSize = j.optString("exportSize").ifEmpty { null }?.let { enumOr<ExportSize>(it, ExportSize.Original) },
         )
     }
 
@@ -158,6 +161,7 @@ private fun Project.toJson() = JSONObject().apply {
     put("background", background)
     put("layers", JSONArray(layers.map { it.toJson() }))
     video?.let { put("video", it.toJson()) }
+    exportSize?.let { put("exportSize", it.name) }
 }
 
 private fun Layer.toJson() = JSONObject().apply {

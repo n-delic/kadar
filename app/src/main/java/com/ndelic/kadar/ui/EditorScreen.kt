@@ -219,7 +219,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             if (p != null) Box(Modifier.fullWidthPanel()) {
                 when (p) {
                     Panel.Sticker -> StickerPanel(state.stickers, vm)
-                    Panel.Canvas -> CanvasPanel(project, vm)
+                    Panel.Canvas -> CanvasPanel(project, state.settings.exportSize, vm)
                     Panel.Speed -> video?.let { SpeedPanel(it, vm) }
                     Panel.Audio -> video?.let { AudioPanel(it, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }) }
                     Panel.Font -> (selected as? TextLayer)?.let { FontPanel(it, vm) }
@@ -227,7 +227,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     Panel.Stroke -> (selected as? TextLayer)?.let { t -> ColorRow(t.outline, allowNone = true) { vm.editText { copy(outline = it) } } }
                     Panel.Box -> (selected as? TextLayer)?.let { t -> ColorRow(t.box, allowNone = true) { vm.editText { copy(box = it) } } }
                     Panel.Layers -> LayersPanel(project.layers, state.selectedId, vm)
-                    Panel.VideoCanvas -> video?.let { VideoCanvasPanel(it, vm) }
+                    Panel.VideoCanvas -> video?.let { VideoCanvasPanel(project, it, state.settings.exportSize, vm) }
                     Panel.Style -> (selected as? TextLayer)?.let { TextStylePanel(it, vm) }
                     Panel.Adjust -> when (val l = selected) {
                         is ImageLayer -> AdjustPanel(l.adjust) { a -> vm.editImage { copy(adjust = a) } }

@@ -53,6 +53,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    // The open-source license texts ship inside the app (Settings > Open-source licenses).
+    sourceSets {
+        getByName("main") { assets.srcDir(rootProject.file("third_party")) }
+    }
     buildFeatures {
         compose = true
         buildConfig = true

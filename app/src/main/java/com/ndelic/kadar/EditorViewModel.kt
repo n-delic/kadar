@@ -46,6 +46,7 @@ data class EditorUiState(
     /** Label of the running long task; the UI blocks input while it is set. */
     val busy: String? = null,
     val stickers: List<Sticker> = emptyList(),
+    val settings: AppSettings = AppSettings(),
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
     /** Evenly spaced frames of the video, for the timeline. */
@@ -71,6 +72,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     )
 
     private val store = ProjectStore(File(app.filesDir, "projects"), fonts)
+    private val settingsStore = SettingsStore(app)
     private val stickerDir = File(app.filesDir, "stickers")
     private val saveLock = Mutex()
     private var videoFrame: Bitmap? = null
@@ -80,7 +82,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     private val undoStack = ArrayDeque<Project>()
     private val redoStack = ArrayDeque<Project>()
 
-    private val _uiState = MutableStateFlow(EditorUiState())
+    private val _uiState = MutableStateFlow(EditorUiState(settings = settingsStore.load()))
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
 
     private val _effects = Channel<EditorEffect>(Channel.BUFFERED)
@@ -429,13 +431,25 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         updateClip { copy(music = Music(uri, name, info.durationMs)) }
     }
 
+    // Settings
+
+    fun updateSettings(change: AppSettings.() -> AppSettings) {
+        val next = _uiState.value.settings.change()
+        settingsStore.save(next)
+        _uiState.update { it.copy(settings = next) }
+    }
+
+    fun setProjectExportSize(size: ExportSize?) = updateProject { it.copy(exportSize = size) }
+
     // Export
 
     fun export(share: Boolean) = work("Saving") {
         val p = _uiState.value.project ?: return@work
         val video = p.video
+        val shortSide = (p.exportSize ?: _uiState.value.settings.exportSize).shortSide
         if (video == null) {
-            val bitmap = renderLayers(p.width, p.height, p.background, p.layers)
+            val scale = shortSide?.let { min(1f, it / min(p.width, p.height).toFloat()) } ?: 1f
+            val bitmap = renderLayers(p.width, p.height, p.background, p.layers, scale)
             val transparent = p.background == Color.TRANSPARENT
             val mime = if (transparent) "image/png" else "image/jpeg"
             val uri = withContext(Dispatchers.IO) {
@@ -446,7 +460,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             val overlay = if (p.layers.isEmpty()) null else timedOverlay(p.width, p.height, p.layers, video.outputDurationMs)
             val out = File(app.cacheDir, "export.mp4")
             try {
-                exportVideo(app, video.composition(overlay), out) { pct -> _uiState.update { it.copy(busy = "Saving video $pct%") } }
+                exportVideo(app, video.composition(overlay, shortSide), out) { pct -> _uiState.update { it.copy(busy = "Saving video $pct%") } }
                 val uri = withContext(Dispatchers.IO) { saveToGallery(app, "video/mp4") { o -> out.inputStream().use { it.copyTo(o) } } }
                 _effects.send(EditorEffect.Saved(uri, "video/mp4", share))
             } finally {

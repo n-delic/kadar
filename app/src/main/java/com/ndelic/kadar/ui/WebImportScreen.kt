@@ -36,12 +36,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ndelic.kadar.R
-import java.net.URLEncoder
+import com.ndelic.kadar.SearchEngine
 
 /** A plain browser: search or open any page, long-press an image to download it into the project (never the gallery). */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun WebImportScreen(onPick: (String) -> Unit, onClose: () -> Unit) {
+fun WebImportScreen(engine: SearchEngine, onPick: (String) -> Unit, onClose: () -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     var webView by remember { mutableStateOf<WebView?>(null) }
     var picked by remember { mutableStateOf<String?>(null) }
@@ -65,7 +65,7 @@ fun WebImportScreen(onPick: (String) -> Unit, onClose: () -> Unit) {
                     textStyle = TextStyle(color = Ink.text, fontSize = 15.sp),
                     cursorBrush = SolidColor(Ink.accent),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = { if (query.isNotBlank()) webView?.loadUrl(searchUrl(query)) }),
+                    keyboardActions = KeyboardActions(onSearch = { if (query.isNotBlank()) webView?.loadUrl(searchUrl(engine, query)) }),
                     modifier = Modifier.weight(1f),
                     decorationBox = { field ->
                         if (query.isEmpty()) Text("Search images or paste a link", color = Ink.dim, fontSize = 15.sp)
@@ -92,7 +92,7 @@ fun WebImportScreen(onPick: (String) -> Unit, onClose: () -> Unit) {
                         if (isImage && hit.extra != null) picked = hit.extra
                         isImage
                     }
-                    loadUrl("https://www.google.com/imghp")
+                    loadUrl(engine.home)
                     webView = this
                 }
             },
@@ -115,8 +115,8 @@ fun WebImportScreen(onPick: (String) -> Unit, onClose: () -> Unit) {
     }
 }
 
-private fun searchUrl(query: String): String {
+private fun searchUrl(engine: SearchEngine, query: String): String {
     val q = query.trim()
     if (q.startsWith("https://") || q.startsWith("http://")) return q
-    return "https://www.google.com/search?udm=2&q=" + URLEncoder.encode(q, "UTF-8")
+    return engine.search(q)
 }

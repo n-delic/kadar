@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import com.ndelic.kadar.Adjust
 import com.ndelic.kadar.EditorViewModel
+import com.ndelic.kadar.ExportSize
 import com.ndelic.kadar.TextAlign
 import com.ndelic.kadar.ImageLayer
 import com.ndelic.kadar.Layer
@@ -102,7 +103,7 @@ fun StickerPanel(stickers: List<Sticker>, vm: EditorViewModel) {
 }
 
 @Composable
-fun CanvasPanel(project: Project, vm: EditorViewModel) {
+fun CanvasPanel(project: Project, defaultExport: ExportSize, vm: EditorViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             items(ASPECTS) { (label, ratio) ->
@@ -112,17 +113,21 @@ fun CanvasPanel(project: Project, vm: EditorViewModel) {
         }
         PanelLabel("Background")
         ColorRow(project.background.takeIf { it != android.graphics.Color.TRANSPARENT }, allowNone = true) { vm.setBackground(it ?: android.graphics.Color.TRANSPARENT) }
+        ExportSizeRow(project, defaultExport, vm)
     }
 }
 
 /** Video canvas: reshape to a social-media ratio (9:16 for reels and stories) with black bars. */
 @Composable
-fun VideoCanvasPanel(clip: VideoClip, vm: EditorViewModel) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        items(ASPECTS) { (label, ratio) ->
-            val active = clip.canvas?.let { ratio != null && abs(it - ratio) < 0.01f } ?: (ratio == null)
-            AspectTile(label, ratio ?: (clip.width / clip.height.toFloat()), active) { vm.setVideoCanvas(ratio) }
+fun VideoCanvasPanel(project: Project, clip: VideoClip, defaultExport: ExportSize, vm: EditorViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            items(ASPECTS) { (label, ratio) ->
+                val active = clip.canvas?.let { ratio != null && abs(it - ratio) < 0.01f } ?: (ratio == null)
+                AspectTile(label, ratio ?: (clip.width / clip.height.toFloat()), active) { vm.setVideoCanvas(ratio) }
+            }
         }
+        ExportSizeRow(project, defaultExport, vm)
     }
 }
 
@@ -157,6 +162,15 @@ fun TextStylePanel(layer: TextLayer, vm: EditorViewModel) {
         TextTabs(TextAlign.entries, layer.align, label = { it.name }) { a -> vm.editText { copy(align = a) } }
         KToggle("Shadow", null, layer.shadow) { on -> vm.editText { copy(shadow = on) } }
         LabeledSlider("Spacing", layer.spacing * 2) { v -> vm.editText { copy(spacing = v / 2) } }
+    }
+}
+
+/** Per-project export size; "Default" follows Settings. */
+@Composable
+fun ExportSizeRow(project: Project, default: ExportSize, vm: EditorViewModel) {
+    Column {
+        PanelLabel("Export size")
+        TextTabs(listOf<ExportSize?>(null) + ExportSize.entries, project.exportSize, label = { it?.label ?: "Default (${default.label})" }) { vm.setProjectExportSize(it) }
     }
 }
 

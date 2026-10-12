@@ -79,7 +79,7 @@ fun canvasSize(w: Int, h: Int, ratio: Float?): Pair<Int, Int> {
  * The edit as a Media3 composition: used for both the live preview and the export. [overlay] draws the text/sticker
  * layers; it sits on the composition, not the clip, so it gets output timestamps (after trim and speed) like the layers.
  */
-fun VideoClip.composition(overlay: TextureOverlay?): Composition {
+fun VideoClip.composition(overlay: TextureOverlay?, shortSide: Int? = null): Composition {
     // CompositionPlayer needs each item's full (unclipped) duration up front.
     val video = EditedMediaItem.Builder(clipped(uri, startMs, endMs))
         .setDurationUs(durationMs * 1000)
@@ -98,7 +98,16 @@ fun VideoClip.composition(overlay: TextureOverlay?): Composition {
         sequences += EditedMediaItemSequence.Builder(track).setIsLooping(true).build()
     }
     return Composition.Builder(sequences)
-        .setEffects(Effects(emptyList(), listOfNotNull(overlay?.let { OverlayEffect(listOf(it)) })))
+        // Downscale after the overlay: the layers are rendered at full canvas size and must line up first.
+        .setEffects(
+            Effects(
+                emptyList(),
+                listOfNotNull(
+                    overlay?.let { OverlayEffect(listOf(it)) },
+                    shortSide?.takeIf { it < minOf(outputSize.first, outputSize.second) }?.let { Presentation.createForShortSide(it) },
+                ),
+            ),
+        )
         // HDR phone footage turns washed out on most apps once posted; memes go out as plain SDR.
         .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
         .build()

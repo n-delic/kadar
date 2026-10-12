@@ -61,7 +61,7 @@ import com.ndelic.kadar.SavedProject
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
+fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, onSettings: () -> Unit) {
     val photo = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::newPhoto) }
     val video = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::newVideo) }
     // Paths of the selected projects; non-empty means selection mode.
@@ -98,6 +98,8 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) 
                         }
                         Text("v${BuildConfig.VERSION_NAME}", color = Ink.dim, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, lineHeight = 10.sp)
                     }
+                    Spacer(Modifier.weight(1f))
+                    CircleButton(R.drawable.ic_settings, "Settings", onClick = onSettings)
                 }
                 Text("Photos and videos, edited on your phone. No account, no watermark.", color = Ink.dim, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
                 Spacer(Modifier.height(24.dp))

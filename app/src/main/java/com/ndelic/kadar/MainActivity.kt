@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import com.ndelic.kadar.ui.EditorScreen
 import com.ndelic.kadar.ui.Ink
 import com.ndelic.kadar.ui.Intro
+import com.ndelic.kadar.ui.SettingsScreen
 import com.ndelic.kadar.ui.KadarTheme
 import com.ndelic.kadar.ui.blockTouches
 import com.ndelic.kadar.ui.HomeScreen
@@ -95,6 +96,7 @@ private fun App(vm: EditorViewModel) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var browsing by rememberSaveable { mutableStateOf(false) }
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
     // Only on a cold start, not after rotation.
     var intro by rememberSaveable { mutableStateOf(true) }
 
@@ -122,14 +124,16 @@ private fun App(vm: EditorViewModel) {
         // Screens with a text field add imePadding() themselves.
         Box(Modifier.windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))) {
             when {
+                settingsOpen -> SettingsScreen(state.settings, onChange = { s -> vm.updateSettings { s } }, onClose = { settingsOpen = false })
                 browsing -> WebImportScreen(
+                    engine = state.settings.search,
                     onPick = { url ->
                         browsing = false
                         if (state.project == null) vm.newPhotoFromUrl(url) else vm.addImageFromUrl(url)
                     },
                     onClose = { browsing = false },
                 )
-                state.project == null -> HomeScreen(state, vm, onBrowse = { browsing = true })
+                state.project == null -> HomeScreen(state, vm, onBrowse = { browsing = true }, onSettings = { settingsOpen = true })
                 else -> EditorScreen(state, vm, onBrowse = { browsing = true })
             }
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)) { data ->

@@ -1,4 +1,4 @@
-package com.ndelic.kadar.ui
+package com.ndelic.kadar.ui.editor
 
 import android.graphics.Bitmap
 import androidx.compose.animation.core.animateFloatAsState
@@ -64,12 +64,15 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import com.ndelic.kadar.Layer
 import com.ndelic.kadar.R
-import com.ndelic.kadar.TextLayer
-import com.ndelic.kadar.VideoLayer
-import com.ndelic.kadar.ImageLayer
-import com.ndelic.kadar.VideoClip
+import com.ndelic.kadar.model.ImageLayer
+import com.ndelic.kadar.model.Layer
+import com.ndelic.kadar.model.TextLayer
+import com.ndelic.kadar.model.VideoLayer
+import com.ndelic.kadar.ui.common.Ink
+import com.ndelic.kadar.ui.common.KIcon
+import com.ndelic.kadar.ui.common.PanelLabel
+import com.ndelic.kadar.video.VideoClip
 import kotlin.math.abs
 import kotlin.math.roundToInt
 

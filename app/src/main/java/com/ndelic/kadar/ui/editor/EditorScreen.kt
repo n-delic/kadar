@@ -1,11 +1,11 @@
 @file:OptIn(UnstableApi::class, ExperimentalApi::class)
 
-package com.ndelic.kadar.ui
+package com.ndelic.kadar.ui.editor
 
 import android.graphics.Bitmap
 import android.graphics.Paint
-import android.graphics.Typeface
 import android.graphics.SurfaceTexture
+import android.graphics.Typeface
 import android.view.Surface
 import android.view.TextureView
 import androidx.activity.compose.BackHandler
@@ -27,16 +27,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.runtime.key
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -46,6 +41,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -59,6 +55,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -79,17 +77,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
@@ -104,21 +104,30 @@ import androidx.media3.effect.MultipleInputVideoGraph
 import androidx.media3.transformer.CompositionPlayer
 import com.ndelic.kadar.EditorUiState
 import com.ndelic.kadar.EditorViewModel
-import com.ndelic.kadar.ImageLayer
-import com.ndelic.kadar.Layer
-import com.ndelic.kadar.Project
 import com.ndelic.kadar.R
-import com.ndelic.kadar.TextLayer
-import com.ndelic.kadar.Transform
-import com.ndelic.kadar.VideoClip
-import com.ndelic.kadar.VideoLayer
-import com.ndelic.kadar.composition
-import com.ndelic.kadar.drawLayer
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import com.ndelic.kadar.Sticker
+import com.ndelic.kadar.model.Adjust
+import com.ndelic.kadar.model.Font
+import com.ndelic.kadar.model.ImageLayer
+import com.ndelic.kadar.model.Layer
+import com.ndelic.kadar.model.Project
+import com.ndelic.kadar.model.TextLayer
+import com.ndelic.kadar.model.Transform
+import com.ndelic.kadar.model.VideoLayer
+import com.ndelic.kadar.model.drawLayer
+import com.ndelic.kadar.ui.common.CircleButton
+import com.ndelic.kadar.ui.common.ColorRow
+import com.ndelic.kadar.ui.common.IconTool
+import com.ndelic.kadar.ui.common.Ink
+import com.ndelic.kadar.ui.common.KIcon
+import com.ndelic.kadar.ui.common.blockTouches
+import com.ndelic.kadar.ui.common.fullWidthPanel
+import com.ndelic.kadar.video.composition
 import kotlin.math.atan2
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Font, Color, Stroke, Box, Style, Adjust, Filters, Layers, Volume }
 

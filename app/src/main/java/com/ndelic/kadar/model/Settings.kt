@@ -1,6 +1,7 @@
-package com.ndelic.kadar
+package com.ndelic.kadar.model
 
 import android.content.Context
+import com.ndelic.kadar.ui.editor.label
 import java.net.URLEncoder
 
 enum class SearchEngine(val label: String, val home: String, private val query: String) {

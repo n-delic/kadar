@@ -1,13 +1,15 @@
-package com.ndelic.kadar
+package com.ndelic.kadar.model
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.net.Uri
-import org.json.JSONArray
-import org.json.JSONObject
+import com.ndelic.kadar.video.Music
+import com.ndelic.kadar.video.VideoClip
 import java.io.File
 import java.io.OutputStream
+import org.json.JSONArray
+import org.json.JSONObject
 
 data class Project(
     val width: Int,

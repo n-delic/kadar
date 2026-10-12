@@ -1,7 +1,5 @@
-package com.ndelic.kadar
+package com.ndelic.kadar.ui.editor
 
-import com.ndelic.kadar.ui.makeRoom
-import com.ndelic.kadar.ui.reorderTarget
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

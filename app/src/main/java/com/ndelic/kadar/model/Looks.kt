@@ -1,4 +1,6 @@
-package com.ndelic.kadar
+package com.ndelic.kadar.model
+
+import com.ndelic.kadar.ui.editor.label
 
 /** Rec. 709 luma weights: how much red, green and blue each add to perceived brightness. */
 val LUMA = floatArrayOf(0.2126f, 0.7152f, 0.0722f)

@@ -1,4 +1,4 @@
-package com.ndelic.kadar.ui
+package com.ndelic.kadar.ui.home
 
 import android.provider.Settings
 import androidx.compose.animation.core.Animatable
@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ndelic.kadar.ui.common.Ink
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 

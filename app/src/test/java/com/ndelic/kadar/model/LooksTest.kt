@@ -1,4 +1,4 @@
-package com.ndelic.kadar
+package com.ndelic.kadar.model
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals

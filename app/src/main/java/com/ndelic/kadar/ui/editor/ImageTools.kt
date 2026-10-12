@@ -1,4 +1,4 @@
-package com.ndelic.kadar.ui
+package com.ndelic.kadar.ui.editor
 
 import android.graphics.Bitmap
 import android.graphics.BitmapShader
@@ -48,8 +48,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.ndelic.kadar.ImageLayer
 import com.ndelic.kadar.R
+import com.ndelic.kadar.model.ImageLayer
+import com.ndelic.kadar.ui.common.CircleButton
+import com.ndelic.kadar.ui.common.Ink
+import com.ndelic.kadar.ui.common.KSlider
+import com.ndelic.kadar.ui.common.TextTabs
+import com.ndelic.kadar.ui.common.blockTouches
+import com.ndelic.kadar.ui.common.fullWidthPanel
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min

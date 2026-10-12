@@ -1,8 +1,7 @@
-package com.ndelic.kadar
+package com.ndelic.kadar.ui.editor
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import com.ndelic.kadar.ui.cropFrom
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

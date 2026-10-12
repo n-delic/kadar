@@ -1,11 +1,11 @@
-package com.ndelic.kadar
+package com.ndelic.kadar.media
 
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Paint
 import android.graphics.ImageDecoder
+import android.graphics.Paint
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Environment
@@ -20,9 +20,8 @@ import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withTimeoutOrNull
+import com.ndelic.kadar.model.opaqueBounds
+import com.ndelic.kadar.video.Music
 import java.io.IOException
 import java.io.OutputStream
 import java.net.HttpURLConnection
@@ -33,6 +32,9 @@ import kotlin.coroutines.resumeWithException
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 
 fun loadBitmap(context: Context, uri: Uri, maxSide: Int): Bitmap = decode(ImageDecoder.createSource(context.contentResolver, uri), maxSide)
 

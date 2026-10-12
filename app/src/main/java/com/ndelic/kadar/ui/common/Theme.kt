@@ -1,4 +1,4 @@
-package com.ndelic.kadar.ui
+package com.ndelic.kadar.ui.common
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
@@ -26,6 +26,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,16 +40,16 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
-import androidx.compose.material3.Typography
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
-import com.ndelic.kadar.R
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ndelic.kadar.R
+import com.ndelic.kadar.ui.editor.label
 
 /** Kadar's palette: near-black so photos and video carry the color, one lime accent, teal for secondary marks. */
 object Ink {

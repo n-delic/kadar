@@ -1,12 +1,13 @@
 @file:OptIn(UnstableApi::class, ExperimentalApi::class)
 
-package com.ndelic.kadar
+package com.ndelic.kadar.video
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.C
+import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.OverlaySettings
@@ -18,12 +19,11 @@ import androidx.media3.common.audio.SpeedProvider
 import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.Size
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.common.Effect
 import androidx.media3.effect.BitmapOverlay
-import androidx.media3.effect.Presentation
-import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.effect.OverlayEffect
+import androidx.media3.effect.Presentation
 import androidx.media3.effect.RgbMatrix
+import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.effect.TextureOverlay
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
@@ -33,12 +33,21 @@ import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
+import com.ndelic.kadar.media.await
+import com.ndelic.kadar.model.Adjust
+import com.ndelic.kadar.model.Layer
+import com.ndelic.kadar.model.Transform
+import com.ndelic.kadar.model.VideoLayer
+import com.ndelic.kadar.model.filterMatrix
+import com.ndelic.kadar.model.glRgbMatrix
+import com.ndelic.kadar.model.renderLayers
+import com.ndelic.kadar.model.segmentBounds
+import java.io.File
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.io.File
-import kotlin.math.roundToInt
 
 data class Music(val uri: Uri, val name: String, val durationMs: Long, val startMs: Long = 0, val volume: Float = 1f)
 

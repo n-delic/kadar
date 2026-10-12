@@ -1,4 +1,4 @@
-package com.ndelic.kadar
+package com.ndelic.kadar.model
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -10,9 +10,11 @@ import android.net.Uri
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import com.ndelic.kadar.video.VideoClip
+import com.ndelic.kadar.video.composition
 import kotlin.math.abs
-import kotlin.math.roundToInt
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** Where a layer's center sits on the canvas, in canvas pixels. Rotation is in degrees, clockwise. */

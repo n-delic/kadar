@@ -1,4 +1,4 @@
-package com.ndelic.kadar.ui
+package com.ndelic.kadar.ui.home
 
 import android.content.Intent
 import android.net.Uri
@@ -36,11 +36,16 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ndelic.kadar.AppSettings
 import com.ndelic.kadar.BuildConfig
-import com.ndelic.kadar.ExportSize
 import com.ndelic.kadar.R
-import com.ndelic.kadar.SearchEngine
+import com.ndelic.kadar.model.AppSettings
+import com.ndelic.kadar.model.ExportSize
+import com.ndelic.kadar.model.SearchEngine
+import com.ndelic.kadar.ui.common.CircleButton
+import com.ndelic.kadar.ui.common.Ink
+import com.ndelic.kadar.ui.common.KIcon
+import com.ndelic.kadar.ui.common.PanelLabel
+import com.ndelic.kadar.ui.editor.label
 
 private const val REPO = "https://github.com/n-delic/kadar"
 

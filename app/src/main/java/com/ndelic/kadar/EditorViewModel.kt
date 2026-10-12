@@ -13,6 +13,40 @@ import androidx.annotation.OptIn
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
+import com.ndelic.kadar.media.cutOutSubject
+import com.ndelic.kadar.media.displayName
+import com.ndelic.kadar.media.downloadImage
+import com.ndelic.kadar.media.loadBitmap
+import com.ndelic.kadar.media.mediaInfo
+import com.ndelic.kadar.media.renderEmoji
+import com.ndelic.kadar.media.saveToGallery
+import com.ndelic.kadar.media.scaleDown
+import com.ndelic.kadar.media.trimTransparent
+import com.ndelic.kadar.media.videoFrame
+import com.ndelic.kadar.model.AppSettings
+import com.ndelic.kadar.model.ExportSize
+import com.ndelic.kadar.model.Font
+import com.ndelic.kadar.model.ImageLayer
+import com.ndelic.kadar.model.Layer
+import com.ndelic.kadar.model.Project
+import com.ndelic.kadar.model.ProjectStore
+import com.ndelic.kadar.model.SavedProject
+import com.ndelic.kadar.model.SettingsStore
+import com.ndelic.kadar.model.TextLayer
+import com.ndelic.kadar.model.Transform
+import com.ndelic.kadar.model.VideoLayer
+import com.ndelic.kadar.model.renderLayers
+import com.ndelic.kadar.ui.editor.Timeline
+import com.ndelic.kadar.ui.editor.label
+import com.ndelic.kadar.video.Music
+import com.ndelic.kadar.video.VideoClip
+import com.ndelic.kadar.video.composition
+import com.ndelic.kadar.video.exportVideo
+import com.ndelic.kadar.video.timedOverlay
+import java.io.File
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -29,10 +63,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.File
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.roundToInt
 
 data class Sticker(val file: File, val thumb: Bitmap)
 

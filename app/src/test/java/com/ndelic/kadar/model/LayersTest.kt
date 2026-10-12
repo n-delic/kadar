@@ -1,5 +1,6 @@
-package com.ndelic.kadar
+package com.ndelic.kadar.model
 
+import com.ndelic.kadar.video.canvasSize
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

@@ -1,21 +1,19 @@
-package com.ndelic.kadar.ui
+package com.ndelic.kadar.ui.home
 
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.border
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -39,9 +37,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,7 +57,13 @@ import com.ndelic.kadar.BuildConfig
 import com.ndelic.kadar.EditorUiState
 import com.ndelic.kadar.EditorViewModel
 import com.ndelic.kadar.R
-import com.ndelic.kadar.SavedProject
+import com.ndelic.kadar.model.Project
+import com.ndelic.kadar.model.SavedProject
+import com.ndelic.kadar.ui.common.CircleButton
+import com.ndelic.kadar.ui.common.Ink
+import com.ndelic.kadar.ui.common.KDialog
+import com.ndelic.kadar.ui.common.KIcon
+import com.ndelic.kadar.ui.editor.label
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

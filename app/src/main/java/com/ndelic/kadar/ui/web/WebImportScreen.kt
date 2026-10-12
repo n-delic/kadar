@@ -1,4 +1,4 @@
-package com.ndelic.kadar.ui
+package com.ndelic.kadar.ui.web
 
 import android.annotation.SuppressLint
 import android.webkit.WebView
@@ -36,7 +36,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ndelic.kadar.R
-import com.ndelic.kadar.SearchEngine
+import com.ndelic.kadar.model.SearchEngine
+import com.ndelic.kadar.ui.common.CircleButton
+import com.ndelic.kadar.ui.common.Ink
+import com.ndelic.kadar.ui.common.KDialog
+import com.ndelic.kadar.ui.common.KIcon
 
 /** A plain browser: search or open any page, long-press an image to download it into the project (never the gallery). */
 @SuppressLint("SetJavaScriptEnabled")

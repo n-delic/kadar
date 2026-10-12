@@ -1,4 +1,4 @@
-package com.ndelic.kadar.ui
+package com.ndelic.kadar.ui.editor
 
 import android.graphics.Bitmap
 import android.graphics.ColorMatrixColorFilter
@@ -29,10 +29,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ndelic.kadar.Adjust
-import com.ndelic.kadar.Look
-import com.ndelic.kadar.filterMatrix
-import com.ndelic.kadar.scaleDown
+import com.ndelic.kadar.media.scaleDown
+import com.ndelic.kadar.model.Adjust
+import com.ndelic.kadar.model.Look
+import com.ndelic.kadar.model.filterMatrix
+import com.ndelic.kadar.ui.common.Ink
+import com.ndelic.kadar.ui.common.KSlider
 
 /** One tile per [Look], previewed on [source] (the image layer or a video frame) with the current sliders, plus its strength. */
 @Composable

@@ -125,7 +125,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             dir.deleteRecursively()
             error("Can't read this video")
         }
-        open(dir, Project(info.width, info.height, background = Color.BLACK, video = VideoClip(uri, info.durationMs)), frame)
+        open(dir, Project(info.width, info.height, background = Color.BLACK, video = VideoClip(uri, info.durationMs, width = info.width, height = info.height)), frame)
     }
 
     /** "Share to Kadar" from the gallery or another app: saves whatever is open, then starts a project from it. */
@@ -229,7 +229,11 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val p = _uiState.value.project ?: return
         // Black text gets a white outline so it stays readable; everything else gets the classic black one.
         val outline = if (color == Color.BLACK) Color.WHITE else Color.BLACK
-        addLayer { TextLayer(it, Transform(p.width / 2f, p.height / 2f), text, fonts.first(), min(p.width, p.height) * 0.1f, color, outline) }
+        addLayer { id ->
+            val layer = TextLayer(id, Transform(p.width / 2f, p.height / 2f), text, fonts.first(), min(p.width, p.height) * 0.1f, color, outline)
+            // Long captions start shrunk to fit the canvas width instead of running off both edges.
+            layer.copy(t = layer.t.copy(scale = min(1f, p.width * 0.9f / layer.width)))
+        }
     }
 
     fun addEmoji(emoji: String) {
@@ -268,6 +272,19 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     fun setSelectedTransform(t: Transform, first: Boolean) = updateSelected(record = first) { it.withTransform(t.copy(scale = t.scale.coerceIn(0.02f, 50f))) }
 
     fun editText(change: TextLayer.() -> TextLayer) = updateSelected { if (it is TextLayer) it.change() else it }
+
+    fun editImage(change: ImageLayer.() -> ImageLayer) = updateSelected { if (it is ImageLayer) it.change() else it }
+
+    fun setFlags(id: Long, hidden: Boolean, locked: Boolean) = updateLayer(id) { it.withFlags(hidden, locked) }
+
+    /** Video canvas: [ratio] null keeps the video's shape. Layers keep their place relative to the center. */
+    fun setVideoCanvas(ratio: Float?) = updateProject { p ->
+        val clip = p.video?.copy(canvas = ratio) ?: return@updateProject p
+        val (w, h) = clip.outputSize
+        val dx = (w - p.width) / 2f
+        val dy = (h - p.height) / 2f
+        p.copy(width = w, height = h, originalHeight = h, video = clip, layers = p.layers.map { it.withTransform(it.t.copy(x = it.t.x + dx, y = it.t.y + dy)) })
+    }
 
     fun bringToFront() {
         val layer = _uiState.value.selected ?: return

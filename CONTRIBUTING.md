@@ -32,9 +32,21 @@ adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:
 
 The first **Remove BG** on a device downloads ML Kit's model (a few MB) through Play services; after that it works offline.
 
-## Installing on family phones
+## Releases
 
-Android only updates an app signed with the same key, so pick one key and keep it. Describe it in `keystore.properties` (git-ignored):
+Debug builds install as a separate app, **Kadar Dev** (`com.ndelic.kadar.debug`), so testing never touches real projects. CI (`.github/workflows/ci.yml`) runs the unit tests, lint and a debug build on every push to `main` and every pull request.
+
+To publish a release:
+
+1. Bump `versionCode` and `versionName` in `app/build.gradle.kts` and add the release to `ROADMAP.md`.
+2. Commit, then tag with the same version: `git tag v0.5.0 && git push && git push --tags`.
+3. `.github/workflows/release.yml` checks the tag matches `versionName`, builds a signed, R8-shrunk APK and publishes it with a SHA-256 file as a GitHub release.
+
+The workflow signs with the repository secrets `KADAR_KEYSTORE_BASE64` (the `.jks`, base64) and `KADAR_KEYSTORE_PASSWORD`. If they're missing it fails rather than publish an unsigned APK.
+
+### The signing key
+
+Android only updates an app signed with the same key, so the key never changes. Losing it means every user has to uninstall (and lose their projects) to get updates. Locally it's described by `keystore.properties` (git-ignored):
 
 ```
 storeFile=/home/<you>/.android/kadar-release.jks
@@ -50,7 +62,20 @@ keytool -genkeypair -keystore ~/.android/kadar-release.jks -storetype PKCS12 \
   -alias kadar -keyalg RSA -keysize 4096 -validity 36500
 ```
 
-Back up the `.jks` file and its password. Then `./gradlew assembleRelease` writes `app/build/outputs/apk/release/app-release.apk`; send it to the phone and open it (allow "install unknown apps" for the file manager or messenger). Without `keystore.properties` the release APK is unsigned and won't install. Bump `versionCode` and `versionName` in `app/build.gradle.kts` for every release.
+Only create a new key when starting a new app. Back up the `.jks` file and its password somewhere safe outside the repo. With `keystore.properties` in place, `./gradlew assembleRelease` writes a signed `app/build/outputs/apk/release/app-release.apk` you can install directly. To (re)load the CI secrets:
+
+```bash
+base64 -w0 ~/.android/kadar-release.jks | gh secret set KADAR_KEYSTORE_BASE64
+gh secret set KADAR_KEYSTORE_PASSWORD   # paste the password
+```
+
+Release builds run R8. Libraries that create classes by reflection need keep rules in `app/proguard-rules.pro` (ML Kit does); always try background removal and a video export on a release build before tagging.
+
+## Clean room and assets
+
+Kadar is an independent implementation. Don't copy, decompile or study another editing app's code, and don't use its icons, images, fonts, stickers or presets. Every asset you add needs an open license, its license file in `third_party/`, and a row in `ATTRIBUTION.md`. Use CC0 or public-domain media in screenshots and tests.
+
+By contributing you agree your contribution is licensed under the GPL-3.0-or-later, with the additional permission in `NOTICE`.
 
 ## Making a change
 

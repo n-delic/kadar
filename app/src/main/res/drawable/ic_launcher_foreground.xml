@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Viewfinder corners around a play mark ("kadar" is a frame or shot); inside the 66dp safe zone. -->
+<!-- Lime viewfinder corners around a teal play mark ("kadar" is a frame or shot); inside the 66dp safe zone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -7,12 +7,12 @@
     android:viewportHeight="108">
     <path
         android:pathData="M33,45V39a6,6 0,0 1,6 -6h6 M63,33h6a6,6 0,0 1,6 6v6 M75,63v6a6,6 0,0 1,-6 6h-6 M45,75h-6a6,6 0,0 1,-6 -6v-6"
-        android:strokeWidth="4.5"
-        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5"
+        android:strokeColor="#FFC6F432"
         android:strokeLineCap="round" />
     <path
-        android:fillColor="#FFFFFFFF"
-        android:strokeColor="#FFFFFFFF"
+        android:fillColor="#FF2DE1C2"
+        android:strokeColor="#FF2DE1C2"
         android:strokeWidth="3"
         android:strokeLineJoin="round"
         android:pathData="M48,44.5L64,54L48,63.5Z" />

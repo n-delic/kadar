@@ -50,18 +50,21 @@ import com.ndelic.kadar.R
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** Kadar's palette: a near-black editor like PicsArt and InShot, one accent. */
+/** Kadar's palette: near-black so photos and video carry the color, one lime accent, teal for secondary marks. */
 object Ink {
-    val bg = Color(0xFF111113)
-    val panel = Color(0xFF1C1C1F)
-    val raised = Color(0xFF2A2A2E)
-    val line = Color(0xFF3A3A40)
+    val bg = Color(0xFF0E0F11)
+    val panel = Color(0xFF18191C)
+    val raised = Color(0xFF25272B)
+    val line = Color(0xFF383A40)
     val text = Color(0xFFFFFFFF)
-    val dim = Color(0xFF9A9AA2)
-    val accent = Color(0xFFB04CFF)
+    val dim = Color(0xFF9B9EA6)
+    val accent = Color(0xFFC6F432)
+    /** Text and icons drawn on top of [accent]. */
+    val onAccent = Color(0xFF0E0F11)
+    val teal = Color(0xFF2DE1C2)
 }
 
-/** Swatches for text, outline and background, roughly PicsArt's order. */
+/** Swatches for text, outline and background: neutrals first, then warm to cool. */
 val SWATCHES = listOf(
     0xFFFFFFFF, 0xFF000000, 0xFF9E9E9E, 0xFF424242, 0xFFFFCDD2, 0xFFFF8A80, 0xFFFF5252, 0xFFFF1744,
     0xFFD50000, 0xFFFF9100, 0xFFFFEA00, 0xFF00E676, 0xFF1DE9B6, 0xFF00B0FF, 0xFF2979FF, 0xFF3D5AFE,
@@ -89,7 +92,7 @@ fun KadarTheme(content: @Composable () -> Unit) {
         typography = KadarType,
         colorScheme = darkColorScheme(
             primary = Ink.accent,
-            onPrimary = Ink.text,
+            onPrimary = Ink.onAccent,
             background = Ink.bg,
             onBackground = Ink.text,
             surface = Ink.bg,
@@ -141,7 +144,7 @@ fun CircleButton(@DrawableRes icon: Int, description: String, enabled: Boolean =
     }
 }
 
-/** Text-only tabs with a dot under the selected one, as in InShot's text style tabs. */
+/** Text-only tabs with a dot under the selected one. */
 @Composable
 fun <T> TextTabs(options: List<T>, selected: T?, label: (T) -> String, onSelect: (T) -> Unit) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {

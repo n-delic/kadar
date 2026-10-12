@@ -1,0 +1,37 @@
+Kadar
+Copyright (C) 2026 NDelic and the Kadar contributors.
+
+Kadar is free software: you can redistribute it and/or modify it under the terms of the GNU General
+Public License as published by the Free Software Foundation, either version 3 of the License, or (at
+your option) any later version (LICENSE).
+
+Additional permission under GNU GPL version 3 section 7
+
+If you modify this Program, or any covered work, by linking or combining it with Google Play services
+or Google ML Kit (or a modified version of those libraries), containing parts covered by the terms of
+their own licenses, the licensors of this Program grant you additional permission to convey the
+resulting work. Corresponding Source for a non-source form of such a combination shall not include
+the source code for the parts of those libraries.
+
+Clean-room statement
+
+Kadar is an independent implementation written from scratch. It contains no code, decompiled code,
+icons, images, fonts, stickers, presets or other assets from any other photo or video editing app.
+Features were built from public descriptions of what common editing tools do, not from another app's
+internals.
+
+Third-party material
+
+This product bundles or links third-party material under its own licenses. The per-file list
+(author, source, license) is in ATTRIBUTION.md.
+
+Anton font (app/src/main/res/font/anton.ttf) - SIL Open Font License 1.1. See third_party/Anton-OFL.txt.
+Plus Jakarta Sans font (app/src/main/res/font/jakarta.ttf) - SIL Open Font License 1.1.
+  See third_party/PlusJakartaSans-OFL.txt.
+Material Symbols icons (app/src/main/res/drawable/ic_*.xml, except ic_launcher_*) - Apache License 2.0.
+  See third_party/MaterialSymbols-LICENSE.txt.
+AndroidX, Jetpack Compose and Media3 libraries - Apache License 2.0.
+Google ML Kit Subject Segmentation and Google Play services - Google APIs Terms of Service and the
+  ML Kit Terms (https://developers.google.com/ml-kit/terms). Not open source.
+Public-domain (CC0) photo and generated test footage shown in README screenshots (docs/screenshots/).
+  See ATTRIBUTION.md.

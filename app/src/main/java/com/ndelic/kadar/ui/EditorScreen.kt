@@ -123,7 +123,7 @@ import kotlin.math.atan2
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-enum class Panel { Sticker, Canvas, Speed, Audio, Font, Color, Stroke, Box, Layers }
+enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Font, Color, Stroke, Box, Style, Adjust, Layers }
 
 @Composable
 fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
@@ -159,6 +159,9 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         LaunchedEffect(video) {
             player.setComposition(video.composition(null))
             player.prepare()
+            // A paused player keeps showing the old frame after a new composition; seek once it's loaded to repaint.
+            delay(300)
+            if (!player.isPlaying) player.seekTo(player.currentPosition)
         }
         LaunchedEffect(playing) { player.playWhenReady = playing }
         LaunchedEffect(player) {
@@ -215,6 +218,13 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     Panel.Stroke -> (selected as? TextLayer)?.let { t -> ColorRow(t.outline, allowNone = true) { vm.editText { copy(outline = it) } } }
                     Panel.Box -> (selected as? TextLayer)?.let { t -> ColorRow(t.box, allowNone = true) { vm.editText { copy(box = it) } } }
                     Panel.Layers -> LayersPanel(project.layers, state.selectedId, vm)
+                    Panel.VideoCanvas -> video?.let { VideoCanvasPanel(it, vm) }
+                    Panel.Style -> (selected as? TextLayer)?.let { TextStylePanel(it, vm) }
+                    Panel.Adjust -> when (val l = selected) {
+                        is ImageLayer -> AdjustPanel(l.adjust) { a -> vm.editImage { copy(adjust = a) } }
+                        null -> video?.let { v -> AdjustPanel(v.adjust) { a -> vm.updateClip { copy(adjust = a) } } }
+                        else -> {}
+                    }
                 }
             }
         }
@@ -242,6 +252,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         if (video != null) {
                             IconTool(R.drawable.ic_content_cut, "Trim", trimming) { trimming = !trimming }
                             IconTool(R.drawable.ic_speed, "Speed", panel == Panel.Speed) { toggle(Panel.Speed) }
+                            IconTool(R.drawable.ic_aspect_ratio, "Canvas", panel == Panel.VideoCanvas) { toggle(Panel.VideoCanvas) }
+                            IconTool(R.drawable.ic_tune, "Adjust", panel == Panel.Adjust) { toggle(Panel.Adjust) }
                             IconTool(R.drawable.ic_music_note, "Audio", panel == Panel.Audio) { toggle(Panel.Audio) }
                         } else {
                             IconTool(R.drawable.ic_aspect_ratio, "Canvas", panel == Panel.Canvas) { toggle(Panel.Canvas) }
@@ -255,6 +267,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_palette, "Color", panel == Panel.Color) { toggle(Panel.Color) }
                         IconTool(R.drawable.ic_border_color, "Stroke", panel == Panel.Stroke) { toggle(Panel.Stroke) }
                         IconTool(R.drawable.ic_rectangle, "Box", panel == Panel.Box) { toggle(Panel.Box) }
+                        IconTool(R.drawable.ic_text_fields, "Style", panel == Panel.Style) { toggle(Panel.Style) }
                         IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, "Back", onClick = vm::sendToBack)
                         IconTool(R.drawable.ic_delete, "Delete", onClick = vm::deleteSelected)
@@ -267,6 +280,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                             (state.selected as? ImageLayer)?.let { l -> scope.launch { erasing = l to vm.loadSource(l) } }
                         }
                         IconTool(R.drawable.ic_crop, "Crop") { cropping = state.selected as? ImageLayer }
+                        IconTool(R.drawable.ic_tune, "Adjust", panel == Panel.Adjust) { toggle(Panel.Adjust) }
                         IconTool(R.drawable.ic_library_add, "Save sticker", onClick = vm::saveSticker)
                         IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, "Back", onClick = vm::sendToBack)
@@ -381,7 +395,7 @@ private class Snaps(private val haptics: HapticFeedback) {
     }
 }
 
-private val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFF3D7F.toInt() }
+private val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF2DE1C2.toInt() }
 
 /**
  * The canvas: video preview underneath, layers drawn on top at screen scale.
@@ -391,7 +405,7 @@ private val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFF3D7F
 @Composable
 private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?, timeMs: Long?, vm: EditorViewModel, onEditText: (TextLayer) -> Unit, modifier: Modifier) {
     // In a video only the layers on screen at the playhead show (and can be grabbed); the selected one always does, to edit it.
-    val shown = if (timeMs == null) project.layers else project.layers.filter { it.visibleAt(timeMs) || it.id == selected?.id }
+    val shown = project.layers.filter { !it.hidden && (timeMs == null || it.visibleAt(timeMs) || it.id == selected?.id) }
     BoxWithConstraints(modifier.padding(horizontal = 8.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
         val scale = min(constraints.maxWidth / project.width.toFloat(), constraints.maxHeight / project.height.toFloat())
         val density = LocalDensity.current
@@ -424,7 +438,7 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                     Modifier.fillMaxSize().pointerInput(scale) {
                         awaitEachGesture {
                             val down = awaitFirstDown()
-                            val sel = current
+                            val sel = current?.takeUnless { it.locked }
                             val handle = sel?.let { handleAt(it, down.position, scale, handleRadius) }
                             if (sel != null && handle != null) {
                                 down.consume()
@@ -452,7 +466,7 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                                 return@awaitEachGesture
                             }
                             val p = down.position / scale
-                            val hit = layers.lastOrNull { it.t.contains(it.width, it.height, p.x, p.y) }
+                            val hit = layers.lastOrNull { !it.locked && it.t.contains(it.width, it.height, p.x, p.y) }
                             if (hit != null) vm.select(hit.id)
                             // Track the unsnapped placement, so a layer can be pulled back out of a snap.
                             var raw = (hit ?: sel)?.t
@@ -497,9 +511,9 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                     }
                 }
             }
-            selected?.let { l ->
+            selected?.takeUnless { it.locked || it.hidden }?.let { l ->
                 HandleDot(R.drawable.ic_close, cornerOf(l, -1f, scale), Color(0xFFFF3B5C))
-                HandleDot(R.drawable.ic_open_in_full, cornerOf(l, 1f, scale), Ink.text)
+                HandleDot(R.drawable.ic_open_in_full, cornerOf(l, 1f, scale), Ink.accent)
             }
         }
     }
@@ -530,7 +544,7 @@ private fun HandleDot(icon: Int, at: Offset, background: Color) {
             .border(1.5.dp, Color.Black.copy(alpha = 0.35f), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        KIcon(icon, Modifier.size(16.dp), if (background == Ink.text) Color.Black else Color.White)
+        KIcon(icon, Modifier.size(16.dp), if (background == Ink.accent) Ink.onAccent else Color.White)
     }
 }
 
@@ -558,7 +572,7 @@ private val selectionShadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
 }
 private val selectionLine = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     style = Paint.Style.STROKE
-    color = 0xFFFFFFFF.toInt()
+    color = 0xFFC6F432.toInt()
 }
 
 private fun android.graphics.Canvas.drawSelection(layer: Layer, viewScale: Float) {
@@ -717,7 +731,7 @@ private fun Track(
     val density = LocalDensity.current
     val xs = pad + layer.startMs.coerceIn(0, total).toFloat() / total * width
     val xe = pad + layer.endMs.coerceIn(0, total).toFloat() / total * width
-    val color = if (layer is TextLayer) Color(0xFF7B3FE4) else Color(0xFF138A74)
+    val color = if (layer is TextLayer) Ink.accent else Ink.teal
     Box(
         Modifier.fillMaxWidth().height(34.dp).padding(vertical = 3.dp).pointerInput(total, width) {
             awaitEachGesture {
@@ -774,9 +788,9 @@ private fun Track(
             contentAlignment = Alignment.CenterStart,
         ) {
             Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                KIcon(if (layer is TextLayer) R.drawable.ic_title else R.drawable.ic_image, Modifier.size(14.dp))
+                KIcon(if (layer is TextLayer) R.drawable.ic_title else R.drawable.ic_image, Modifier.size(14.dp), Ink.onAccent)
                 Spacer(Modifier.width(6.dp))
-                Text(if (layer is TextLayer) layer.text.lines().first() else "Image", color = Color.White, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(if (layer is TextLayer) layer.text.lines().first() else "Image", color = Ink.onAccent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -809,7 +823,7 @@ private fun ClipRow(clip: VideoClip, frames: List<Bitmap>, total: Long, onSeek: 
 private val TIMELINE_PAD = 28.dp
 private const val MIN_CLIP_MS = 300L
 
-/** PicsArt-style full-screen typing: the text appears big, in its own font and color. */
+/** Full-screen typing: the text appears big, in its own font and color. */
 @Composable
 private fun TextEntry(initial: String, font: Typeface, color: Int, onDone: (String, Int) -> Unit, onCancel: () -> Unit) {
     var value by remember { mutableStateOf(TextFieldValue(initial, TextRange(initial.length))) }

@@ -19,8 +19,8 @@ android {
         // Android 10+: MediaStore RELATIVE_PATH and IS_PENDING need it.
         minSdk = 29
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.5.0"
     }
 
     signingConfigs {
@@ -34,10 +34,16 @@ android {
         }
     }
     buildTypes {
+        // A separate "Kadar Dev" app, so testing a build never touches the real one and its projects.
+        debug {
+            applicationIdSuffix = ".debug"
+            manifestPlaceholders["appName"] = "Kadar Dev"
+        }
         release {
+            manifestPlaceholders["appName"] = "Kadar"
             isMinifyEnabled = true
             isShrinkResources = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release")
         }
     }

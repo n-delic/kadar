@@ -53,4 +53,26 @@ class LayersTest {
         assertEquals(-360f, Transform(0f, 0f, rotation = -358f).snapped(1000f, 1000f, 5f).rotation, 0.001f)
         assertEquals(45f, Transform(0f, 0f, rotation = 45f).snapped(1000f, 1000f, 5f).rotation, 0.001f)
     }
+
+    @Test
+    fun adjustMatrixIsIdentityAtZeroAndGrayAtNoSaturation() {
+        val identity = Adjust().colorMatrix()
+        for (i in 0..19) assertEquals(if (i in setOf(0, 6, 12, 18)) 1f else 0f, identity[i], 0.0001f)
+        val gray = Adjust(saturation = -1f).colorMatrix()
+        // Every color row is the same luma mix.
+        for (col in 0..2) {
+            assertEquals(gray[col], gray[5 + col], 0.0001f)
+            assertEquals(gray[col], gray[10 + col], 0.0001f)
+        }
+        assertEquals(64f, Adjust(brightness = 0.5f).colorMatrix()[4], 0.0001f)
+    }
+
+    @Test
+    fun canvasSizeKeepsTheLongSideEven() {
+        assertEquals(1080 to 1920, canvasSize(1920, 1080, 9f / 16))
+        assertEquals(1920 to 1080, canvasSize(1920, 1080, null))
+        assertEquals(1920 to 1920, canvasSize(1080, 1920, 1f))
+        // 4K is capped so the phone's encoder can keep up.
+        assertEquals(1080 to 1920, canvasSize(3840, 2160, 9f / 16))
+    }
 }

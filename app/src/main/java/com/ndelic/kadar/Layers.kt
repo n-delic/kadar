@@ -2,6 +2,7 @@ package com.ndelic.kadar
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
@@ -60,8 +61,13 @@ sealed interface Layer {
     val startMs: Long
     val endMs: Long
 
+    /** Hidden layers aren't drawn or exported; locked ones can't be grabbed on the canvas (only picked from the Layers list). */
+    val hidden: Boolean
+    val locked: Boolean
+
     fun visibleAt(ms: Long) = ms >= startMs && ms < endMs
     fun withTime(startMs: Long, endMs: Long): Layer
+    fun withFlags(hidden: Boolean, locked: Boolean): Layer
 
     /** Draws the content centered on the origin; [drawLayer] applies [t] around it. */
     fun drawContent(canvas: Canvas)
@@ -81,15 +87,42 @@ data class ImageLayer(
     val source: String? = null,
     val sourceX: Int = 0,
     val sourceY: Int = 0,
+    val adjust: Adjust = Adjust(),
     override val startMs: Long = 0,
     override val endMs: Long = Long.MAX_VALUE,
+    override val hidden: Boolean = false,
+    override val locked: Boolean = false,
 ) : Layer {
+    private val paint = if (adjust.isNone) bitmapPaint else Paint(bitmapPaint).apply { colorFilter = ColorMatrixColorFilter(adjust.colorMatrix()) }
     override val width get() = bitmap.width.toFloat()
     override val height get() = bitmap.height.toFloat()
-    override fun drawContent(canvas: Canvas) = canvas.drawBitmap(bitmap, -width / 2, -height / 2, bitmapPaint)
+    override fun drawContent(canvas: Canvas) = canvas.drawBitmap(bitmap, -width / 2, -height / 2, paint)
     override fun withTransform(t: Transform) = copy(t = t)
     override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = endMs)
+    override fun withFlags(hidden: Boolean, locked: Boolean) = copy(hidden = hidden, locked = locked)
 }
+
+/** Brightness, contrast and saturation, each -1..1 with 0 meaning unchanged. Used by image layers and the video. */
+data class Adjust(val brightness: Float = 0f, val contrast: Float = 0f, val saturation: Float = 0f) {
+    val isNone get() = brightness == 0f && contrast == 0f && saturation == 0f
+
+    /** 4x5 color matrix for [android.graphics.ColorMatrix]: saturate, then contrast around mid-gray, then brighten. */
+    fun colorMatrix(): FloatArray {
+        val s = 1 + saturation
+        val k = 1 + contrast
+        val offset = 128 * (1 - k) + 128 * brightness
+        val luma = floatArrayOf(0.2126f, 0.7152f, 0.0722f)
+        val m = FloatArray(20)
+        for (row in 0..2) {
+            for (col in 0..2) m[row * 5 + col] = k * (luma[col] * (1 - s) + if (row == col) s else 0f)
+            m[row * 5 + 4] = offset
+        }
+        m[18] = 1f
+        return m
+    }
+}
+
+enum class TextAlign { Left, Center, Right }
 
 data class TextLayer(
     override val id: Long,
@@ -102,17 +135,29 @@ data class TextLayer(
     val outline: Int?,
     /** Rounded box behind the text (caption style), or null for none. */
     val box: Int? = null,
+    val shadow: Boolean = false,
+    /** Extra space between letters, in ems. */
+    val spacing: Float = 0f,
+    val align: TextAlign = TextAlign.Center,
     override val startMs: Long = 0,
     override val endMs: Long = Long.MAX_VALUE,
+    override val hidden: Boolean = false,
+    override val locked: Boolean = false,
 ) : Layer {
     private val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).also {
         it.typeface = font.typeface
         it.textSize = size
+        it.letterSpacing = spacing
     }
     private val layout: StaticLayout = run {
         val w = text.lines().maxOf { paint.measureText(it) }.toInt() + 1
+        val alignment = when (align) {
+            TextAlign.Left -> Layout.Alignment.ALIGN_NORMAL
+            TextAlign.Center -> Layout.Alignment.ALIGN_CENTER
+            TextAlign.Right -> Layout.Alignment.ALIGN_OPPOSITE
+        }
         StaticLayout.Builder.obtain(text, 0, text.length, paint, w)
-            .setAlignment(Layout.Alignment.ALIGN_CENTER)
+            .setAlignment(alignment)
             .setIncludePad(true)
             .build()
     }
@@ -129,20 +174,25 @@ data class TextLayer(
             canvas.drawRoundRect(-width / 2, -height / 2, width / 2, height / 2, size * 0.25f, size * 0.25f, boxPaint)
         }
         canvas.translate(-layout.width / 2f, -layout.height / 2f)
+        // The shadow goes on the first pass only, so it sits under the outline instead of over it.
+        if (shadow) paint.setShadowLayer(size * 0.08f, 0f, size * 0.04f, 0xAA000000.toInt())
         if (outline != null) {
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = stroke
             paint.strokeJoin = Paint.Join.ROUND
             paint.color = outline
             layout.draw(canvas)
+            paint.clearShadowLayer()
         }
         paint.style = Paint.Style.FILL
         paint.color = color
         layout.draw(canvas)
+        paint.clearShadowLayer()
     }
 
     override fun withTransform(t: Transform) = copy(t = t)
     override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = endMs)
+    override fun withFlags(hidden: Boolean, locked: Boolean) = copy(hidden = hidden, locked = locked)
 }
 
 private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
@@ -166,10 +216,18 @@ fun renderLayers(width: Int, height: Int, background: Int, layers: List<Layer>, 
         Canvas(bitmap).apply {
             drawColor(background)
             scale(scale, scale)
-            under?.let { drawBitmap(it, null, RectF(0f, 0f, width.toFloat(), height.toFloat()), bitmapPaint) }
-            layers.forEach { drawLayer(it) }
+            under?.let { drawBitmap(it, null, fitRect(it.width, it.height, width, height), bitmapPaint) }
+            layers.forEach { if (!it.hidden) drawLayer(it) }
         }
     }
+
+/** [w]×[h] scaled to fit inside [boxW]×[boxH], centered (letterboxed). */
+fun fitRect(w: Int, h: Int, boxW: Int, boxH: Int): RectF {
+    val f = minOf(boxW / w.toFloat(), boxH / h.toFloat())
+    val dw = w * f
+    val dh = h * f
+    return RectF((boxW - dw) / 2, (boxH - dh) / 2, (boxW + dw) / 2, (boxH + dh) / 2)
+}
 
 /** Splits `0..durationMs` at every layer start and end, so the set of visible layers is constant inside each piece. */
 fun segmentBounds(ranges: List<Pair<Long, Long>>, durationMs: Long): List<Pair<Long, Long>> =

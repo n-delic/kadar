@@ -69,7 +69,8 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
             originalHeight = j.getInt("originalHeight"),
             background = j.getInt("background"),
             layers = layers,
-            video = j.optJSONObject("video")?.let(::clipFromJson),
+            // Projects from before the video canvas existed: the canvas was the video's own size.
+            video = j.optJSONObject("video")?.let { clipFromJson(it, j.getInt("width"), j.getInt("height")) },
         )
     }
 
@@ -89,6 +90,9 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
                         source = j.optString("source").ifEmpty { null },
                         sourceX = j.optInt("sourceX"),
                         sourceY = j.optInt("sourceY"),
+                        adjust = adjustFromJson(j),
+                        hidden = j.optBoolean("hidden"),
+                        locked = j.optBoolean("locked"),
                         startMs = start,
                         endMs = end,
                     )
@@ -103,6 +107,11 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
                 color = j.getInt("color"),
                 outline = if (j.has("outline")) j.getInt("outline") else null,
                 box = if (j.has("box")) j.getInt("box") else null,
+                shadow = j.optBoolean("shadow"),
+                spacing = j.optDouble("spacing", 0.0).toFloat(),
+                align = runCatching { TextAlign.valueOf(j.optString("align")) }.getOrDefault(TextAlign.Center),
+                hidden = j.optBoolean("hidden"),
+                locked = j.optBoolean("locked"),
                 startMs = start,
                 endMs = end,
             )
@@ -110,7 +119,7 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
         }
     }
 
-    private fun clipFromJson(j: JSONObject) = VideoClip(
+    private fun clipFromJson(j: JSONObject, projectWidth: Int, projectHeight: Int) = VideoClip(
         uri = Uri.parse(j.getString("uri")),
         durationMs = j.getLong("durationMs"),
         startMs = j.getLong("startMs"),
@@ -118,6 +127,10 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
         speed = j.getDouble("speed").toFloat(),
         volume = j.getDouble("volume").toFloat(),
         keepPitch = j.optBoolean("keepPitch", true),
+        width = j.optInt("videoWidth", projectWidth),
+        height = j.optInt("videoHeight", projectHeight),
+        canvas = if (j.has("canvas")) j.getDouble("canvas").toFloat() else null,
+        adjust = adjustFromJson(j),
         music = j.optJSONObject("music")?.let {
             Music(Uri.parse(it.getString("uri")), it.getString("name"), it.getLong("durationMs"), it.getLong("startMs"), it.getDouble("volume").toFloat())
         },
@@ -147,10 +160,13 @@ private fun Layer.toJson() = JSONObject().apply {
     put("rotation", t.rotation.toDouble())
     put("startMs", startMs)
     put("endMs", endMs)
+    put("hidden", hidden)
+    put("locked", locked)
     when (val layer = this@toJson) {
         is ImageLayer -> {
             put("type", "image")
             put("file", layer.file)
+            putAdjust(layer.adjust)
             layer.source?.let {
                 put("source", it)
                 put("sourceX", layer.sourceX)
@@ -165,6 +181,9 @@ private fun Layer.toJson() = JSONObject().apply {
             put("color", layer.color)
             layer.outline?.let { put("outline", it) }
             layer.box?.let { put("box", it) }
+            put("shadow", layer.shadow)
+            put("spacing", layer.spacing.toDouble())
+            put("align", layer.align.name)
         }
     }
 }
@@ -177,6 +196,10 @@ private fun VideoClip.toJson() = JSONObject().apply {
     put("speed", speed.toDouble())
     put("volume", volume.toDouble())
     put("keepPitch", keepPitch)
+    put("videoWidth", width)
+    put("videoHeight", height)
+    canvas?.let { put("canvas", it.toDouble()) }
+    putAdjust(adjust)
     music?.let { m ->
         put("music", JSONObject().apply {
             put("uri", m.uri.toString())
@@ -186,6 +209,18 @@ private fun VideoClip.toJson() = JSONObject().apply {
             put("volume", m.volume.toDouble())
         })
     }
+}
+
+private fun adjustFromJson(j: JSONObject) = Adjust(
+    j.optDouble("brightness", 0.0).toFloat(),
+    j.optDouble("contrast", 0.0).toFloat(),
+    j.optDouble("saturation", 0.0).toFloat(),
+)
+
+private fun JSONObject.putAdjust(a: Adjust) {
+    put("brightness", a.brightness.toDouble())
+    put("contrast", a.contrast.toDouble())
+    put("saturation", a.saturation.toDouble())
 }
 
 /** Write-then-rename, so a crash mid-save never leaves a half-written project. */

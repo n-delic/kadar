@@ -1,0 +1,51 @@
+name: Release
+
+# Push a tag like v0.5.0 to build a signed APK and publish it as a GitHub release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Check the tag matches versionName
+        run: |
+          version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "::error::Tag $GITHUB_REF_NAME but versionName is $version"; exit 1; }
+
+      # Same key every release, or phones refuse to update. An unsigned APK can't be installed, so fail instead.
+      - name: Restore the signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KADAR_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KADAR_KEYSTORE_PASSWORD }}
+        run: |
+          [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ] || { echo "::error::Signing secrets are not set, see CONTRIBUTING.md"; exit 1; }
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/kadar.jks"
+          printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=kadar\nkeyPassword=%s\n' "$RUNNER_TEMP/kadar.jks" "$KEYSTORE_PASSWORD" "$KEYSTORE_PASSWORD" > keystore.properties
+
+      - run: ./gradlew testDebugUnitTest assembleRelease
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          apk="kadar-$GITHUB_REF_NAME.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$apk"
+          sha256sum "$apk" > "$apk.sha256"
+          gh release create "$GITHUB_REF_NAME" "$apk" "$apk.sha256" --title "Kadar $GITHUB_REF_NAME" --generate-notes
+
+      - name: Remove the signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/kadar.jks" keystore.properties

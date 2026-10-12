@@ -4,9 +4,9 @@ Guide for AI coding agents (and humans) working in this repo.
 
 ## What this is
 
-**Kadar**, a personal photo and video editor for Android, built to replace subscription apps (PicsArt, InShot) for a meme page and for family phones. Everything runs on the phone and offline; the only network use is the in-app image browser (and a one-time download of ML Kit's background-removal model through Play services).
+**Kadar**, a free, open-source (GPL-3.0-or-later) photo and video editor for Android, started for a meme page and released publicly. Everything runs on the phone and offline; the only network use is the in-app image browser (and a one-time download of ML Kit's background-removal model through Play services).
 
-The owner's phone is a Galaxy S25. It also gets installed on older family phones, hence `minSdk 29`.
+The owner's phone is a Galaxy S25; it also runs on older phones, hence `minSdk 29`.
 
 ## What it does today
 
@@ -29,7 +29,7 @@ The owner's phone is a Galaxy S25. It also gets installed on older family phones
 - ML Kit Subject Segmentation (Play services, on-device) for background removal
 - `org.json` for project files, Coroutines/Flow for async
 - No DI framework, no navigation library: `MainActivity` builds one `EditorViewModel` with `viewModel()` and switches screens on `uiState.project` plus a `browsing` flag
-- **Not Material-looking**: dark PicsArt/InShot-style UI from `ui/Theme.kt` (`Ink` colors, Plus Jakarta Sans, `IconTool`, `CircleButton`, `KSlider`, `ColorRow`, `TextTabs`, `KDialog`). Material 3 is only the plumbing underneath; don't use stock M3 buttons, chips or top bars in screens.
+- **Not Material-looking**: Kadar's own dark UI with a lime accent from `ui/Theme.kt` (`Ink` colors, Plus Jakarta Sans, `IconTool`, `CircleButton`, `KSlider`, `ColorRow`, `TextTabs`, `KDialog`). Material 3 is only the plumbing underneath; don't use stock M3 buttons, chips or top bars in screens.
 - Icons are Material Symbols Rounded (weight 300) vector drawables `res/drawable/ic_*.xml`, added with `scripts/add-icons.sh <name>...`
 
 Versions live in `gradle/libs.versions.toml`.
@@ -63,6 +63,7 @@ app/src/test/.../LayersTest.kt           JVM tests for transform math, transpare
 ./gradlew testDebugUnitTest   # unit tests
 ./gradlew assembleDebug       # debug APK
 ./gradlew assembleRelease     # R8-shrunk APK, signed if keystore.properties exists
+git tag v0.5.0 && git push --tags   # CI builds, signs and publishes the release (versionName must match)
 ./gradlew installDebug        # install on the running emulator/device
 emulator -avd pixel_7_api35   # reference emulator (Google Play image, needed for ML Kit)
 ```
@@ -82,7 +83,7 @@ emulator -avd pixel_7_api35   # reference emulator (Google Play image, needed fo
 11. **Long tasks go through `EditorViewModel.work`.** It shows the busy overlay, runs one task at a time, and turns exceptions into a snackbar. Transformer must be called on the main thread.
 12. **Match existing patterns.** State is one `StateFlow<EditorUiState>`, one-shot messages go through the `effects` channel, panels are composables in `ui/Panels.kt` that call the ViewModel directly. Reuse the components in `ui/Theme.kt` before writing new widgets.
 13. **Edge drags need `systemGestureExclusion()`**, or the system back gesture steals them (the timeline does this).
-14. **No copyrighted assets.** Fonts, stickers and icons must be free to redistribute (OFL, CC0, own work). Never copy assets out of PicsArt, InShot or similar apps; copy behavior, not content.
+14. **Clean room, open assets.** Never copy, decompile or look at another editing app's code, and never take its icons, images, fonts, stickers, presets or distinctive UI design; build features from public descriptions of what they do. Every bundled asset must be openly licensed (OFL, CC0, Apache/MIT, own work) and get a row in `ATTRIBUTION.md` plus its license file in `third_party/`. Don't name other apps in the UI or store text.
 15. **Smallest change that fully works.** No new dependencies, layers or abstractions without a clear need. UI text is English and inline for now (no translation yet).
 
 ## Verifying a change

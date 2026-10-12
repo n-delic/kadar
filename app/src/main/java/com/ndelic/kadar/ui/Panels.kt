@@ -42,7 +42,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import com.ndelic.kadar.Adjust
 import com.ndelic.kadar.EditorViewModel
+import com.ndelic.kadar.TextAlign
 import com.ndelic.kadar.ImageLayer
 import com.ndelic.kadar.Layer
 import com.ndelic.kadar.Project
@@ -113,6 +115,51 @@ fun CanvasPanel(project: Project, vm: EditorViewModel) {
     }
 }
 
+/** Video canvas: reshape to a social-media ratio (9:16 for reels and stories) with black bars. */
+@Composable
+fun VideoCanvasPanel(clip: VideoClip, vm: EditorViewModel) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        items(ASPECTS) { (label, ratio) ->
+            val active = clip.canvas?.let { ratio != null && abs(it - ratio) < 0.01f } ?: (ratio == null)
+            AspectTile(label, ratio ?: (clip.width / clip.height.toFloat()), active) { vm.setVideoCanvas(ratio) }
+        }
+    }
+}
+
+/** Brightness, contrast and saturation sliders; [onChange] gets the whole new value. */
+@Composable
+fun AdjustPanel(adjust: Adjust, onChange: (Adjust) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PanelLabel("Adjust")
+            Spacer(Modifier.weight(1f))
+            if (!adjust.isNone) {
+                Text("Reset", color = Ink.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onChange(Adjust()) }.padding(6.dp))
+            }
+        }
+        LabeledSlider("Brightness", adjust.brightness) { onChange(adjust.copy(brightness = it)) }
+        LabeledSlider("Contrast", adjust.contrast) { onChange(adjust.copy(contrast = it)) }
+        LabeledSlider("Saturation", adjust.saturation) { onChange(adjust.copy(saturation = it)) }
+    }
+}
+
+@Composable
+private fun LabeledSlider(label: String, value: Float, onCommit: (Float) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = Ink.dim, fontSize = 12.sp, modifier = Modifier.width(76.dp))
+        Box(Modifier.weight(1f)) { KSlider(null, value, -1f..1f, { "${(it * 100).roundToInt()}" }, onCommit) }
+    }
+}
+
+@Composable
+fun TextStylePanel(layer: TextLayer, vm: EditorViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        TextTabs(TextAlign.entries, layer.align, label = { it.name }) { a -> vm.editText { copy(align = a) } }
+        KToggle("Shadow", null, layer.shadow) { on -> vm.editText { copy(shadow = on) } }
+        LabeledSlider("Spacing", layer.spacing * 2) { v -> vm.editText { copy(spacing = v / 2) } }
+    }
+}
+
 /** A box drawn in the target aspect ratio, so the choice reads at a glance. */
 @Composable
 private fun AspectTile(label: String, ratio: Float, active: Boolean, onClick: () -> Unit) {
@@ -168,6 +215,8 @@ fun LayersPanel(layers: List<Layer>, selectedId: Long?, vm: EditorViewModel) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
+                SmallIcon(if (l.hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility, if (l.hidden) "Show" else "Hide") { vm.setFlags(l.id, !l.hidden, l.locked) }
+                SmallIcon(if (l.locked) R.drawable.ic_lock else R.drawable.ic_lock_open, if (l.locked) "Unlock" else "Lock") { vm.setFlags(l.id, l.hidden, !l.locked) }
                 SmallIcon(R.drawable.ic_arrow_upward, "Move up") { vm.moveLayer(l.id, +1) }
                 SmallIcon(R.drawable.ic_arrow_downward, "Move down") { vm.moveLayer(l.id, -1) }
             }

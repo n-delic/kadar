@@ -6,7 +6,7 @@
 
     <application
         android:icon="@mipmap/ic_launcher"
-        android:label="Kadar"
+        android:label="${appName}"
         android:theme="@style/Theme.Kadar">
         <activity
             android:name=".MainActivity"

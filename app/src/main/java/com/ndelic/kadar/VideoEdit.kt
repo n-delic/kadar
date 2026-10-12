@@ -15,7 +15,12 @@ import androidx.media3.common.audio.SonicAudioProcessor
 import androidx.media3.common.audio.SpeedProvider
 import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.common.Effect
 import androidx.media3.effect.BitmapOverlay
+import androidx.media3.effect.Brightness
+import androidx.media3.effect.Contrast
+import androidx.media3.effect.HslAdjustment
+import androidx.media3.effect.Presentation
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.TextureOverlay
 import androidx.media3.transformer.Composition
@@ -31,6 +36,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
+import kotlin.math.roundToInt
 
 data class Music(val uri: Uri, val name: String, val durationMs: Long, val startMs: Long = 0, val volume: Float = 1f)
 
@@ -45,8 +51,28 @@ data class VideoClip(
     /** Speeding up raises the pitch (chipmunk voice) unless this corrects it back. */
     val keepPitch: Boolean = true,
     val music: Music? = null,
+    /** The video's own display size (rotation applied). */
+    val width: Int = 0,
+    val height: Int = 0,
+    /** Output aspect ratio (width / height), or null to keep the video's own; the rest is black. */
+    val canvas: Float? = null,
+    val adjust: Adjust = Adjust(),
 ) {
     val outputDurationMs get() = ((endMs - startMs) / speed).toLong()
+
+    /** Output frame size; also the project canvas, so layers line up with the exported frame. */
+    val outputSize get() = canvasSize(width, height, canvas)
+}
+
+/**
+ * Size of a [ratio] canvas for a [w]×[h] video: the long side stays (capped at 1920 so phones can encode it), dimensions even.
+ * Null [ratio] keeps the video's own size.
+ */
+fun canvasSize(w: Int, h: Int, ratio: Float?): Pair<Int, Int> {
+    if (ratio == null) return w to h
+    val long = minOf(maxOf(w, h), 1920)
+    fun even(v: Float) = (v / 2).roundToInt() * 2
+    return if (ratio >= 1) even(long.toFloat()) to even(long / ratio) else even(long * ratio) to even(long.toFloat())
 }
 
 /**
@@ -59,7 +85,7 @@ fun VideoClip.composition(overlay: TextureOverlay?): Composition {
         .setDurationUs(durationMs * 1000)
         .setRemoveAudio(volume == 0f)
         .setSpeed(ConstantSpeed(speed))
-        .setEffects(Effects(listOfNotNull(gain(volume), pitchFix(speed).takeIf { keepPitch && speed != 1f }), emptyList()))
+        .setEffects(Effects(listOfNotNull(gain(volume), pitchFix(speed).takeIf { keepPitch && speed != 1f }), videoEffects()))
         .build()
     val sequences = mutableListOf(EditedMediaItemSequence.Builder(video).build())
     music?.let { m ->
@@ -124,6 +150,16 @@ suspend fun exportVideo(context: Context, composition: Composition, out: File, o
     } finally {
         poll.cancel()
         if (!done.isCompleted) transformer.cancel()
+    }
+}
+
+private fun VideoClip.videoEffects(): List<Effect> = buildList {
+    if (adjust.brightness != 0f) add(Brightness(adjust.brightness))
+    if (adjust.contrast != 0f) add(Contrast(adjust.contrast))
+    if (adjust.saturation != 0f) add(HslAdjustment.Builder().adjustSaturation(adjust.saturation * 100).build())
+    if (canvas != null) {
+        val (w, h) = outputSize
+        add(Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_SCALE_TO_FIT))
     }
 }
 

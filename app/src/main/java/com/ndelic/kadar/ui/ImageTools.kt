@@ -58,7 +58,7 @@ import kotlin.math.roundToInt
 private enum class Brush { Erase, Restore }
 
 /**
- * PicsArt-style eraser: one finger paints, two fingers zoom and pan. Restore paints the original back
+ * Eraser: one finger paints, two fingers zoom and pan. Restore paints the original back
  * (only after a cut-out or crop, when [source] exists).
  */
 @Composable

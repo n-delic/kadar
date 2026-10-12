@@ -128,7 +128,7 @@ import kotlin.math.atan2
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Font, Color, Stroke, Box, Style, Adjust, Layers }
+enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Font, Color, Stroke, Box, Style, Adjust, Filters, Layers }
 
 @Composable
 fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
@@ -237,6 +237,11 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         null -> video?.let { v -> AdjustPanel(v.adjust) { a -> vm.updateClip { copy(adjust = a) } } }
                         else -> {}
                     }
+                    Panel.Filters -> when (val l = selected) {
+                        is ImageLayer -> FiltersPanel(l.bitmap, l.adjust) { a -> vm.editImage { copy(adjust = a) } }
+                        null -> video?.let { v -> FiltersPanel(state.filmstrip.firstOrNull(), v.adjust) { a -> vm.updateClip { copy(adjust = a) } } }
+                        else -> {}
+                    }
                 }
             }
         }
@@ -265,6 +270,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                             IconTool(R.drawable.ic_speed, "Speed", panel == Panel.Speed) { toggle(Panel.Speed) }
                             IconTool(R.drawable.ic_aspect_ratio, "Canvas", panel == Panel.VideoCanvas) { toggle(Panel.VideoCanvas) }
                             IconTool(R.drawable.ic_tune, "Adjust", panel == Panel.Adjust) { toggle(Panel.Adjust) }
+                            IconTool(R.drawable.ic_filter_vintage, "Filters", panel == Panel.Filters) { toggle(Panel.Filters) }
                             IconTool(R.drawable.ic_music_note, "Audio", panel == Panel.Audio) { toggle(Panel.Audio) }
                         } else {
                             IconTool(R.drawable.ic_aspect_ratio, "Canvas", panel == Panel.Canvas) { toggle(Panel.Canvas) }
@@ -293,6 +299,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         }
                         IconTool(R.drawable.ic_crop, "Crop") { cropping = state.selected as? ImageLayer }
                         IconTool(R.drawable.ic_tune, "Adjust", panel == Panel.Adjust) { toggle(Panel.Adjust) }
+                        IconTool(R.drawable.ic_filter_vintage, "Filters", panel == Panel.Filters) { toggle(Panel.Filters) }
                         IconTool(R.drawable.ic_library_add, "Save sticker", onClick = vm::saveSticker)
                         IconTool(R.drawable.ic_content_copy, "Duplicate", onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)

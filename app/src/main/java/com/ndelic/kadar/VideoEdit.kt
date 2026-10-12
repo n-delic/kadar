@@ -17,11 +17,9 @@ import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.Effect
 import androidx.media3.effect.BitmapOverlay
-import androidx.media3.effect.Brightness
-import androidx.media3.effect.Contrast
-import androidx.media3.effect.HslAdjustment
 import androidx.media3.effect.Presentation
 import androidx.media3.effect.OverlayEffect
+import androidx.media3.effect.RgbMatrix
 import androidx.media3.effect.TextureOverlay
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
@@ -163,9 +161,8 @@ suspend fun exportVideo(context: Context, composition: Composition, out: File, o
 }
 
 private fun VideoClip.videoEffects(): List<Effect> = buildList {
-    if (adjust.brightness != 0f) add(Brightness(adjust.brightness))
-    if (adjust.contrast != 0f) add(Contrast(adjust.contrast))
-    if (adjust.saturation != 0f) add(HslAdjustment.Builder().adjustSaturation(adjust.saturation * 100).build())
+    // The same matrix as an image layer's paint, so a look or adjustment matches between photo and video.
+    if (!adjust.isNone) glRgbMatrix(adjust.filterMatrix()).let { m -> add(RgbMatrix { _, _ -> m }) }
     if (canvas != null) {
         val (w, h) = outputSize
         add(Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_SCALE_TO_FIT))

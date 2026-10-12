@@ -227,12 +227,16 @@ private fun adjustFromJson(j: JSONObject) = Adjust(
     j.optDouble("brightness", 0.0).toFloat(),
     j.optDouble("contrast", 0.0).toFloat(),
     j.optDouble("saturation", 0.0).toFloat(),
+    runCatching { Look.valueOf(j.optString("look")) }.getOrDefault(Look.None),
+    j.optDouble("lookAmount", 1.0).toFloat(),
 )
 
 private fun JSONObject.putAdjust(a: Adjust) {
     put("brightness", a.brightness.toDouble())
     put("contrast", a.contrast.toDouble())
     put("saturation", a.saturation.toDouble())
+    put("look", a.look.name)
+    put("lookAmount", a.amount.toDouble())
 }
 
 /** Write-then-rename, so a crash mid-save never leaves a half-written project. */

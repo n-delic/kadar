@@ -138,8 +138,10 @@ fun AdjustPanel(adjust: Adjust, onChange: (Adjust) -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PanelLabel("Adjust")
             Spacer(Modifier.weight(1f))
-            if (!adjust.isNone) {
-                Text("Reset", color = Ink.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onChange(Adjust()) }.padding(6.dp))
+            // Resets the sliders only; the look has its own panel.
+            val reset = Adjust(look = adjust.look, amount = adjust.amount)
+            if (adjust != reset) {
+                Text("Reset", color = Ink.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onChange(reset) }.padding(6.dp))
             }
         }
         LabeledSlider("Brightness", adjust.brightness) { onChange(adjust.copy(brightness = it)) }
@@ -294,4 +296,4 @@ fun FontPanel(layer: TextLayer, vm: EditorViewModel) {
     }
 }
 
-private fun percent(v: Float) = "${(v * 100).roundToInt()}%"
+fun percent(v: Float) = "${(v * 100).roundToInt()}%"

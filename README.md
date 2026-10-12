@@ -1,10 +1,15 @@
 <p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/kadar-logo-light-text.svg">
+    <img src="docs/brand/kadar-logo-dark-text.svg" height="72" alt="Kadar">
+  </picture>
+</p>
+
+<p align="center">
   <img src="docs/screenshots/home.jpg" width="230" alt="Kadar home screen">
   <img src="docs/screenshots/photo-editor.jpg" width="230" alt="Photo editor with a cut-out and a meme caption">
   <img src="docs/screenshots/video-editor.jpg" width="230" alt="Video editor with two timed captions on the timeline">
 </p>
-
-<h1 align="center">Kadar</h1>
 
 <p align="center">
   <b>A free, open-source photo and video editor for Android.</b><br>

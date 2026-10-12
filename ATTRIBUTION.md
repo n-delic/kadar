@@ -13,6 +13,14 @@ Every non-code asset in Kadar, with its author, source and license. Rules for ad
 | `app/src/main/res/drawable/ic_launcher_background.xml`, `ic_launcher_foreground.xml` | Kadar contributors | Original work: Kadar app icon (viewfinder corners around a play mark) | GPL-3.0-or-later |
 | Emoji stickers | Device emoji font | Drawn from the phone's own system emoji font at runtime; no emoji images are bundled | Device font license |
 
+## Brand
+
+| Asset | Author | Source | License |
+|---|---|---|---|
+| `docs/brand/kadar-mark.svg`, `kadar-mark-512.png` | Kadar contributors | Original work: Kadar mark (same geometry as the app icon) | GPL-3.0-or-later |
+| `docs/brand/kadar-logo-light-text.svg`, `kadar-logo-dark-text.svg` | Kadar contributors | Original work: mark plus "Kadar" in Plus Jakarta Sans ExtraBold, converted to outlines by `scripts/make-logo.py` | GPL-3.0-or-later; font OFL-1.1 |
+| `docs/brand/kadar-social.png` | Kadar contributors | Original work: GitHub social preview (logo and tagline in Plus Jakarta Sans) | GPL-3.0-or-later; font OFL-1.1 |
+
 ## Documentation
 
 | Asset | Author | Source | License |

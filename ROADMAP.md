@@ -66,7 +66,7 @@
 - Settings: image search engine (Google, DuckDuckGo, Bing, Brave) and default export size, with a per-project override; About with the license texts
 - Home: launch animation, logo, project multi-select (duplicate, delete), PHOTO / VIDEO badges; pinch to zoom the photo canvas, tap around it to deselect
 
-## Done for the next release
+## v0.5.2: done
 
 - Video export: a progress ring with the percentage, a Cancel button (nothing is saved), the screen stays on while it runs, and a Video quality setting (Standard, or High for about twice the bitrate)
 - Voiceover: in the Audio panel, record your voice from the playhead while the video plays (muted, so the speaker isn't recorded); recordings stay in the project, each with its own volume and a delete button; the preview plays them and the export mixes them in. The microphone permission is asked for only on the first Record
@@ -75,6 +75,7 @@
 - Crop video layers: pick the part of the clip to show on one of its frames (free or 1:1, 4:5, 9:16, 16:9); the kept part stays where it was, and Crop again shows the whole frame to change it
 - Video layers stack with text, stickers and drawings in track order: drag a video layer's track above a caption's to cover it, in the preview and the export
 - Fix: see-through parts of text, stickers and drawings (soft edges, shadows, fades, the highlighter) exported darker than the preview showed them
+- Fixes: paused video layers and the blurred canvas show their frame right away (they could stay black until you scrubbed), the Audio panel no longer squeezes the preview to a thumbnail, voiceovers are listed by start time, a new project says "Just now"
 
 ## Next
 

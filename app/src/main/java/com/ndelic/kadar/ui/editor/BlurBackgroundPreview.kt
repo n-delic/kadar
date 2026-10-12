@@ -55,13 +55,17 @@ fun BlurBackgroundPreview(clip: VideoClip, canvasWidth: Int, canvasHeight: Int, 
     LaunchedEffect(player, main) {
         if (main == null) return@LaunchedEffect
         var lastSeek = 0L
+        var drawn = false
         while (true) {
             val c = current
             val play = main.isPlaying
             player.playWhenReady = play
             val want = (c.startMs + (main.currentPosition * c.speed).toLong()).coerceAtMost(c.endMs)
             val now = SystemClock.uptimeMillis()
-            if (player.playbackState != Player.STATE_BUFFERING && overlayNeedsSeek(player.currentPosition, want, play, now - lastSeek)) {
+            // A paused player draws nothing into a view that got its surface after the player was ready, until it seeks.
+            val firstDraw = !drawn && player.playbackState == Player.STATE_READY && player.surfaceSize.width > 0
+            if (firstDraw || player.playbackState != Player.STATE_BUFFERING && overlayNeedsSeek(player.currentPosition, want, play, now - lastSeek)) {
+                drawn = drawn || firstDraw
                 player.seekTo(want)
                 lastSeek = now
             }

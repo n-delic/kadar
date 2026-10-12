@@ -52,6 +52,7 @@ fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Play
     LaunchedEffect(player, main, totalMs) {
         if (main == null) return@LaunchedEffect
         var lastSeek = 0L
+        var drawn = false
         while (true) {
             val l = current
             val target = overlaySourceMs(l.clipStartMs, overlaySpan(l.startMs, l.endMs, l.playableMs, totalMs), main.currentPosition)
@@ -62,7 +63,10 @@ fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Play
             val want = target ?: l.clipStartMs
             val now = SystemClock.uptimeMillis()
             // While a seek is still loading, its position says nothing about drift; seeking again would only stall it.
-            if (player.playbackState != Player.STATE_BUFFERING && overlayNeedsSeek(player.currentPosition, want, play, now - lastSeek)) {
+            // A paused player draws nothing into a view that got its surface after the player was ready, until it seeks.
+            val firstDraw = !drawn && player.playbackState == Player.STATE_READY && player.surfaceSize.width > 0
+            if (firstDraw || player.playbackState != Player.STATE_BUFFERING && overlayNeedsSeek(player.currentPosition, want, play, now - lastSeek)) {
+                drawn = drawn || firstDraw
                 player.seekTo(want)
                 lastSeek = now
             }

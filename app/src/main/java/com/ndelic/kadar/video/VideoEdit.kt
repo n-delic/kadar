@@ -152,7 +152,7 @@ fun VideoClip.composition(
     sequences += overlays.map { (v, span) -> v.sequence(span, outputDurationMs) }
     sequences += EditedMediaItemSequence.Builder(video).build()
     if (blurred) sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItem(blurredBackground()).build()
-    music?.let { sequences += it.sequence(outputDurationMs) }
+    music?.let { sequences += it.sequences(outputDurationMs) }
     // Audio only, after every video sequence, so the compositor's input numbers above stay as they are.
     sequences += voices.mapNotNull { it.sequence(outputDurationMs) }
     return Composition.Builder(sequences)
@@ -212,9 +212,9 @@ private const val BLANK_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAI
  * The song repeated or cut to [totalMs], one item per repeat. Not a looping sequence: that restarts its item's clock on
  * every repeat, and the fades need to know where in the output each repeat plays.
  */
-private fun Music.sequence(totalMs: Long): EditedMediaItemSequence {
+private fun Music.sequences(totalMs: Long): List<EditedMediaItemSequence> {
     val loopMs = durationMs - startMs
-    val repeats = loopSpans(loopMs, totalMs).map { (from, to) ->
+    return loopSpans(loopMs, totalMs).map { (from, to) ->
         val gain = DefaultGainProvider.Builder(volume)
         fadeWindows(from, to, totalMs, fadeIn, fadeOut).forEach { (start, end) ->
             // The provider gets sample counts into the window, and inside it its gain replaces the default, so volume goes in here.
@@ -222,13 +222,16 @@ private fun Music.sequence(totalMs: Long): EditedMediaItemSequence {
                 volume * fadeGain(from + start + (end - start) * samples / ofSamples, totalMs, fadeIn, fadeOut)
             }
         }
-        EditedMediaItem.Builder(clipped(uri, startMs, if (to - from < loopMs) startMs + to - from else C.TIME_END_OF_SOURCE))
+        val item = EditedMediaItem.Builder(clipped(uri, startMs, if (to - from < loopMs) startMs + to - from else C.TIME_END_OF_SOURCE))
             .setDurationUs(durationMs * 1000)
-            .setRemoveVideo(true)
             .setEffects(Effects(listOf(GainProcessor(gain.build())), emptyList()))
             .build()
+        EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO))
+            .apply { if (from > 0) addGap(from * 1000) }
+            .addItem(item)
+            .apply { if (totalMs > to) addGap((totalMs - to) * 1000) }
+            .build()
     }
-    return EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO)).addItems(repeats).build()
 }
 
 /** Audio only: a gap until the voice starts, the recording (cut at [totalMs]), then a gap to [totalMs]. */

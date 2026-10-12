@@ -77,12 +77,33 @@ Kadar is an independent implementation. Don't copy, decompile or study another e
 
 By contributing you agree your contribution is licensed under the GPL-3.0-or-later, with the additional permission in `NOTICE`.
 
+## Code structure
+
+The app is one Gradle module split into packages by area under `app/src/main/java/com/ndelic/kadar/`:
+
+- `model/`: data types and pure logic (layers, filters, projects and their JSON, settings). No Android UI.
+- `media/`: files, MediaStore, downloads, ML Kit.
+- `video/`: building and exporting the video composition.
+- `ui/common/`: the theme and shared components. `ui/home/`, `ui/editor/`, `ui/web/`: one package per area of the app.
+- `EditorViewModel.kt` holds the state and actions; `MainActivity.kt` switches screens.
+
+Tests live in `app/src/test` under the same package as the code they test. `AGENTS.md` has the full file map and a "Where new code goes" table; check it before adding a file.
+
+To keep it this way:
+
+1. **Reuse first.** Look in `ui/common/Theme.kt`, `model/` and `media/` before writing something new; extract shared code instead of copying it.
+2. **One responsibility per file.** New screens and panels get their own file in their `ui/` package; don't grow `ui/editor/EditorScreen.kt`.
+3. **Logic out of the UI.** Calculations are plain functions in `model/` or `video/`, with a test.
+4. **Dependencies point inward.** `ui` can use everything; `model` uses nothing from the app; `media` and `video` use only `model`.
+5. **Moves are separate commits** that only change `package` and `import` lines, so reviews and merges stay easy.
+6. **Update `AGENTS.md`** (Layout and "Where new code goes") when you add a file or package.
+
 ## Making a change
 
 1. Read `AGENTS.md`, especially "Rules that matter". The drawing-path and project-safety rules are not optional.
 2. Keep the change small and focused on one thing.
 3. Put pure logic (math, parsing) in plain Kotlin and cover it with a test in `app/src/test`.
-4. For UI, reuse the helpers in `ui/Panels.kt` and follow how the other panels are built.
+4. For UI, reuse the components in `ui/common/Theme.kt` and follow how the panels in `ui/editor/` are built.
 5. Run the tests and the build, then try the change on an emulator, including an export.
 
 ### Changing the project format

@@ -11,7 +11,7 @@ The owner's phone is a Galaxy S25; it also runs on older phones, hence `minSdk 2
 ## What it does today
 
 - **Photo**: open a photo, blank canvas, or web image; add text (meme outline style), emoji, images and saved stickers as layers; move, pinch-resize, rotate; remove backgrounds on-device; change canvas aspect and background; export JPEG/PNG to `Pictures/Kadar`.
-- **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time, an eye and a lock at its left, and long-press-drag to reorder. Video layers (picture-in-picture) put more clips on top, placed like stickers, with their own track and volume; export H.264/AAC MP4 to `Movies/Kadar`.
+- **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time, an eye and a lock at its left, and long-press-drag to reorder. Pinch the timeline to zoom, slide two fingers to scroll (view-only, `TimelineViewport`); one finger always edits or scrubs. Video layers (picture-in-picture) put more clips on top, placed like stickers, with their own track and volume; export H.264/AAC MP4 to `Movies/Kadar`.
 - **In/out animations** (`model/Animation.kt`, `ui/editor/AnimationPanel.kt`): video text and sticker layers get an entrance and an exit (None, Fade, Pop, Slide up), 300 ms each, at most half the layer's time. `motionAt` turns a layer and an output time into alpha, scale and offset, and `Canvas.drawLayer(layer, motion, canvasHeight)` applies it around `drawLayer`; the stage uses it with the player position (every frame while playing), the export's `timedOverlay` with each frame's timestamp.
 - **Undo / redo** for every edit (gestures and timeline drags count once per drag).
 - **Snapping** to the canvas center and 0°/90°, caption boxes behind text, a Layers panel (photos only, top-bar button; video shows layers as timeline tracks), keep-pitch for speed changes.
@@ -69,6 +69,7 @@ app/src/main/java/com/ndelic/kadar/
   ui/editor/
     EditorScreen.kt        Top bar, Stage (canvas, gestures, handles, view zoom, video preview), tool row, TextEntry
     Timeline.kt            NLE timeline (layer tracks + clip) and TrimStrip
+    TimelineMath.kt        TimelineViewport (zoom/scroll: time to x, pinch, follow the playhead), ruler steps, filmstrip frames
     Panels.kt              Tool panels: stickers, canvas, speed, audio, font, style, adjust, layers, volume
     FiltersPanel.kt        Look tiles and strength slider
     AnimationPanel.kt      In and Out animation choices for a video text/sticker layer

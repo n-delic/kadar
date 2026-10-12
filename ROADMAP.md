@@ -59,6 +59,7 @@
 
 - [x] Filters: eight in-house looks (Mono, Noir, Sepia, Warm, Cool, Vivid, Fade, Teal & Orange) with a strength slider, for image layers and the whole video
 - [x] Timeline tracks do everything the photo Layers panel does: long-press a track and drag it up/down to reorder, hide and lock with the eye and lock at its left (the Layers button is photo-only)
+- [x] Zoomable timeline for long videos: pinch to zoom (down to about a second across), slide two fingers to scroll, a time ruler on top, and the view pages along with the playhead while playing; one finger edits and scrubs as before
 - [ ] Video layers: their own trim, crop and opacity, and a way to put them above text and stickers
 - [ ] Export frame timing with video layers follows the topmost overlay clip: a 30 fps overlay makes a 60 fps main clip export at 30 fps, and an overlay with irregular frames (screen recordings) makes the whole export choppy. The main clip should drive the frame timing
 - [ ] Blurred-background video canvas (Media3's blur-with-frame effect squeezed the frame on the emulator; needs another approach)
@@ -66,7 +67,6 @@
 ## Later / maybe
 
 - [ ] Several video clips in a row, with transitions
-- [ ] Zoomable timeline for long videos
 - [ ] More free fonts (Google Fonts, OFL) and a CC0 sticker pack
 - [ ] Templates, once it's clear which layouts get used most
 - [ ] Bosnian translation

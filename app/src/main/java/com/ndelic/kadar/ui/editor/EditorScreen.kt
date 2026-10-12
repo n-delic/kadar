@@ -74,6 +74,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -111,6 +112,7 @@ import com.ndelic.kadar.R
 import com.ndelic.kadar.Sticker
 import com.ndelic.kadar.model.Adjust
 import com.ndelic.kadar.model.Anim
+import com.ndelic.kadar.model.CropRect
 import com.ndelic.kadar.model.DrawLayer
 import com.ndelic.kadar.model.Font
 import com.ndelic.kadar.model.ImageLayer
@@ -158,6 +160,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     var trimming by rememberSaveable { mutableStateOf(false) }
     var erasing by remember { mutableStateOf<Pair<ImageLayer, Bitmap?>?>(null) }
     var cropping by remember { mutableStateOf<ImageLayer?>(null) }
+    var croppingVideo by remember { mutableStateOf<Pair<VideoLayer, Bitmap>?>(null) }
     // Open draw screen: the drawing to add to (null for a new one) and the video frame under the playhead.
     var drawing by remember { mutableStateOf<Pair<Long?, Bitmap?>?>(null) }
     val scope = rememberCoroutineScope()
@@ -367,6 +370,10 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_check, stringResource(R.string.done)) { vm.select(null) }
                         ToolDivider()
                         IconTool(R.drawable.ic_tune, stringResource(R.string.edit), panel == Panel.Overlay) { toggle(Panel.Overlay) }
+                        IconTool(R.drawable.ic_crop, stringResource(R.string.tool_crop)) {
+                            playing = false
+                            (state.selected as? VideoLayer)?.let { l -> scope.launch { vm.layerFrame(l, positionMs)?.let { croppingVideo = l to it } } }
+                        }
                         IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, stringResource(R.string.tool_front), onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, stringResource(R.string.tool_back), onClick = vm::sendToBack)
@@ -437,12 +444,25 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     }
     cropping?.let { layer ->
         CropScreen(
-            layer = layer,
+            bitmap = layer.bitmap,
             onDone = { r ->
                 cropping = null
                 vm.applyCrop(layer.id, r[0], r[1], r[2], r[3])
             },
             onCancel = { cropping = null },
+        )
+    }
+    croppingVideo?.let { (layer, frame) ->
+        val fw = frame.width.toFloat()
+        val fh = frame.height.toFloat()
+        CropScreen(
+            bitmap = frame,
+            initial = layer.crop.run { Rect(left * fw, top * fh, right * fw, bottom * fh) },
+            onDone = { r ->
+                croppingVideo = null
+                vm.cropVideo(layer.id, CropRect(r[0] / fw, r[1] / fh, r[2] / fw, r[3] / fh))
+            },
+            onCancel = { croppingVideo = null },
         )
     }
     drawing?.let { (target, under) ->

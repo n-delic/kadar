@@ -27,6 +27,7 @@ import com.ndelic.kadar.media.startVoiceRecording
 import com.ndelic.kadar.media.trimTransparent
 import com.ndelic.kadar.media.videoFrame
 import com.ndelic.kadar.model.AppSettings
+import com.ndelic.kadar.model.CropRect
 import com.ndelic.kadar.model.DrawLayer
 import com.ndelic.kadar.model.ExportQuality
 import com.ndelic.kadar.model.ExportSize
@@ -490,6 +491,16 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             layer.copy(t = t, bitmap = cut, file = file, source = layer.source ?: layer.file, sourceX = layer.sourceX + left, sourceY = layer.sourceY + top)
         }
     }
+
+    /** A frame of video layer [layer] at the playhead ([positionMs]), else its nearest end, to crop on; null (with a message) if unreadable. */
+    suspend fun layerFrame(layer: VideoLayer, positionMs: Long): Bitmap? {
+        val ms = layer.clipStartMs + (positionMs - layer.startMs).coerceAtMost(layer.endMs - layer.startMs - 1).coerceAtLeast(0)
+        val frame = withContext(Dispatchers.IO) { runCatching { videoFrame(app, layer.uri, ms) }.getOrNull() }
+        if (frame == null) _effects.trySend(EditorEffect.Message(UiText.Res(R.string.error_read_video)))
+        return frame
+    }
+
+    fun cropVideo(id: Long, crop: CropRect) = updateLayer(id) { (it as? VideoLayer)?.withCrop(crop) ?: it }
 
     // Stickers
 

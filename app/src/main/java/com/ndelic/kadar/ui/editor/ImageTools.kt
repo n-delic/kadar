@@ -195,12 +195,15 @@ internal fun DrawScope.checker(area: Size, cell: Float) {
 // A null label is the localized "Free".
 private val CROP_RATIOS = listOf(null to null, "1:1" to 1f, "4:5" to 0.8f, "9:16" to 9f / 16, "16:9" to 16f / 9)
 
-/** Crop one image layer: drag the corners or the middle; ratios lock the shape. Returns `[left, top, right, bottom)`. */
+/**
+ * Crop [bitmap] (an image layer's, or a video layer's frame), starting from [initial] or the whole of it: drag the
+ * corners or the middle; ratios lock the shape. Returns `[left, top, right, bottom)` in [bitmap]'s pixels.
+ */
 @Composable
-fun CropScreen(layer: ImageLayer, onDone: (IntArray) -> Unit, onCancel: () -> Unit) {
-    val bw = layer.bitmap.width.toFloat()
-    val bh = layer.bitmap.height.toFloat()
-    var rect by remember { mutableStateOf(Rect(0f, 0f, bw, bh)) }
+fun CropScreen(bitmap: Bitmap, onDone: (IntArray) -> Unit, onCancel: () -> Unit, initial: Rect? = null) {
+    val bw = bitmap.width.toFloat()
+    val bh = bitmap.height.toFloat()
+    var rect by remember { mutableStateOf(initial ?: Rect(0f, 0f, bw, bh)) }
     var ratio by remember { mutableStateOf<Pair<String?, Float?>>(CROP_RATIOS.first()) }
     BackHandler(onBack = onCancel)
 
@@ -240,7 +243,7 @@ fun CropScreen(layer: ImageLayer, onDone: (IntArray) -> Unit, onCancel: () -> Un
             ) {
                 translate(origin.x, origin.y) { checker(Size(bw * fit, bh * fit), 12.dp.toPx()) }
                 drawImage(
-                    layer.bitmap.asImageBitmap(),
+                    bitmap.asImageBitmap(),
                     dstOffset = IntOffset(origin.x.roundToInt(), origin.y.roundToInt()),
                     dstSize = IntSize((bw * fit).roundToInt(), (bh * fit).roundToInt()),
                 )

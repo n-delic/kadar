@@ -1,5 +1,6 @@
 package com.ndelic.kadar.video
 
+import com.ndelic.kadar.model.CropRect
 import com.ndelic.kadar.model.Transform
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -16,6 +17,9 @@ data class OverlayPlacement(val x: Float, val y: Float, val scale: Float, val ro
  */
 fun overlayPlacement(t: Transform, width: Int, height: Int) =
     OverlayPlacement(2 * t.x / width - 1, 1 - 2 * t.y / height, t.scale, -t.rotation)
+
+/** [c] as Media3's `Crop` arguments: left, right, bottom and top in normalized device coordinates (-1..1, y pointing up). */
+fun cropNdc(c: CropRect) = floatArrayOf(2 * c.left - 1, 2 * c.right - 1, 1 - 2 * c.bottom, 1 - 2 * c.top)
 
 /**
  * When a video layer actually plays in a [totalMs] long output, as `start to end` in output time: from its [startMs]

@@ -22,6 +22,7 @@ import androidx.media3.common.util.Size
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.Brightness
+import androidx.media3.effect.Crop
 import androidx.media3.effect.GaussianBlur
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.Presentation
@@ -253,11 +254,12 @@ private fun VoiceClip.sequence(totalMs: Long): EditedMediaItemSequence? {
 /** One overlay's sequence: a gap until it starts, its clip from [VideoLayer.clipStartMs], then a gap to [totalMs]. */
 private fun VideoLayer.sequence(span: Pair<Long, Long>, totalMs: Long): EditedMediaItemSequence {
     val (start, end) = span
+    val (left, right, bottom, top) = cropNdc(crop)
     val clip = EditedMediaItem.Builder(clipped(uri, clipStartMs, clipStartMs + end - start))
         .setDurationUs(durationMs * 1000)
         .setRemoveAudio(volume == 0f)
-        // Presented at the layer's own size, so the compositor's scale is the layer's scale.
-        .setEffects(Effects(listOf(gain(volume)), listOf(Presentation.createForWidthAndHeight(videoWidth, videoHeight, Presentation.LAYOUT_STRETCH_TO_FIT))))
+        // Cropped, then presented at the layer's own size, so the compositor's scale is the layer's scale.
+        .setEffects(Effects(listOf(gain(volume)), listOf(Crop(left, right, bottom, top), Presentation.createForWidthAndHeight(width.roundToInt(), height.roundToInt(), Presentation.LAYOUT_STRETCH_TO_FIT))))
         .build()
     val tracks = if (volume == 0f) setOf(C.TRACK_TYPE_VIDEO) else setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO)
     return EditedMediaItemSequence.Builder(tracks)

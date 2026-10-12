@@ -2,6 +2,7 @@ package com.ndelic.kadar.ui.editor
 
 import android.os.SystemClock
 import android.view.TextureView
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
@@ -75,20 +76,31 @@ fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Play
     }
     val w = layer.width * scale
     val h = layer.height * scale
-    val size = with(LocalDensity.current) { DpSize(w.toDp(), h.toDp()) }
-    key(player) {
-        AndroidView(
-            factory = { TextureView(it).also(player::setVideoTextureView) },
-            // Unbounded, so a layer bigger than the canvas keeps its size (the stage clips it) and its top-left anchor.
-            modifier = Modifier.fillMaxSize().wrapContentSize(Alignment.TopStart, unbounded = true).size(size).graphicsLayer {
-                translationX = layer.t.x * scale - w / 2
-                translationY = layer.t.y * scale - h / 2
-                scaleX = layer.t.scale
-                scaleY = layer.t.scale
-                rotationZ = layer.t.rotation
-                alpha = if (showing) layer.opacity else 0f
-            },
-        )
+    val density = LocalDensity.current
+    val size = with(density) { DpSize(w.toDp(), h.toDp()) }
+    // The whole frame, shifted so the crop sits in the layer's box, which clips the rest.
+    val frame = with(density) { DpSize((layer.videoWidth * scale).toDp(), (layer.videoHeight * scale).toDp()) }
+    // Unbounded, so a layer bigger than the canvas keeps its size (the stage clips it) and its top-left anchor.
+    Box(
+        Modifier.fillMaxSize().wrapContentSize(Alignment.TopStart, unbounded = true).size(size).graphicsLayer {
+            translationX = layer.t.x * scale - w / 2
+            translationY = layer.t.y * scale - h / 2
+            scaleX = layer.t.scale
+            scaleY = layer.t.scale
+            rotationZ = layer.t.rotation
+            alpha = if (showing) layer.opacity else 0f
+            clip = true
+        },
+    ) {
+        key(player) {
+            AndroidView(
+                factory = { TextureView(it).also(player::setVideoTextureView) },
+                modifier = Modifier.wrapContentSize(Alignment.TopStart, unbounded = true).size(frame).graphicsLayer {
+                    translationX = -layer.crop.left * layer.videoWidth * scale
+                    translationY = -layer.crop.top * layer.videoHeight * scale
+                },
+            )
+        }
     }
 }
 

@@ -114,7 +114,7 @@ data class ImageLayer(
 
 /**
  * Another video on top of the main clip (picture-in-picture), [videoWidth]×[videoHeight] being its display size
- * (rotation applied). It plays from its own start, so it shows for at most [durationMs].
+ * (rotation applied). It plays its clip from [clipStartMs] on, so it shows for at most [playableMs].
  * Its pixels come only from the Media3 compositor (`VideoClip.composition`), in the preview and the export alike, so it draws
  * nothing here (thumbnails and the bitmap overlay skip it); the stage shows its selection box like any layer.
  */
@@ -131,12 +131,20 @@ data class VideoLayer(
     override val endMs: Long = startMs + durationMs,
     override val hidden: Boolean = false,
     override val locked: Boolean = false,
+    /** 0 to 1. */
+    val opacity: Float = 1f,
+    /** Where in its own clip it starts playing. */
+    val clipStartMs: Long = 0,
 ) : Layer {
     override val width get() = videoWidth.toFloat()
     override val height get() = videoHeight.toFloat()
+    val playableMs get() = durationMs - clipStartMs
     override fun drawContent(canvas: Canvas) = Unit
     override fun withTransform(t: Transform) = copy(t = t)
-    override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = minOf(endMs, startMs + durationMs))
+    override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = minOf(endMs, startMs + playableMs))
+
+    /** Plays the clip from [ms] on; the track gets shorter if less is left than it was long. */
+    fun withClipStart(ms: Long) = copy(clipStartMs = ms).let { it.withTime(it.startMs, it.endMs) }
     override fun withFlags(hidden: Boolean, locked: Boolean) = copy(hidden = hidden, locked = locked)
 }
 

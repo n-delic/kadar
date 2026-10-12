@@ -303,14 +303,6 @@ fun AudioPanel(clip: VideoClip, vm: EditorViewModel, onAddMusic: () -> Unit) {
 }
 
 @Composable
-fun VideoVolumePanel(layer: VideoLayer, vm: EditorViewModel) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        PanelLabel("Overlay sound")
-        KSlider(R.drawable.ic_volume_up, layer.volume, 0f..1f, ::percent) { v -> vm.editVideo { copy(volume = v) } }
-    }
-}
-
-@Composable
 fun FontPanel(layer: TextLayer, vm: EditorViewModel) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
         items(vm.fonts) { f ->

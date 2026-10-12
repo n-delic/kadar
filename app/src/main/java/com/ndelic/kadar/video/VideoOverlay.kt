@@ -1,6 +1,7 @@
 package com.ndelic.kadar.video
 
 import com.ndelic.kadar.model.Transform
+import kotlin.math.roundToInt
 
 /**
  * A video layer's placement in Media3's compositor: its center in normalized device coordinates of the output frame
@@ -24,5 +25,14 @@ fun overlaySpan(startMs: Long, endMs: Long, durationMs: Long, totalMs: Long): Pa
     val end = minOf(endMs, startMs + durationMs, totalMs)
     return if (end - startMs < MIN_OVERLAY_MS) null else startMs to end
 }
+
+/** A video layer's alpha at [timeUs]: its [opacity] while it plays ([span], in ms), else 0 to hide the gap frames around it. */
+fun overlayAlpha(opacity: Float, span: Pair<Long, Long>, timeUs: Long) = if (timeUs in span.first * 1000 until span.second * 1000) opacity else 0f
+
+/**
+ * Frames per second of the export (and preview) once video layers are on: the main clip's own rate, rounded, at most
+ * 60 so phones can encode it. 30 when the rate is unknown.
+ */
+fun outputFrameRate(clipFrameRate: Float) = if (clipFrameRate > 0) clipFrameRate.roundToInt().coerceIn(1, 60) else 30
 
 private const val MIN_OVERLAY_MS = 100L

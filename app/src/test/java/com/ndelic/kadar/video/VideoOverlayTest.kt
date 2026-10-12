@@ -36,4 +36,19 @@ class VideoOverlayTest {
         assertNull(overlaySpan(10_000, 12_000, 3_000, 10_000))
         assertNull(overlaySpan(9_950, 12_000, 3_000, 10_000))
     }
+
+    @Test
+    fun alphaIsTheOpacityOnlyWhileTheLayerPlays() {
+        assertEquals(0f, overlayAlpha(0.5f, 1_000L to 2_000L, 999_999), 0f)
+        assertEquals(0.5f, overlayAlpha(0.5f, 1_000L to 2_000L, 1_000_000), 0f)
+        assertEquals(0f, overlayAlpha(0.5f, 1_000L to 2_000L, 2_000_000), 0f)
+    }
+
+    @Test
+    fun frameRateFollowsTheClipWithinWhatPhonesEncode() {
+        assertEquals(30, outputFrameRate(29.97f))
+        assertEquals(60, outputFrameRate(59.6f))
+        assertEquals(60, outputFrameRate(240f))
+        assertEquals(30, outputFrameRate(0f))
+    }
 }

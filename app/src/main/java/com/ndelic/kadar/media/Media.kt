@@ -106,8 +106,8 @@ fun renderEmoji(emoji: String, size: Float = 512f): Bitmap {
     return trimTransparent(bitmap)?.first ?: bitmap
 }
 
-/** Display size (rotation applied) and duration; width and height are 0 for audio. */
-data class MediaInfo(val width: Int, val height: Int, val durationMs: Long)
+/** Display size (rotation applied), duration and average frame rate; width, height and frame rate are 0 for audio. */
+data class MediaInfo(val width: Int, val height: Int, val durationMs: Long, val frameRate: Float)
 
 fun mediaInfo(context: Context, uri: Uri): MediaInfo = MediaMetadataRetriever().use { r ->
     r.setDataSource(context, uri)
@@ -116,7 +116,8 @@ fun mediaInfo(context: Context, uri: Uri): MediaInfo = MediaMetadataRetriever().
     val h = int(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
     val rotated = int(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION) % 180 != 0
     val duration = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0
-    if (rotated) MediaInfo(h, w, duration) else MediaInfo(w, h, duration)
+    val fps = if (duration > 0) int(MediaMetadataRetriever.METADATA_KEY_VIDEO_FRAME_COUNT) * 1000f / duration else 0f
+    if (rotated) MediaInfo(h, w, duration, fps) else MediaInfo(w, h, duration, fps)
 }
 
 /** A frame near [timeMs], small enough for a thumbnail. */

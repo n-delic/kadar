@@ -147,8 +147,9 @@ study, share and change it; if you distribute a modified version, you must publi
 same license.
 
 Kadar is an independent implementation written from scratch. It contains no code, decompiled code,
-icons, images, fonts, stickers or presets from any other photo or video app; every bundled asset is
-openly licensed and listed in [ATTRIBUTION.md](ATTRIBUTION.md).
+icons, images, fonts, stickers or presets from any other photo or video app; its workflow follows the
+observable behavior of common mobile editors, and no other app's code or binaries were examined. Every
+bundled asset is openly licensed and listed in [ATTRIBUTION.md](ATTRIBUTION.md). See [NOTICE](NOTICE).
 
 Built with [AndroidX Media3](https://github.com/androidx/media),
 [Jetpack Compose](https://developer.android.com/compose) and

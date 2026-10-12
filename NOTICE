@@ -13,12 +13,13 @@ their own licenses, the licensors of this Program grant you additional permissio
 resulting work. Corresponding Source for a non-source form of such a combination shall not include
 the source code for the parts of those libraries.
 
-Clean-room statement
+Independent implementation
 
-Kadar is an independent implementation written from scratch. It contains no code, decompiled code,
-icons, images, fonts, stickers, presets or other assets from any other photo or video editing app.
-Features were built from public descriptions of what common editing tools do, not from another app's
-internals.
+Kadar is written from scratch. It contains no code, decompiled code, icons, images, fonts, stickers,
+presets or other assets from any other photo or video editing app. Its features and workflow follow
+the observable behavior of common mobile editors (as seen while using them and in screenshots of their
+public interface); no other app's code, binaries or internal data were examined. This is a statement of
+how Kadar was made, not a legal certification.
 
 Third-party material
 

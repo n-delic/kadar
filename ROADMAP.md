@@ -48,7 +48,7 @@
 - GPL-3.0-or-later, NOTICE and ATTRIBUTION.md
 - Fix: the keyboard no longer shrinks the editor while typing text
 
-## Done for the next release
+## v0.5.1: done
 
 - Video over video: add more clips as layers on top of the main one, picture-in-picture style. Move, pinch-resize and rotate them on the stage, set when they show on their own timeline track, give them their own volume (muted by default), and export them with the main clip
 - Draw: circle things, draw arrows and scribble with a marker or a see-through highlighter, any color and size, with undo inside the draw screen. Each drawing is a layer you can move, resize, rotate, time on the video timeline, duplicate or draw more onto
@@ -56,17 +56,20 @@
 - In/out animations for text and stickers in videos: None, Fade, Pop or Slide up, for the entrance and the exit separately (Animate tool); the preview plays them and the export matches
 - Eight more caption fonts, all free (OFL) and bundled, so they work offline: Tall (Bebas Neue), Narrow (Oswald), Heavy (Archivo Black), Comic (Bangers), Marker (Caveat Brush), Casual (Comic Neue), Retro (Pacifico) and Horror (Creepster). The font row scrolls and marks the chosen one in lime
 - Bosnian translation: the app follows the phone's language, or pick it per app in Android 13+ settings (App languages). Error messages and busy labels are translated too
+- Filters: eight in-house looks (Mono, Noir, Sepia, Warm, Cool, Vivid, Fade, Teal & Orange) with a strength slider, for image layers and the whole video
+- Timeline tracks do everything the photo Layers panel does: long-press a track and drag it up/down to reorder, hide and lock with the eye and lock at its left (the Layers button is photo-only)
+- Zoomable timeline for long videos: pinch to zoom (down to about a second across), slide two fingers to scroll, a time ruler on top, and the view pages along with the playhead while playing; one finger edits and scrubs as before
+- Video layers: opacity, and "Starts at" to play them from the middle of their clip (Edit panel)
+- Export frame timing with video layers follows the main clip's frame rate (at most 60 fps), not the topmost overlay's, so a 30 fps or screen-recorded overlay no longer makes the export choppy
+- Blurred-background video canvas: on a 1:1, 4:5, 9:16 or 16:9 canvas, Canvas > Blur fills the bars with a blurred, darkened, zoomed copy of the video instead of black (the same clip as a second compositor sequence underneath)
+- Fixes from a code review: no crash when dragging a track end after trimming or when cropping past the image edge, scrubbing keeps working after the preview refreshes, undo records the first move of a snapped layer, the editor stays open if saving fails, image downloads are size-capped and don't pass browser cookies to redirect targets, Eraser and Draw ask before Back throws work away
+- Settings: image search engine (Google, DuckDuckGo, Bing, Brave) and default export size, with a per-project override; About with the license texts
+- Home: launch animation, logo, project multi-select (duplicate, delete), PHOTO / VIDEO badges; pinch to zoom the photo canvas, tap around it to deselect
 
 ## Next
 
-- [x] Filters: eight in-house looks (Mono, Noir, Sepia, Warm, Cool, Vivid, Fade, Teal & Orange) with a strength slider, for image layers and the whole video
-- [x] Timeline tracks do everything the photo Layers panel does: long-press a track and drag it up/down to reorder, hide and lock with the eye and lock at its left (the Layers button is photo-only)
-- [x] Zoomable timeline for long videos: pinch to zoom (down to about a second across), slide two fingers to scroll, a time ruler on top, and the view pages along with the playhead while playing; one finger edits and scrubs as before
-- [x] Video layers: opacity, and "Starts at" to play them from the middle of their clip (Edit panel)
-- [x] Export frame timing with video layers follows the main clip's frame rate (at most 60 fps), not the topmost overlay's, so a 30 fps or screen-recorded overlay no longer makes the export choppy
 - [ ] Video layers: crop, and a way to put them above text and stickers
 - [ ] Overlay clips with long frame gaps (screen recordings that only emit frames when the screen changes) make Media3's compositor draw a stretched copy of the overlay over the main clip during the gap. Constant-frame-rate clips (phone camera) are fine. Fix idea: re-time such overlays to a constant rate before compositing
-- [x] Blurred-background video canvas: on a 1:1, 4:5, 9:16 or 16:9 canvas, Canvas > Blur fills the bars with a blurred, darkened, zoomed copy of the video instead of black (the same clip as a second compositor sequence underneath)
 
 ## Later / maybe
 

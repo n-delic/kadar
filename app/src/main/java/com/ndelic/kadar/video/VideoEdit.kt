@@ -86,7 +86,7 @@ data class VideoClip(
     /** Output frame size; also the project canvas, so layers line up with the exported frame. */
     val outputSize get() = canvasSize(width, height, canvas)
 
-    /** Whether the composition gets the blurred copy as a second sequence (so the preview needs the compositor too). */
+    /** Whether the composition gets the blurred copy as a second sequence (the export only; the preview draws it with BlurBackgroundPreview). */
     val blurred get() = blur && canvas != null
 }
 

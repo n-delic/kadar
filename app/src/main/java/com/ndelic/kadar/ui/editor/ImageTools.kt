@@ -300,7 +300,6 @@ private fun centered(ratio: Float, bw: Float, bh: Float): Rect {
     return Rect((bw - w) / 2, (bh - h) / 2, (bw + w) / 2, (bh + h) / 2)
 }
 
-/** Cancel and apply for the full-screen tools; [middle] holds tool buttons between them. */
 /** Back asks before throwing away unsaved work in a full-screen tool; with nothing changed it just cancels. */
 @Composable
 internal fun DiscardGuard(changed: Boolean, onCancel: () -> Unit) {
@@ -320,6 +319,7 @@ internal fun DiscardGuard(changed: Boolean, onCancel: () -> Unit) {
     }
 }
 
+/** Cancel and apply for the full-screen tools; [middle] holds tool buttons between them. */
 @Composable
 internal fun ToolTopBar(onCancel: () -> Unit, onDone: () -> Unit, doneEnabled: Boolean, middle: @Composable () -> Unit = {}) {
     Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {

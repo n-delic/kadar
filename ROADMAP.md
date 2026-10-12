@@ -52,6 +52,7 @@
 
 - Video over video: add more clips as layers on top of the main one, picture-in-picture style. Move, pinch-resize and rotate them on the stage, set when they show on their own timeline track, give them their own volume (muted by default), and export them with the main clip
 - Draw: circle things, draw arrows and scribble with a marker or a see-through highlighter, any color and size, with undo inside the draw screen. Each drawing is a layer you can move, resize, rotate, time on the video timeline, duplicate or draw more onto
+- Project names: unnamed projects show their type and day ("Photo · Oct 12"); select one project on the home screen and tap Rename. Sort the grid by Recent, Name or Type (videos first), remembered between launches, and search by name once there are more than 6 projects
 
 ## Next
 

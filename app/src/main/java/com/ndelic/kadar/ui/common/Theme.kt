@@ -18,6 +18,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -39,13 +42,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ndelic.kadar.R
@@ -246,15 +253,57 @@ fun PanelLabel(text: String) {
 }
 
 @Composable
-fun KDialog(title: String, text: String, confirm: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+fun KDialog(title: String, text: String, confirm: String, onConfirm: () -> Unit, onDismiss: () -> Unit) =
+    KDialog(title, confirm, onConfirm, onDismiss) { Text(text, color = Ink.dim) }
+
+/** [KDialog] with any [content] in place of the message, such as a [KTextField]. */
+@Composable
+fun KDialog(title: String, confirm: String, onConfirm: () -> Unit, onDismiss: () -> Unit, content: @Composable () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Ink.raised,
         title = { Text(title, color = Ink.text) },
-        text = { Text(text, color = Ink.dim) },
+        text = content,
         confirmButton = { TextButton(onClick = onConfirm) { Text(confirm, color = Ink.accent, fontWeight = FontWeight.Bold) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = Ink.dim) } },
     )
+}
+
+/** Single-line pill field with an optional leading [icon]; [placeholder] shows when empty and names it for TalkBack. */
+@Composable
+fun KTextField(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    @DrawableRes icon: Int? = null,
+    background: Color = Ink.raised,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.height(44.dp).clip(RoundedCornerShape(22.dp)).background(background).padding(horizontal = 14.dp),
+    ) {
+        icon?.let {
+            KIcon(it, Modifier.size(20.dp), Ink.dim)
+            Spacer(Modifier.width(10.dp))
+        }
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = TextStyle(color = Ink.text, fontSize = 15.sp, fontFamily = UiFont),
+            cursorBrush = SolidColor(Ink.accent),
+            keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
+            modifier = Modifier.weight(1f).semantics { contentDescription = placeholder },
+            decorationBox = { field ->
+                if (value.text.isEmpty()) Text(placeholder, color = Ink.dim, fontSize = 15.sp)
+                field()
+            },
+        )
+    }
 }
 
 /** Makes a full-screen layer swallow touches meant for what's underneath. */

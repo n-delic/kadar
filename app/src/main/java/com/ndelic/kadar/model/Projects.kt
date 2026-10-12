@@ -22,9 +22,14 @@ data class Project(
     val video: VideoClip? = null,
     /** Export size for this project, or null to use the app-wide default from Settings. */
     val exportSize: ExportSize? = null,
+    /** Set from the home screen; null shows [defaultName]. */
+    val name: String? = null,
 )
 
-data class SavedProject(val dir: File, val modified: Long, val thumb: Bitmap?, val isVideo: Boolean)
+data class SavedProject(val dir: File, val modified: Long, val thumb: Bitmap?, val isVideo: Boolean, val name: String? = null) {
+    /** Folder names are creation timestamps (see [ProjectStore.create]). */
+    val label = name ?: defaultName(isVideo, dir.name.toLongOrNull() ?: modified)
+}
 
 /**
  * One folder per project under [root]: `project.json`, a thumbnail, and every image the project uses
@@ -47,10 +52,23 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
         .mapNotNull { dir ->
             val json = File(dir, PROJECT)
             if (!json.exists()) return@mapNotNull null
-            val isVideo = runCatching { JSONObject(json.readText()).has("video") }.getOrDefault(false)
-            SavedProject(dir, json.lastModified(), BitmapFactory.decodeFile(File(dir, THUMB).path), isVideo)
+            val j = runCatching { JSONObject(json.readText()) }.getOrNull()
+            SavedProject(dir, json.lastModified(), BitmapFactory.decodeFile(File(dir, THUMB).path), j?.has("video") == true, j?.optString("name")?.ifEmpty { null })
         }
         .sortedByDescending { it.modified }
+
+    /**
+     * Sets or clears (null) a project's name in place, leaving every other field as written (even ones this version
+     * doesn't know). Keeps the modified time: a rename isn't an edit, so it shouldn't jump to the top of "Recent".
+     */
+    fun rename(dir: File, name: String?) {
+        val file = File(dir, PROJECT)
+        val modified = file.lastModified()
+        val j = JSONObject(file.readText())
+        if (name == null) j.remove("name") else j.put("name", name)
+        writeAtomic(file) { it.write(j.toString().toByteArray()) }
+        file.setLastModified(modified)
+    }
 
     /** Stores [bitmap] in the project folder and returns its file name. */
     fun writeImage(dir: File, bitmap: Bitmap): String {
@@ -85,6 +103,7 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
             // Projects from before the video canvas existed: the canvas was the video's own size.
             video = j.optJSONObject("video")?.let { clipFromJson(it, j.getInt("width"), j.getInt("height")) },
             exportSize = j.optString("exportSize").ifEmpty { null }?.let { enumOr<ExportSize>(it, ExportSize.Original) },
+            name = j.optString("name").ifEmpty { null },
         )
     }
 
@@ -195,6 +214,7 @@ private fun Project.toJson() = JSONObject().apply {
     put("layers", JSONArray(layers.map { it.toJson() }))
     video?.let { put("video", it.toJson()) }
     exportSize?.let { put("exportSize", it.name) }
+    name?.let { put("name", it) }
 }
 
 private fun Layer.toJson() = JSONObject().apply {

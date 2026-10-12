@@ -104,7 +104,6 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.effect.MultipleInputVideoGraph
 import androidx.media3.transformer.CompositionPlayer
 import com.ndelic.kadar.EditorUiState
 import com.ndelic.kadar.EditorViewModel
@@ -149,10 +148,10 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     var typing by rememberSaveable { mutableStateOf<String?>(null) }
     val image = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::addImage) }
     val music = rememberLauncherForActivityResult(OpenDocument()) { it?.let(vm::setMusic) }
-    // Bumped to swap in a fresh preview player (a paused blurred preview, or one that failed), resuming at [resumeAt].
+    // Bumped to swap in a fresh preview player after it failed, resuming at [resumeAt].
     var playerGeneration by remember { mutableIntStateOf(0) }
     val resumeAt = remember { longArrayOf(0) }
-    val player = if (video != null) rememberCompositionPlayer(multiInput = video.blurred, playerGeneration) else null
+    val player = if (video != null) rememberCompositionPlayer(playerGeneration) else null
     var playing by remember { mutableStateOf(false) }
     var positionMs by remember { mutableLongStateOf(0L) }
     val overlayVideo = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let { uri -> vm.addVideo(uri, positionMs) } }
@@ -180,20 +179,12 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     // When the preview last failed and was rebuilt, to give up instead of rebuilding in a loop.
     val lastFailure = remember { longArrayOf(-RETRY_WINDOW_MS) }
     if (player != null && video != null) {
-        // Video layers aren't in the preview's composition: VideoLayerPreview draws each with its own player.
-        val freshPlayer = remember(player) { booleanArrayOf(true) }
+        // The preview's composition is the clip alone: VideoLayerPreview draws each video layer with its own player and
+        // BlurBackgroundPreview the blurred canvas, so the main player stays single-input. Media3 1.11's multi-input
+        // preview fails mid-playback ("frame for an ended input") on devices; the export still composites everything.
         LaunchedEffect(player, video) {
-            // A paused multi-input player (the blurred canvas) won't repaint a new composition, so use a new player.
-            if (!freshPlayer[0] && video.blurred && !player.isPlaying) {
-                // Coalesce a drag (e.g. a slider) into one rebuild instead of one per move.
-                delay(150)
-                resumeAt[0] = player.currentPosition
-                playerGeneration++
-                return@LaunchedEffect
-            }
-            freshPlayer[0] = false
             val start = resumeAt[0].also { resumeAt[0] = 0 }
-            player.setComposition(video.composition(null), start)
+            player.setComposition(video.copy(blur = false).composition(null), start)
             player.prepare()
             // A paused player keeps showing the old frame after a new composition; seek once it's loaded to repaint.
             delay(300)
@@ -611,6 +602,7 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
         ) {
             Box(Modifier.fillMaxSize().clipToBounds().background(if (transparent) Color(0xFF3A3A3A) else Color(project.background))) {
                 if (transparent) Checkerboard()
+                project.video?.takeIf { it.blurred }?.let { BlurBackgroundPreview(it, project.width, project.height, scale, player) }
                 player?.let { p -> VideoSurface(p, project.width, project.height, Modifier.fillMaxSize()) }
                 // Over the main video and under the canvas (text, stickers, handles), bottom layer first, like the export.
                 if (videoEnd != null) {
@@ -825,6 +817,8 @@ private fun VideoSurface(player: CompositionPlayer, canvasWidth: Int, canvasHeig
         AndroidView(
             factory = { context ->
                 TextureView(context).apply {
+                    // The canvas's letterbox bars are transparent, so the blurred background preview shows through.
+                    isOpaque = false
                     surfaceTextureListener = object : TextureView.SurfaceTextureListener {
                         private var surface: Surface? = null
 
@@ -864,17 +858,13 @@ private const val PREVIEW_LONG_SIDE = 1280f
 
 /** The preview player, null for the moment one is swapped for the next. */
 @Composable
-private fun rememberCompositionPlayer(multiInput: Boolean, generation: Int): CompositionPlayer? {
+private fun rememberCompositionPlayer(generation: Int): CompositionPlayer? {
     val context = LocalContext.current
     var player by remember { mutableStateOf<CompositionPlayer?>(null) }
     // Made in the effect rather than in remember: on a new key the old player is released (onDispose) before the next
     // one is built, so two never fight over decoders and the GPU.
-    DisposableEffect(multiInput, generation) {
-        // The blurred background needs the compositor; other projects keep the plain single-input preview.
-        val p = CompositionPlayer.Builder(context)
-            .apply { if (multiInput) setVideoGraphFactory(MultipleInputVideoGraph.Factory()) }
-            .build()
-            .apply { repeatMode = Player.REPEAT_MODE_ALL }
+    DisposableEffect(generation) {
+        val p = CompositionPlayer.Builder(context).build().apply { repeatMode = Player.REPEAT_MODE_ALL }
         player = p
         onDispose {
             player = null

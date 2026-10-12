@@ -84,7 +84,8 @@ emulator -avd pixel_7_api35   # reference emulator (Google Play image, needed fo
 12. **Match existing patterns.** State is one `StateFlow<EditorUiState>`, one-shot messages go through the `effects` channel, panels are composables in `ui/Panels.kt` that call the ViewModel directly. Reuse the components in `ui/Theme.kt` before writing new widgets.
 13. **Edge drags need `systemGestureExclusion()`**, or the system back gesture steals them (the timeline does this).
 14. **Clean room, open assets.** Never copy, decompile or look at another editing app's code, and never take its icons, images, fonts, stickers, presets or distinctive UI design; build features from public descriptions of what they do. Every bundled asset must be openly licensed (OFL, CC0, Apache/MIT, own work) and get a row in `ATTRIBUTION.md` plus its license file in `third_party/`. Don't name other apps in the UI or store text.
-15. **Smallest change that fully works.** No new dependencies, layers or abstractions without a clear need. UI text is English and inline for now (no translation yet).
+15. **Known patents to stay clear of** (checked 2026-10-12, assignee search, not a legal opinion): US11989808B2 covers recording a creator's edit steps as a "replay" others apply to their own photo; read its claims before building anything like edit-sharing templates. USD1056949S1 is a design patent on a staggered two-column card feed with a five-tab bottom bar and a central round "+"; don't build the home screen that way.
+16. **Smallest change that fully works.** No new dependencies, layers or abstractions without a clear need. UI text is English and inline for now (no translation yet).
 
 ## Verifying a change
 

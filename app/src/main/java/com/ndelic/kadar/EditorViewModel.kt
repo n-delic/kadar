@@ -304,7 +304,35 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val file = withContext(Dispatchers.IO) { store.writeImage(dir, cut) }
         // Keep the subject where it was on screen: the crop's center is off the old center.
         val t = layer.t.shiftedLocal((b[0] + b[2]) / 2f - layer.width / 2, (b[1] + b[3]) / 2f - layer.height / 2)
-        updateLayer(layer.id) { layer.copy(t = t, bitmap = cut, file = file) }
+        updateLayer(layer.id) {
+            layer.copy(t = t, bitmap = cut, file = file, source = layer.source ?: layer.file, sourceX = layer.sourceX + b[0], sourceY = layer.sourceY + b[1])
+        }
+    }
+
+    /** The untouched original behind a cut-out or crop, for the restore brush; null if there is none. */
+    suspend fun loadSource(layer: ImageLayer): Bitmap? {
+        val dir = _uiState.value.projectDir ?: return null
+        val name = layer.source ?: return null
+        return withContext(Dispatchers.IO) { BitmapFactory.decodeFile(File(dir, name).path) }
+    }
+
+    /** Result of the eraser screen: one undo step for the whole session. Same size as before, so the source offset still holds. */
+    fun applyErase(id: Long, bitmap: Bitmap) = work("Saving") {
+        val dir = _uiState.value.projectDir ?: return@work
+        val file = withContext(Dispatchers.IO) { store.writeImage(dir, bitmap) }
+        updateLayer(id) { (it as ImageLayer).copy(bitmap = bitmap, file = file) }
+    }
+
+    /** Crops the layer to `[left, top, right, bottom)` of its bitmap, keeping the kept part where it was on screen. */
+    fun applyCrop(id: Long, left: Int, top: Int, right: Int, bottom: Int) = work("Cropping") {
+        val layer = _uiState.value.project?.layers?.firstOrNull { it.id == id } as? ImageLayer ?: return@work
+        val dir = _uiState.value.projectDir ?: return@work
+        val cut = Bitmap.createBitmap(layer.bitmap, left, top, right - left, bottom - top)
+        val file = withContext(Dispatchers.IO) { store.writeImage(dir, cut) }
+        val t = layer.t.shiftedLocal((left + right) / 2f - layer.width / 2, (top + bottom) / 2f - layer.height / 2)
+        updateLayer(id) {
+            layer.copy(t = t, bitmap = cut, file = file, source = layer.source ?: layer.file, sourceX = layer.sourceX + left, sourceY = layer.sourceY + top)
+        }
     }
 
     // Stickers

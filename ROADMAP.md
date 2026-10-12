@@ -31,10 +31,13 @@
 - "Share to Kadar" from the gallery or any app; shared videos are copied into the project when the grant can't be kept
 - Unused images are deleted from a project folder when it's closed
 
+## v0.4: done
+
+- Eraser / restore brush for image layers (one finger paints, two fingers zoom and pan); restore paints the original back after a cut-out or crop
+- Crop an image layer (free or 1:1, 4:5, 9:16, 16:9), the kept part stays where it was
+
 ## Next
 
-- [ ] Manual eraser / restore brush to fix background-removal edges
-- [ ] Crop a single image layer
 - [ ] Text shadow, letter spacing, alignment
 - [ ] Hide and lock layers; drag tracks up/down to reorder
 

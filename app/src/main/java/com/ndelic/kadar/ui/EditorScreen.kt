@@ -64,6 +64,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -117,6 +118,7 @@ import com.ndelic.kadar.VideoClip
 import com.ndelic.kadar.composition
 import com.ndelic.kadar.drawLayer
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.atan2
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -137,6 +139,9 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     var playing by remember { mutableStateOf(false) }
     var positionMs by remember { mutableLongStateOf(0L) }
     var trimming by rememberSaveable { mutableStateOf(false) }
+    var erasing by remember { mutableStateOf<Pair<ImageLayer, Bitmap?>?>(null) }
+    var cropping by remember { mutableStateOf<ImageLayer?>(null) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(state.selectedId) {
         // Selecting from the Layers list keeps the list open; anything else starts from the layer's tools.
@@ -258,6 +263,10 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_check, "Done") { vm.select(null) }
                         ToolDivider()
                         IconTool(R.drawable.ic_background_replace, "Remove BG", onClick = vm::removeBackground)
+                        IconTool(R.drawable.ic_ink_eraser, "Eraser") {
+                            (state.selected as? ImageLayer)?.let { l -> scope.launch { erasing = l to vm.loadSource(l) } }
+                        }
+                        IconTool(R.drawable.ic_crop, "Crop") { cropping = state.selected as? ImageLayer }
                         IconTool(R.drawable.ic_library_add, "Save sticker", onClick = vm::saveSticker)
                         IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, "Back", onClick = vm::sendToBack)
@@ -294,6 +303,28 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                 )
             }
         }
+    }
+
+    erasing?.let { (layer, source) ->
+        EraseScreen(
+            layer = layer,
+            source = source,
+            onDone = {
+                erasing = null
+                vm.applyErase(layer.id, it)
+            },
+            onCancel = { erasing = null },
+        )
+    }
+    cropping?.let { layer ->
+        CropScreen(
+            layer = layer,
+            onDone = { r ->
+                cropping = null
+                vm.applyCrop(layer.id, r[0], r[1], r[2], r[3])
+            },
+            onCancel = { cropping = null },
+        )
     }
 
     typing?.let { initial ->

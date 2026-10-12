@@ -49,7 +49,7 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
 
     /** Deletes images no layer uses any more (after undo history is gone, so nothing can bring them back). */
     fun cleanUp(dir: File, project: Project) {
-        val used = project.layers.filterIsInstance<ImageLayer>().map { it.file }.toSet() + THUMB
+        val used = project.layers.filterIsInstance<ImageLayer>().flatMap { listOfNotNull(it.file, it.source) }.toSet() + THUMB
         dir.listFiles().orEmpty()
             .filter { (it.name.endsWith(".png") || it.name.endsWith(".jpg")) && it.name !in used }
             .forEach { it.delete() }
@@ -83,7 +83,16 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
             "image" -> {
                 val file = j.getString("file")
                 // A missing image drops that one layer rather than the whole project.
-                BitmapFactory.decodeFile(File(dir, file).path)?.let { ImageLayer(id, t, it, file, start, end) }
+                BitmapFactory.decodeFile(File(dir, file).path)?.let {
+                    ImageLayer(
+                        id, t, it, file,
+                        source = j.optString("source").ifEmpty { null },
+                        sourceX = j.optInt("sourceX"),
+                        sourceY = j.optInt("sourceY"),
+                        startMs = start,
+                        endMs = end,
+                    )
+                }
             }
             "text" -> TextLayer(
                 id = id,
@@ -142,6 +151,11 @@ private fun Layer.toJson() = JSONObject().apply {
         is ImageLayer -> {
             put("type", "image")
             put("file", layer.file)
+            layer.source?.let {
+                put("source", it)
+                put("sourceX", layer.sourceX)
+                put("sourceY", layer.sourceY)
+            }
         }
         is TextLayer -> {
             put("type", "text")

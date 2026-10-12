@@ -68,12 +68,19 @@ sealed interface Layer {
     fun withTransform(t: Transform): Layer
 }
 
-/** [file] is the image's name inside the project folder, so the project can be reopened. */
+/**
+ * [file] is the image's name inside the project folder, so the project can be reopened.
+ * After a cut-out or crop, [source] is the untouched original and ([sourceX], [sourceY]) where this bitmap's
+ * top-left sits in it, so the restore brush can paint the original back.
+ */
 data class ImageLayer(
     override val id: Long,
     override val t: Transform,
     val bitmap: Bitmap,
     val file: String,
+    val source: String? = null,
+    val sourceX: Int = 0,
+    val sourceY: Int = 0,
     override val startMs: Long = 0,
     override val endMs: Long = Long.MAX_VALUE,
 ) : Layer {

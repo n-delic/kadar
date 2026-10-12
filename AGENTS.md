@@ -14,6 +14,7 @@ The owner's phone is a Galaxy S25. It also gets installed on older family phones
 - **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time; export H.264/AAC MP4 to `Movies/Kadar`.
 - **Undo / redo** for every edit (gestures and timeline drags count once per drag).
 - **Snapping** to the canvas center and 0°/90°, caption boxes behind text, a Layers panel, keep-pitch for speed changes.
+- **Eraser / restore brush and crop** for image layers (`ui/ImageTools.kt`). `ImageLayer.source` + `sourceX/Y` remember the untouched original and where the layer's bitmap sits in it; keep them right in any new operation that resizes or crops a bitmap.
 - **Share to Kadar**: `MainActivity` (singleTask) takes `ACTION_SEND` images and videos and calls `EditorViewModel.openShared`.
 - **Projects**: every edit autosaves into the app's private storage and shows up on the home screen; reopen or long-press to delete.
 - **Web images**: an in-app browser (Google Images by default). Long-press an image to download it into the project, never into the gallery.
@@ -49,6 +50,7 @@ app/src/main/java/com/ndelic/kadar/
                       NLE Timeline (layer tracks + clip), TrimStrip, full-screen TextEntry
   ui/Panels.kt        Tool panels: stickers, canvas, speed, audio, font
   ui/WebImportScreen.kt  WebView browser with long-press-to-import
+  ui/ImageTools.kt    EraseScreen (erase/restore brush) and CropScreen for image layers
 app/src/main/res/font/anton.ttf          Meme font (SIL OFL, license in third_party/)
 app/src/main/res/font/jakarta.ttf        UI font, Plus Jakarta Sans variable (SIL OFL)
 scripts/add-icons.sh                     Fetches Material Symbols as vector drawables

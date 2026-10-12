@@ -1,3 +1,5 @@
+@file:OptIn(UnstableApi::class)
+
 package com.ndelic.kadar.ui.editor
 
 import android.graphics.ColorMatrixColorFilter
@@ -6,6 +8,7 @@ import android.graphics.Shader
 import android.os.Build
 import android.os.SystemClock
 import android.view.TextureView
+import androidx.annotation.OptIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.wrapContentSize
@@ -28,6 +31,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.ndelic.kadar.model.filterMatrix
 import com.ndelic.kadar.video.VideoClip

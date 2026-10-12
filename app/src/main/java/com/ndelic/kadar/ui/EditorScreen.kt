@@ -32,6 +32,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.key
 import androidx.compose.ui.text.font.FontWeight
@@ -831,7 +832,7 @@ private fun TextEntry(initial: String, font: Typeface, color: Int, onDone: (Stri
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     BackHandler(onBack = onCancel)
-    Column(Modifier.fillMaxSize().background(Ink.bg.copy(alpha = 0.94f)).blockTouches()) {
+    Column(Modifier.fillMaxSize().background(Ink.bg.copy(alpha = 0.94f)).blockTouches().imePadding()) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             CircleButton(R.drawable.ic_close, "Cancel", onClick = onCancel)
             Spacer(Modifier.weight(1f))

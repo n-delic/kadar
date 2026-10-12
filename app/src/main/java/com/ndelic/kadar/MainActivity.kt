@@ -16,7 +16,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -111,7 +115,9 @@ private fun App(vm: EditorViewModel) {
     }
 
     Box(Modifier.fillMaxSize().background(Ink.bg)) {
-        Box(Modifier.safeDrawingPadding()) {
+        // System bars only: the keyboard must not shrink the editor (the video would resize behind the text entry).
+        // Screens with a text field add imePadding() themselves.
+        Box(Modifier.windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))) {
             when {
                 browsing -> WebImportScreen(
                     onPick = { url ->

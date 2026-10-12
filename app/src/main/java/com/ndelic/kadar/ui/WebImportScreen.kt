@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -47,7 +48,7 @@ fun WebImportScreen(onPick: (String) -> Unit, onClose: () -> Unit) {
 
     BackHandler { webView?.takeIf { it.canGoBack() }?.goBack() ?: onClose() }
 
-    Column(Modifier.fillMaxSize().background(Ink.bg)) {
+    Column(Modifier.fillMaxSize().background(Ink.bg).imePadding()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
             CircleButton(R.drawable.ic_close, "Close", onClick = onClose)
             Spacer(Modifier.width(10.dp))

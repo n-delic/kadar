@@ -28,7 +28,15 @@ data class SavedProject(val dir: File, val modified: Long, val thumb: Bitmap?, v
  */
 class ProjectStore(private val root: File, private val fonts: List<Font>) {
 
-    fun create(): File = File(root, System.currentTimeMillis().toString()).also { it.mkdirs() }
+    /** A new, empty project folder; names are timestamps, bumped when several are made in the same millisecond. */
+    fun create(): File {
+        var stamp = System.currentTimeMillis()
+        while (File(root, stamp.toString()).exists()) stamp++
+        return File(root, stamp.toString()).also { it.mkdirs() }
+    }
+
+    /** Copies a whole project (images included) to a new folder. Videos and music are shared references, not copied. */
+    fun duplicate(dir: File): File = create().also { dir.copyRecursively(it, overwrite = true) }
 
     fun list(): List<SavedProject> = root.listFiles().orEmpty()
         .mapNotNull { dir ->

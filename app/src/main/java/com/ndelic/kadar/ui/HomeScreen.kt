@@ -1,6 +1,15 @@
 package com.ndelic.kadar.ui
 
 import android.text.format.DateUtils
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.border
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
@@ -40,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,29 +64,40 @@ import com.ndelic.kadar.SavedProject
 fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
     val photo = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::newPhoto) }
     val video = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::newVideo) }
-    var deleting by remember { mutableStateOf<SavedProject?>(null) }
+    // Paths of the selected projects; non-empty means selection mode.
+    var selected by rememberSaveable { mutableStateOf(listOf<String>()) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    val selecting = selected.isNotEmpty()
+    val picked = state.projects.filter { it.dir.path in selected }
+    fun toggle(p: SavedProject) {
+        selected = if (p.dir.path in selected) selected - p.dir.path else selected + p.dir.path
+    }
+    // Projects can disappear (deleted elsewhere); keep the selection to ones that exist.
+    LaunchedEffect(state.projects) { selected = selected.filter { path -> state.projects.any { it.dir.path == path } } }
+    BackHandler(enabled = selecting) { selected = emptyList() }
 
+    Box(Modifier.fillMaxSize()) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         modifier = Modifier.fillMaxSize().background(Ink.bg),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 20.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 20.dp, bottom = if (selecting) 110.dp else 20.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(12.dp).clip(CircleShape).background(Ink.accent))
-                    Spacer(Modifier.width(10.dp))
+                    Image(painterResource(R.drawable.ic_mark), contentDescription = null, modifier = Modifier.size(40.dp))
+                    Spacer(Modifier.width(12.dp))
                     Text("Kadar", color = Ink.text, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        listOf("v${BuildConfig.VERSION_NAME}", BuildConfig.STAGE).filter { it.isNotEmpty() }.joinToString(" "),
-                        color = Ink.dim,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Ink.raised).padding(horizontal = 8.dp, vertical = 3.dp),
-                    )
+                    Spacer(Modifier.width(6.dp))
+                    // Superscript: small type hanging off the top of the name, no box.
+                    Column(Modifier.align(Alignment.Top).padding(top = 3.dp)) {
+                        if (BuildConfig.STAGE.isNotEmpty()) {
+                            Text(BuildConfig.STAGE.uppercase(), color = Ink.accent, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp, lineHeight = 10.sp)
+                        }
+                        Text("v${BuildConfig.VERSION_NAME}", color = Ink.dim, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, lineHeight = 10.sp)
+                    }
                 }
                 Text("Photos and videos, edited on your phone. No account, no watermark.", color = Ink.dim, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
                 Spacer(Modifier.height(24.dp))
@@ -105,12 +126,47 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) 
             }
         }
         items(state.projects, key = { it.dir.path }) { p ->
-            Column(Modifier.combinedClickable(onClick = { vm.openProject(p.dir) }, onLongClick = { deleting = p })) {
-                Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(RoundedCornerShape(14.dp)).background(Ink.raised)) {
+            val isPicked = p.dir.path in selected
+            Column(
+                Modifier.combinedClickable(
+                    onClick = { if (selecting) toggle(p) else vm.openProject(p.dir) },
+                    onLongClick = { toggle(p) },
+                ),
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Ink.raised)
+                        .border(if (isPicked) 3.dp else 0.dp, if (isPicked) Ink.accent else Color.Transparent, RoundedCornerShape(14.dp)),
+                ) {
                     p.thumb?.let { Image(it.asImageBitmap(), contentDescription = "Project", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
-                    if (p.isVideo) {
-                        Box(Modifier.padding(6.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.55f)).padding(4.dp)) {
-                            KIcon(R.drawable.ic_movie, Modifier.size(14.dp), description = "Video")
+                    Row(
+                        Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(6.dp)
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(Ink.accent)
+                            .padding(start = 5.dp, end = 7.dp, top = 3.dp, bottom = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        KIcon(if (p.isVideo) R.drawable.ic_movie else R.drawable.ic_image, Modifier.size(12.dp), Ink.onAccent)
+                        Spacer(Modifier.width(4.dp))
+                        Text(if (p.isVideo) "VIDEO" else "PHOTO", color = Ink.onAccent, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.8.sp)
+                    }
+                    if (selecting) {
+                        Box(
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(6.dp)
+                                .size(22.dp)
+                                .clip(CircleShape)
+                                .background(if (isPicked) Ink.accent else Color.Black.copy(alpha = 0.45f))
+                                .border(1.5.dp, if (isPicked) Ink.accent else Color.White, CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (isPicked) KIcon(R.drawable.ic_check, Modifier.size(15.dp), Ink.onAccent, "Selected")
                         }
                     }
                 }
@@ -125,17 +181,60 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) 
         }
     }
 
-    deleting?.let { p ->
+
+    AnimatedVisibility(
+        visible = selecting,
+        enter = slideInVertically { it } + fadeIn(),
+        exit = slideOutVertically { it } + fadeOut(),
+        modifier = Modifier.align(Alignment.BottomCenter),
+    ) {
+        Row(
+            Modifier
+                .padding(16.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(22.dp))
+                .background(Ink.raised)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(44.dp).clip(CircleShape).clickable { selected = emptyList() }, contentAlignment = Alignment.Center) {
+                KIcon(R.drawable.ic_close, Modifier.size(22.dp), description = "Cancel selection")
+            }
+            Text("${picked.size} selected", color = Ink.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).padding(start = 4.dp))
+            BarAction(R.drawable.ic_select_all, "All") { selected = state.projects.map { it.dir.path } }
+            BarAction(R.drawable.ic_content_copy, "Duplicate") {
+                vm.duplicateProjects(picked.map { it.dir })
+                selected = emptyList()
+            }
+            BarAction(R.drawable.ic_delete, "Delete", tint = Color(0xFFFF5A6E)) { confirmDelete = true }
+        }
+    }
+    }
+
+    if (confirmDelete) {
+        val n = picked.size
         KDialog(
-            title = "Delete project?",
-            text = "Its images are deleted too. Things you saved to the gallery stay.",
+            title = if (n == 1) "Delete project?" else "Delete $n projects?",
+            text = "Their images are deleted too. Things you saved to the gallery stay.",
             confirm = "Delete",
             onConfirm = {
-                vm.deleteProject(p.dir)
-                deleting = null
+                vm.deleteProjects(picked.map { it.dir })
+                selected = emptyList()
+                confirmDelete = false
             },
-            onDismiss = { deleting = null },
+            onDismiss = { confirmDelete = false },
         )
+    }
+}
+
+@Composable
+private fun BarAction(icon: Int, label: String, tint: Color = Ink.text, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 6.dp),
+    ) {
+        KIcon(icon, Modifier.size(22.dp), tint)
+        Text(label, color = tint, fontSize = 11.sp)
     }
 }
 

@@ -2,5 +2,7 @@
     <style name="Theme.Kadar" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/ink</item>
         <item name="android:windowSplashScreenBackground">@color/ink</item>
+        <!-- No system icon: the in-app intro draws the logo, so launch is one continuous animation. -->
+        <item name="android:windowSplashScreenAnimatedIcon">@android:color/transparent</item>
     </style>
 </resources>

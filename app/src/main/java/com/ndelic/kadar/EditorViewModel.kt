@@ -38,6 +38,8 @@ data class Sticker(val file: File, val thumb: Bitmap)
 
 data class EditorUiState(
     val projects: List<SavedProject> = emptyList(),
+    /** False until the project list (and its thumbnails) is first read; the intro waits for it. */
+    val projectsLoaded: Boolean = false,
     val projectDir: File? = null,
     val project: Project? = null,
     val selectedId: Long? = null,
@@ -146,11 +148,16 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         open(dir, project, frame, saved = true)
     }
 
-    fun deleteProject(dir: File) {
+    fun deleteProjects(dirs: List<File>) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { dir.deleteRecursively() }
+            withContext(Dispatchers.IO) { dirs.forEach { it.deleteRecursively() } }
             refreshProjects()
         }
+    }
+
+    fun duplicateProjects(dirs: List<File>) = work(if (dirs.size == 1) "Duplicating" else "Duplicating ${dirs.size} projects") {
+        withContext(Dispatchers.IO) { dirs.forEach { store.duplicate(it) } }
+        refreshProjects()
     }
 
     /** Saves right away (the autosave is debounced) and returns to the project list. */
@@ -212,7 +219,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     private fun refreshProjects() {
         viewModelScope.launch {
             val list = withContext(Dispatchers.IO) { store.list() }
-            _uiState.update { it.copy(projects = list) }
+            _uiState.update { it.copy(projects = list, projectsLoaded = true) }
         }
     }
 

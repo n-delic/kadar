@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Kadar mark (tile, lime corners, teal play), cropped to the app icon's 66dp safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="66dp"
+    android:height="66dp"
+    android:viewportWidth="66"
+    android:viewportHeight="66">
+    <group android:translateX="-21" android:translateY="-21">
+        <path android:pathData="M37,21h34a16,16 0,0 1,16 16v34a16,16 0,0 1,-16 16h-34a16,16 0,0 1,-16 -16v-34a16,16 0,0 1,16 -16z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="0"
+                    android:startY="21"
+                    android:endX="0"
+                    android:endY="87"
+                    android:startColor="#FF2E3036"
+                    android:endColor="#FF16171A" />
+            </aapt:attr>
+        </path>
+        <path
+            android:pathData="M33,45V39a6,6 0,0 1,6 -6h6 M63,33h6a6,6 0,0 1,6 6v6 M75,63v6a6,6 0,0 1,-6 6h-6 M45,75h-6a6,6 0,0 1,-6 -6v-6"
+            android:strokeWidth="5"
+            android:strokeColor="#FFC6F432"
+            android:strokeLineCap="round" />
+        <path
+            android:fillColor="#FF2DE1C2"
+            android:strokeColor="#FF2DE1C2"
+            android:strokeWidth="3"
+            android:strokeLineJoin="round"
+            android:pathData="M48,44.5L64,54L48,63.5Z" />
+    </group>
+</vector>

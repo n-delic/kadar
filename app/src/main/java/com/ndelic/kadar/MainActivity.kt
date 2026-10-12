@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.ndelic.kadar.ui.EditorScreen
 import com.ndelic.kadar.ui.Ink
+import com.ndelic.kadar.ui.Intro
 import com.ndelic.kadar.ui.KadarTheme
 import com.ndelic.kadar.ui.blockTouches
 import com.ndelic.kadar.ui.HomeScreen
@@ -94,6 +95,8 @@ private fun App(vm: EditorViewModel) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var browsing by rememberSaveable { mutableStateOf(false) }
+    // Only on a cold start, not after rotation.
+    var intro by rememberSaveable { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -142,6 +145,7 @@ private fun App(vm: EditorViewModel) {
             }
             state.busy?.let { BusyOverlay(it) }
         }
+        if (intro) Intro(ready = state.projectsLoaded, onDone = { intro = false })
     }
 }
 

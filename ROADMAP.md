@@ -46,6 +46,7 @@
 - Signed release APKs built by GitHub Actions on every version tag; CI on every push
 - Separate "Kadar Dev" debug app; R8 keep rules so background removal works in release builds
 - GPL-3.0-or-later, NOTICE and ATTRIBUTION.md
+- Fix: the keyboard no longer shrinks the editor while typing text
 
 ## Next
 

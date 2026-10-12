@@ -74,6 +74,7 @@
 - Smoother video preview: video layers and the blurred canvas each play in their own view, so dragging a layer moves it instantly, and a blurred-canvas project no longer stops or jumps back to 0:00 while playing; with music the picture no longer goes black
 - Crop video layers: pick the part of the clip to show on one of its frames (free or 1:1, 4:5, 9:16, 16:9); the kept part stays where it was, and Crop again shows the whole frame to change it
 - Video layers stack with text, stickers and drawings in track order: drag a video layer's track above a caption's to cover it, in the preview and the export
+- Fix: see-through parts of text, stickers and drawings (soft edges, shadows, fades, the highlighter) exported darker than the preview showed them
 
 ## Next
 

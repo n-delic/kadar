@@ -328,11 +328,13 @@ fun timedOverlay(width: Int, height: Int, layers: List<Layer>, durationMs: Long)
         when {
             visible.isEmpty() -> null
             visible.any { it.motionAt(mid, it.until()) != Steady } -> Stretch(start * 1000, end * 1000, null, visible.map { it.withTransform(it.t) })
-            else -> Stretch(start * 1000, end * 1000, renderLayers(width, height, android.graphics.Color.TRANSPARENT, visible), visible)
+            else -> Stretch(start * 1000, end * 1000, renderLayers(width, height, android.graphics.Color.TRANSPARENT, visible).straightAlpha(), visible)
         }
     }
     val nothing = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
     val frame by lazy { Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888) }
+    val straight by lazy { Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply { isPremultiplied = false } }
+    val pixels by lazy { IntArray(width * height) }
     return object : BitmapOverlay() {
         // BitmapOverlay uploads again when the bitmap's generation id changes, which every redraw of [frame] does.
         override fun getBitmap(presentationTimeUs: Long): Bitmap {
@@ -342,8 +344,23 @@ fun timedOverlay(width: Int, height: Int, layers: List<Layer>, durationMs: Long)
             val canvas = Canvas(frame)
             val ms = presentationTimeUs / 1000
             s.layers.forEach { canvas.drawLayer(it, it.motionAt(ms, it.until()), height) }
-            return frame
+            frame.getPixels(pixels, 0, width, 0, 0, width, height)
+            straight.setPixels(pixels, 0, width, 0, 0, width, height)
+            return straight
         }
+    }
+}
+
+/**
+ * This bitmap with its colors not multiplied by alpha. Media3's overlay shader blends `rgb * a`, but an Android bitmap
+ * is stored already multiplied, so see-through pixels (edges, shadows, fades, highlighter) would come out darker than
+ * on the stage. getPixels returns straight colors and setPixels keeps them on a bitmap that isn't premultiplied.
+ */
+private fun Bitmap.straightAlpha(): Bitmap {
+    val px = IntArray(width * height).also { getPixels(it, 0, width, 0, 0, width, height) }
+    return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).apply {
+        isPremultiplied = false
+        setPixels(px, 0, width, 0, 0, width, height)
     }
 }
 

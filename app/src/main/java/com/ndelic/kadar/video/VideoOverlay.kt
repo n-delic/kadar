@@ -41,6 +41,17 @@ fun overlayAlpha(opacity: Float, span: Pair<Long, Long>, timeUs: Long) = if (tim
 fun outputFrameRate(clipFrameRate: Float) = if (clipFrameRate > 0) clipFrameRate.roundToInt().coerceIn(1, 60) else 30
 
 /**
+ * How layers stack around video layers: [layers] (bottom first) cut at every one [isVideo] picks, giving the other
+ * layers under the first video layer, between each pair and above the last, so one more group than video layers.
+ * Each group is drawn as one picture at its place in the stack, in the preview and the export alike.
+ */
+fun <T> drawnGroups(layers: List<T>, isVideo: (T) -> Boolean): List<List<T>> {
+    val groups = mutableListOf(mutableListOf<T>())
+    layers.forEach { if (isVideo(it)) groups += mutableListOf<T>() else groups.last() += it }
+    return groups
+}
+
+/**
  * Where in its own clip a video layer is at output time [positionMs]: it plays at normal speed from [clipStartMs] once
  * its [span] starts, whatever the main clip's speed. Null outside the span, where it isn't shown.
  */

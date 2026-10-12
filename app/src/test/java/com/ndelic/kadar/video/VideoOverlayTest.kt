@@ -66,6 +66,16 @@ class VideoOverlayTest {
     }
 
     @Test
+    fun drawnGroupsCutAtEveryVideoLayer() {
+        fun groups(vararg layers: String) = drawnGroups(layers.toList()) { it.startsWith("v") }
+        assertEquals(listOf(listOf("a", "b")), groups("a", "b"))
+        // Video layers at the bottom leave everything in the top group, which stays the composition's own overlay.
+        assertEquals(listOf(emptyList(), listOf("a")), groups("v1", "a"))
+        assertEquals(listOf(listOf("a"), listOf("b", "c"), emptyList()), groups("a", "v1", "b", "c", "v2"))
+        assertEquals(listOf(emptyList(), emptyList(), listOf("a")), groups("v1", "v2", "a"))
+    }
+
+    @Test
     fun sourceTimeRunsFromTheInPointOnceTheSpanStarts() {
         assertEquals(500L, overlaySourceMs(500, 1_000L to 4_000L, 1_000))
         assertEquals(2_500L, overlaySourceMs(500, 1_000L to 4_000L, 3_000))

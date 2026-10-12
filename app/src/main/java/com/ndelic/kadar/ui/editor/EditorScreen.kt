@@ -78,6 +78,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
@@ -132,6 +133,7 @@ import com.ndelic.kadar.ui.common.KIcon
 import com.ndelic.kadar.ui.common.blockTouches
 import com.ndelic.kadar.ui.common.fullWidthPanel
 import com.ndelic.kadar.video.composition
+import com.ndelic.kadar.video.drawnGroups
 import kotlin.math.atan2
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -187,7 +189,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         // preview fails mid-playback ("frame for an ended input") on devices; the export still composites everything.
         LaunchedEffect(player, video) {
             val start = resumeAt[0].also { resumeAt[0] = 0 }
-            player.setComposition(video.copy(blur = false).composition(null), start)
+            player.setComposition(video.copy(blur = false).composition(), start)
             player.prepare()
             // A paused player keeps showing the old frame after a new composition; seek once it's loaded to repaint.
             delay(300)
@@ -542,7 +544,13 @@ private val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF2DE1C2
 @Composable
 private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?, timeMs: Long?, vm: EditorViewModel, onEditText: (TextLayer) -> Unit, modifier: Modifier) {
     // In a video only the layers on screen at the playhead show (and can be grabbed); the selected one always does, to edit it.
-    val shown = project.layers.filter { !it.hidden && (timeMs == null || it.visibleAt(timeMs) || it.id == selected?.id) }
+    fun Layer.onStage() = !hidden && (timeMs == null || visibleAt(timeMs) || id == selected?.id)
+    val shown = project.layers.filter { it.onStage() }
+    // Every video layer covers the layers under it in the list, like in the export: those are drawn on canvases of their
+    // own under its view. Its view stays in place while it is off screen at the playhead, so its player is kept.
+    val stack = project.layers.filter { it.onStage() || it is VideoLayer && !it.hidden }
+    val groups = drawnGroups(stack) { it is VideoLayer }
+    val videos = stack.filterIsInstance<VideoLayer>()
     BoxWithConstraints(modifier.padding(horizontal = 8.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
         val scale = min(constraints.maxWidth / project.width.toFloat(), constraints.maxHeight / project.height.toFloat())
         val density = LocalDensity.current
@@ -560,6 +568,14 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                     if (player.isPlaying) withFrameMillis {} else delay(50)
                 }
             }
+        }
+        fun DrawScope.drawLayers(group: List<Layer>, after: (android.graphics.Canvas) -> Unit = {}) = drawIntoCanvas { canvas ->
+            val c = canvas.nativeCanvas
+            c.save()
+            c.scale(scale, scale)
+            group.forEach { if (animated && videoEnd != null) c.drawLayer(it, it.motionAt(clock.longValue, minOf(it.endMs, videoEnd)), project.height) else c.drawLayer(it) }
+            after(c)
+            c.restore()
         }
         val current by rememberUpdatedState(selected)
         val editText by rememberUpdatedState(onEditText)
@@ -628,9 +644,15 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                 if (transparent) Checkerboard()
                 project.video?.takeIf { it.blurred }?.let { BlurBackgroundPreview(it, project.width, project.height, scale, player) }
                 player?.let { p -> VideoSurface(p, project.width, project.height, Modifier.fillMaxSize()) }
-                // Over the main video and under the canvas (text, stickers, handles), bottom layer first, like the export.
+                // Over the main video and under the top canvas (handles and the layers above every video layer), bottom
+                // layer first, each over the layers drawn under it, like the export.
                 if (videoEnd != null) {
-                    project.layers.forEach { l -> if (l is VideoLayer && !l.hidden) key(l.id) { VideoLayerPreview(l, videoEnd, scale, player) } }
+                    videos.forEachIndexed { i, l ->
+                        key(l.id) {
+                            if (groups[i].isNotEmpty()) Canvas(Modifier.fillMaxSize()) { drawLayers(groups[i]) }
+                            VideoLayerPreview(l, videoEnd, scale, player)
+                        }
+                    }
                 }
                 Canvas(
                     Modifier.fillMaxSize().pointerInput(scale, project.width, project.height) {
@@ -716,15 +738,10 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                         }
                     },
                 ) {
-                    drawIntoCanvas { canvas ->
-                        val c = canvas.nativeCanvas
-                        c.save()
-                        c.scale(scale, scale)
-                        shown.forEach { if (animated && videoEnd != null) c.drawLayer(it, it.motionAt(clock.longValue, minOf(it.endMs, videoEnd)), project.height) else c.drawLayer(it) }
+                    drawLayers(groups.last()) { c ->
                         selected?.let { c.drawSelection(it, scale) }
                         if (snaps.x) c.drawLine(cx, 0f, cx, project.height.toFloat(), guidePaint.also { it.strokeWidth = 2 / scale })
                         if (snaps.y) c.drawLine(0f, cy, project.width.toFloat(), cy, guidePaint.also { it.strokeWidth = 2 / scale })
-                        c.restore()
                     }
                 }
             }

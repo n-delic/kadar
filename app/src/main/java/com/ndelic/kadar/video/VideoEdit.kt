@@ -127,15 +127,13 @@ fun blurSize(w: Int, h: Int): Pair<Int, Int> {
 private const val BLUR_LONG_SIDE = 320
 
 /**
- * The edit as a Media3 composition: used for both the live preview and the export. [overlay] draws the text/sticker
- * layers; it sits on the composition, not the clip, so it gets output timestamps (after trim and speed) like the layers.
- * [videos] are picture-in-picture layers, each a sequence of its own (the export's; the preview draws them itself).
+ * The edit as a Media3 composition: used for both the live preview and the export. [layers] (the export's; the preview
+ * draws them itself) stack in their order: video layers are picture-in-picture sequences of their own; the other
+ * layers above the topmost video layer are one [timedOverlay] on the composition, not the clip, so it gets output
+ * timestamps (after trim and speed) like the layers, and those under a video layer are drawn into a sequence of their
+ * own. Call it on the main thread, like [timedOverlay].
  */
-fun VideoClip.composition(
-    overlay: TextureOverlay?,
-    shortSide: Int? = null,
-    videos: List<VideoLayer> = emptyList(),
-): Composition {
+fun VideoClip.composition(layers: List<Layer> = emptyList(), shortSide: Int? = null): Composition {
     // CompositionPlayer needs each item's full (unclipped) duration up front.
     val video = EditedMediaItem.Builder(clipped(uri, startMs, endMs))
         .setDurationUs(durationMs * 1000)
@@ -145,12 +143,29 @@ fun VideoClip.composition(
         .build()
     // Media3's compositor takes every output frame time from sequence 0 and draws it on top, then the others in order.
     // So sequence 0 is an invisible frame clock at the clip's rate, then the overlays (topmost layer first), each padded
-    // with gaps to the clip's full length, then the clip, and under it the blurred background. The clip's letterbox
-    // bars are transparent (Media3 clears to transparent black), so the background shows through them.
-    val overlays = videos.asReversed().filter { !it.hidden }.mapNotNull { v -> overlaySpan(v.startMs, v.endMs, v.playableMs, outputDurationMs)?.let { v to it } }
+    // with gaps to the clip's full length and followed by the layers drawn right under it, then the clip, and under it
+    // the blurred background. The clip's letterbox bars are transparent (Media3 clears to transparent black), so the
+    // background shows through them.
+    val (w, h) = outputSize
+    fun VideoLayer.span() = overlaySpan(startMs, endMs, playableMs, outputDurationMs)
+    val shown = layers.filter { !it.hidden && (it !is VideoLayer || it.span() != null) }
+    val groups = drawnGroups(shown) { it is VideoLayer }
+    val videos = shown.filterIsInstance<VideoLayer>()
+    // Compositor inputs after sequence 0, topmost first: a video layer and its span, or null for drawn layers (full frame).
+    val inputs = mutableListOf<Pair<VideoLayer, Pair<Long, Long>>?>()
     val sequences = mutableListOf<EditedMediaItemSequence>()
-    if (overlays.isNotEmpty()) sequences += frameClock()
-    sequences += overlays.map { (v, span) -> v.sequence(span, outputDurationMs) }
+    if (videos.isNotEmpty()) sequences += blankStill()
+    videos.indices.reversed().forEach { i ->
+        val span = videos[i].span()!!
+        inputs += videos[i] to span
+        sequences += videos[i].sequence(span, outputDurationMs)
+        if (groups[i].isNotEmpty()) {
+            inputs += null
+            val drawn = OverlayEffect(listOf(timedOverlay(w, h, groups[i], outputDurationMs)))
+            sequences += blankStill(listOf(Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_STRETCH_TO_FIT), drawn, Unpremultiply))
+        }
+    }
+    val overlay = groups.last().takeIf { it.isNotEmpty() }?.let { timedOverlay(w, h, it, outputDurationMs) }
     sequences += EditedMediaItemSequence.Builder(video).build()
     if (blurred) sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItem(blurredBackground()).build()
     music?.let { sequences += it.sequences(outputDurationMs) }
@@ -169,17 +184,23 @@ fun VideoClip.composition(
         )
         // HDR phone footage turns washed out on most apps once posted; memes go out as plain SDR.
         .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
-        .apply { if (overlays.isNotEmpty()) setVideoCompositorSettings(overlaySettings(overlays)) }
+        .apply { if (videos.isNotEmpty()) setVideoCompositorSettings(overlaySettings(inputs)) }
         .build()
 }
 
 /**
- * Sequence 0 when there are video layers: a blank still repeated at the clip's frame rate, which the compositor hides
- * (alpha 0). It makes the output frame times steady and the clip's own, whatever the overlays' frame rates.
+ * A blank still as long as the output, repeated at the clip's frame rate, with [effects]. Without effects it is
+ * sequence 0 when there are video layers, the frame clock the compositor hides (alpha 0): it makes the output frame
+ * times steady and the clip's own, whatever the overlays' frame rates. With effects it carries drawn layers; with no
+ * speed change and starting at 0, its frame times are output time like the layers'.
  */
-private fun VideoClip.frameClock(): EditedMediaItemSequence {
+private fun VideoClip.blankStill(effects: List<Effect> = emptyList()): EditedMediaItemSequence {
     val still = MediaItem.Builder().setUri(BLANK_PNG).setMimeType(MimeTypes.IMAGE_PNG).setImageDurationMs(outputDurationMs).build()
-    val item = EditedMediaItem.Builder(still).setDurationUs(outputDurationMs * 1000).setFrameRate(outputFrameRate(frameRate)).build()
+    val item = EditedMediaItem.Builder(still)
+        .setDurationUs(outputDurationMs * 1000)
+        .setFrameRate(outputFrameRate(frameRate))
+        .setEffects(Effects(emptyList(), effects))
+        .build()
     return EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItem(item).build()
 }
 
@@ -270,16 +291,16 @@ private fun VideoLayer.sequence(span: Pair<Long, Long>, totalMs: Long): EditedMe
 }
 
 /**
- * Hides the frame clock (sequence 0) and places overlay `i` (sequence `i + 1`) by its layer; the clip after them keeps
- * the default full-frame settings.
+ * Hides the frame clock (sequence 0) and places input `i` (sequence `i + 1`) by its video layer; drawn layers (null)
+ * and the clip after them keep the default full-frame settings.
  */
-private fun VideoClip.overlaySettings(overlays: List<Pair<VideoLayer, Pair<Long, Long>>>) =
+private fun VideoClip.overlaySettings(inputs: List<Pair<VideoLayer, Pair<Long, Long>>?>) =
     object : VideoCompositorSettings {
         override fun getOutputSize(inputSizes: List<Size>) = Size(outputSize.first, outputSize.second)
 
         override fun getOverlaySettings(inputId: Int, presentationTimeUs: Long): OverlaySettings {
             if (inputId == 0) return StaticOverlaySettings.Builder().setAlphaScale(0f).build()
-            val (layer, span) = overlays.getOrNull(inputId - 1) ?: return StaticOverlaySettings.Builder().build()
+            val (layer, span) = inputs.getOrNull(inputId - 1) ?: return StaticOverlaySettings.Builder().build()
             val p = overlayPlacement(layer.t, outputSize.first, outputSize.second)
             return StaticOverlaySettings.Builder()
                 .setBackgroundFrameAnchor(p.x, p.y)

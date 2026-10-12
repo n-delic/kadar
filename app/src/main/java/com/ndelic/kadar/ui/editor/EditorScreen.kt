@@ -107,6 +107,7 @@ import com.ndelic.kadar.EditorViewModel
 import com.ndelic.kadar.R
 import com.ndelic.kadar.Sticker
 import com.ndelic.kadar.model.Adjust
+import com.ndelic.kadar.model.DrawLayer
 import com.ndelic.kadar.model.Font
 import com.ndelic.kadar.model.ImageLayer
 import com.ndelic.kadar.model.Layer
@@ -152,6 +153,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     var trimming by rememberSaveable { mutableStateOf(false) }
     var erasing by remember { mutableStateOf<Pair<ImageLayer, Bitmap?>?>(null) }
     var cropping by remember { mutableStateOf<ImageLayer?>(null) }
+    // Open draw screen: the drawing to add to (null for a new one) and the video frame under the playhead.
+    var drawing by remember { mutableStateOf<Pair<Long?, Bitmap?>?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(state.selectedId) {
@@ -279,6 +282,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             is TextLayer -> 1
             is ImageLayer -> 2
             is VideoLayer -> 3
+            is DrawLayer -> 4
         }
         AnimatedContent(targetState = toolset, transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(100)) }, label = "tools") { tools ->
             Row(
@@ -288,10 +292,16 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                 fun toggle(p: Panel) {
                     panel = if (panel == p) null else p
                 }
+                fun draw() {
+                    playing = false
+                    val target = (state.selected as? DrawLayer)?.id
+                    scope.launch { drawing = target to vm.frameAt(positionMs) }
+                }
                 when (tools) {
                     0 -> {
                         IconTool(R.drawable.ic_title, "Text") { typing = "" }
                         IconTool(R.drawable.ic_sentiment_satisfied, "Sticker", panel == Panel.Sticker) { toggle(Panel.Sticker) }
+                        IconTool(R.drawable.ic_draw, "Draw", onClick = ::draw)
                         IconTool(R.drawable.ic_image, "Image") { image.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) }
                         IconTool(R.drawable.ic_language, "Web", onClick = onBrowse)
                         if (video != null) {
@@ -315,6 +325,15 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_border_color, "Stroke", panel == Panel.Stroke) { toggle(Panel.Stroke) }
                         IconTool(R.drawable.ic_rectangle, "Box", panel == Panel.Box) { toggle(Panel.Box) }
                         IconTool(R.drawable.ic_text_fields, "Style", panel == Panel.Style) { toggle(Panel.Style) }
+                        IconTool(R.drawable.ic_content_copy, "Duplicate", onClick = vm::duplicateSelected)
+                        IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
+                        IconTool(R.drawable.ic_flip_to_back, "Back", onClick = vm::sendToBack)
+                        IconTool(R.drawable.ic_delete, "Delete", onClick = vm::deleteSelected)
+                    }
+                    4 -> {
+                        IconTool(R.drawable.ic_check, "Done") { vm.select(null) }
+                        ToolDivider()
+                        IconTool(R.drawable.ic_draw, "Draw", onClick = ::draw)
                         IconTool(R.drawable.ic_content_copy, "Duplicate", onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, "Back", onClick = vm::sendToBack)
@@ -399,6 +418,18 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                 vm.applyCrop(layer.id, r[0], r[1], r[2], r[3])
             },
             onCancel = { cropping = null },
+        )
+    }
+    drawing?.let { (target, under) ->
+        DrawScreen(
+            project = project,
+            layers = project.layers.filter { !it.hidden && (video == null || it.visibleAt(positionMs) || it.id == target) },
+            under = under,
+            onDone = { strokes ->
+                drawing = null
+                vm.applyDrawing(target, strokes)
+            },
+            onCancel = { drawing = null },
         )
     }
 

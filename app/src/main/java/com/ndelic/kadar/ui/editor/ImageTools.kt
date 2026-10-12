@@ -170,7 +170,7 @@ private fun strokePaint() = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     strokeJoin = Paint.Join.ROUND
 }
 
-private fun DrawScope.checker(area: Size, cell: Float) {
+internal fun DrawScope.checker(area: Size, cell: Float) {
     drawRect(Color(0xFF3A3A3A), Offset.Zero, area)
     clipRect(0f, 0f, area.width, area.height) {
         var y = 0f
@@ -296,10 +296,13 @@ private fun centered(ratio: Float, bw: Float, bh: Float): Rect {
     return Rect((bw - w) / 2, (bh - h) / 2, (bw + w) / 2, (bh + h) / 2)
 }
 
+/** Cancel and apply for the full-screen tools; [middle] holds tool buttons between them. */
 @Composable
-private fun ToolTopBar(onCancel: () -> Unit, onDone: () -> Unit, doneEnabled: Boolean) {
+internal fun ToolTopBar(onCancel: () -> Unit, onDone: () -> Unit, doneEnabled: Boolean, middle: @Composable () -> Unit = {}) {
     Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
         CircleButton(R.drawable.ic_close, "Cancel", onClick = onCancel)
+        Spacer(Modifier.weight(1f))
+        middle()
         Spacer(Modifier.weight(1f))
         CircleButton(R.drawable.ic_check, "Apply", enabled = doneEnabled, onClick = onDone)
     }

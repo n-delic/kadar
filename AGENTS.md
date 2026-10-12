@@ -14,6 +14,7 @@ The owner's phone is a Galaxy S25; it also runs on older phones, hence `minSdk 2
 - **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time, an eye and a lock at its left, and long-press-drag to reorder. Video layers (picture-in-picture) put more clips on top, placed like stickers, with their own track and volume; export H.264/AAC MP4 to `Movies/Kadar`.
 - **Undo / redo** for every edit (gestures and timeline drags count once per drag).
 - **Snapping** to the canvas center and 0°/90°, caption boxes behind text, a Layers panel (photos only, top-bar button; video shows layers as timeline tracks), keep-pitch for speed changes.
+- **Drawing** (`model/Strokes.kt`, `ui/editor/DrawScreen.kt`): the Draw tool opens a full-screen pad (one finger draws, two zoom/pan) with marker and highlighter pens, colors, size and undo-last-stroke. Apply makes one `DrawLayer` (strokes in its own pixels, centered on its origin by `withStrokes`, smoothed by `smoothSegments`); Draw on a selected drawing adds strokes to it.
 - **Filters** (`model/Looks.kt`, `ui/editor/FiltersPanel.kt`): in-house looks as 4x5 color matrices, blended by a strength and stored on `Adjust` (`look`, `amount`). `Adjust.filterMatrix()` (look, then the sliders) is the one matrix for the image layer paint and, through `glRgbMatrix`, the video's Media3 `RgbMatrix`, so photos and video match.
 - **Eraser / restore brush and crop** for image layers (`ui/editor/ImageTools.kt`). `ImageLayer.source` + `sourceX/Y` remember the untouched original and where the layer's bitmap sits in it; keep them right in any new operation that resizes or crops a bitmap.
 - **Settings** (`model/Settings.kt`, `ui/home/SettingsScreen.kt`): image search engine, default export size (per-project override in the Canvas panels), About with the bundled license texts (`third_party/` is packaged as app assets).
@@ -43,9 +44,10 @@ app/src/main/java/com/ndelic/kadar/
   MainActivity.kt          Screen switching (home / editor / browser / settings), snackbars, busy overlay, share sheet
   EditorViewModel.kt       The one ViewModel: projects, layers, stickers, canvas, video, settings, export, autosave, undo
   model/                   Data and pure logic, no UI
-    Layers.kt              Transform (placement + hit test), Layer / ImageLayer / TextLayer / VideoLayer, Adjust,
+    Layers.kt              Transform (placement + hit test), Layer / ImageLayer / TextLayer / VideoLayer / DrawLayer, Adjust,
                            drawLayer, renderLayers, opaqueBounds
     Looks.kt               Filters: Look matrices, Adjust.filterMatrix(), glRgbMatrix() for Media3
+    Strokes.kt             Freehand strokes: PenStroke, smoothing, bounds, DrawLayer.withStrokes (re-centering)
     Projects.kt            Project, ProjectStore (one folder per project: project.json, thumb.jpg, images), JSON
     Settings.kt            AppSettings (search engine, export size), SettingsStore
   media/
@@ -65,7 +67,8 @@ app/src/main/java/com/ndelic/kadar/
     Timeline.kt            NLE timeline (layer tracks + clip) and TrimStrip
     Panels.kt              Tool panels: stickers, canvas, speed, audio, font, style, adjust, layers, volume
     FiltersPanel.kt        Look tiles and strength slider
-    ImageTools.kt          EraseScreen (erase/restore brush) and CropScreen
+    ImageTools.kt          EraseScreen (erase/restore brush), CropScreen, ToolTopBar for full-screen tools
+    DrawScreen.kt          Freehand drawing pad (marker / highlighter) that makes or extends a DrawLayer
   ui/web/
     WebImportScreen.kt     WebView image browser with long-press-to-import
 app/src/test/java/com/ndelic/kadar/   Same packages as main: model/, video/, ui/editor/ (JVM tests for the pure logic)

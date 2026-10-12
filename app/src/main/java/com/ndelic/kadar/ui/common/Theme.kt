@@ -65,6 +65,8 @@ object Ink {
     val teal = Color(0xFF2DE1C2)
     /** Video layer tracks. */
     val violet = Color(0xFFB79CFF)
+    /** Drawing tracks. */
+    val coral = Color(0xFFFF8A65)
 }
 
 /** Swatches for text, outline and background: neutrals first, then warm to cool. */

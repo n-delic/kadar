@@ -8,6 +8,7 @@ import com.ndelic.kadar.video.Music
 import com.ndelic.kadar.video.VideoClip
 import java.io.File
 import java.io.OutputStream
+import kotlin.math.roundToInt
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -142,6 +143,22 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
                 startMs = start,
                 endMs = end,
             )
+            // Versions before drawings skip this type too.
+            "draw" -> DrawLayer(
+                id = id,
+                t = t,
+                strokes = j.getJSONArray("strokes").let { a ->
+                    (0 until a.length()).map { i ->
+                        val stroke = a.getJSONObject(i)
+                        val p = stroke.getJSONArray("points")
+                        PenStroke(stroke.getInt("color"), stroke.getDouble("width").toFloat(), FloatArray(p.length() / 2 * 2) { p.getDouble(it).toFloat() })
+                    }
+                },
+                hidden = j.optBoolean("hidden"),
+                locked = j.optBoolean("locked"),
+                startMs = start,
+                endMs = end,
+            )
             else -> null
         }
     }
@@ -220,6 +237,17 @@ private fun Layer.toJson() = JSONObject().apply {
             put("videoWidth", layer.videoWidth)
             put("videoHeight", layer.videoHeight)
             put("volume", layer.volume.toDouble())
+        }
+        is DrawLayer -> {
+            put("type", "draw")
+            put("strokes", JSONArray(layer.strokes.map { stroke ->
+                JSONObject().apply {
+                    put("color", stroke.color)
+                    put("width", stroke.width.toDouble())
+                    // Flat x, y list rounded to a tenth of a pixel: finer than anyone can see, and keeps the file small.
+                    put("points", JSONArray(stroke.points.map { (it * 10).roundToInt() / 10.0 }))
+                }
+            }))
         }
     }
 }

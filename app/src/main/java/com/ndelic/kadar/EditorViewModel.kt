@@ -24,10 +24,12 @@ import com.ndelic.kadar.media.scaleDown
 import com.ndelic.kadar.media.trimTransparent
 import com.ndelic.kadar.media.videoFrame
 import com.ndelic.kadar.model.AppSettings
+import com.ndelic.kadar.model.DrawLayer
 import com.ndelic.kadar.model.ExportSize
 import com.ndelic.kadar.model.Font
 import com.ndelic.kadar.model.ImageLayer
 import com.ndelic.kadar.model.Layer
+import com.ndelic.kadar.model.PenStroke
 import com.ndelic.kadar.model.Project
 import com.ndelic.kadar.model.ProjectStore
 import com.ndelic.kadar.model.SavedProject
@@ -36,6 +38,7 @@ import com.ndelic.kadar.model.TextLayer
 import com.ndelic.kadar.model.Transform
 import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.model.renderLayers
+import com.ndelic.kadar.model.withStrokes
 import com.ndelic.kadar.ui.editor.Timeline
 import com.ndelic.kadar.ui.editor.label
 import com.ndelic.kadar.video.Music
@@ -312,6 +315,13 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         addLayer { VideoLayer(it, Transform(p.width / 2f, p.height / 2f, p.width * 0.5f / info.width), uri, info.durationMs, info.width, info.height, startMs = start) }
     }
 
+    /** Result of the draw screen, one undo step: [strokes] (canvas pixels) become a new layer, or go onto drawing [id]. */
+    fun applyDrawing(id: Long?, strokes: List<PenStroke>) {
+        if (strokes.isEmpty()) return
+        if (id == null) addLayer { DrawLayer(it, Transform(0f, 0f), emptyList()).withStrokes(strokes) }
+        else updateLayer(id) { (it as? DrawLayer)?.withStrokes(strokes) ?: it }
+    }
+
     private fun addLayer(make: (Long) -> Layer) {
         val layer = make(nextId++)
         updateProject { it.copy(layers = it.layers + layer) }
@@ -366,6 +376,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
                 is ImageLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
                 is TextLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
                 is VideoLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
+                is DrawLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
             }
         }
     }
@@ -402,6 +413,12 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val dir = _uiState.value.projectDir ?: return null
         val name = layer.source ?: return null
         return withContext(Dispatchers.IO) { BitmapFactory.decodeFile(File(dir, name).path) }
+    }
+
+    /** The video frame under the playhead ([positionMs], output time), as a guide for the draw screen; null for photos. */
+    suspend fun frameAt(positionMs: Long): Bitmap? {
+        val v = _uiState.value.project?.video ?: return null
+        return withContext(Dispatchers.IO) { runCatching { videoFrame(app, v.uri, v.startMs + (positionMs * v.speed).toLong()) }.getOrNull() }
     }
 
     /** Result of the eraser screen: one undo step for the whole session. Same size as before, so the source offset still holds. */

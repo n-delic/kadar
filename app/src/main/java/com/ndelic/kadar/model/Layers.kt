@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.net.Uri
@@ -134,6 +135,40 @@ data class VideoLayer(
 }
 
 /**
+ * Freehand drawing: [strokes] in the layer's own pixels, centered on its origin (see [withStrokes]), so it moves,
+ * scales, rotates and times like any other layer.
+ */
+data class DrawLayer(
+    override val id: Long,
+    override val t: Transform,
+    val strokes: List<PenStroke>,
+    override val startMs: Long = 0,
+    override val endMs: Long = Long.MAX_VALUE,
+    override val hidden: Boolean = false,
+    override val locked: Boolean = false,
+) : Layer {
+    private val bounds = strokeBounds(strokes)
+    private val paths by lazy { strokes.map { it.path() } }
+    override val width get() = bounds?.let { it[2] - it[0] } ?: 0f
+    override val height get() = bounds?.let { it[3] - it[1] } ?: 0f
+    override fun drawContent(canvas: Canvas) = strokes.forEachIndexed { i, s ->
+        penPaint.color = s.color
+        penPaint.strokeWidth = s.width
+        canvas.drawPath(paths[i], penPaint)
+    }
+    override fun withTransform(t: Transform) = copy(t = t)
+    override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = endMs)
+    override fun withFlags(hidden: Boolean, locked: Boolean) = copy(hidden = hidden, locked = locked)
+}
+
+private fun PenStroke.path() = Path().apply {
+    val s = smoothSegments(points)
+    if (s.isEmpty()) return@apply
+    moveTo(s[0], s[1])
+    for (i in 2 until s.size step 4) quadTo(s[i], s[i + 1], s[i + 2], s[i + 3])
+}
+
+/**
  * Brightness, contrast and saturation, each -1..1 with 0 meaning unchanged, plus a [Look] blended in by [amount] (0..1).
  * Used by image layers and the video.
  */
@@ -236,6 +271,14 @@ data class TextLayer(
 
 private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
 private val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+// Lazy so JVM tests that only touch the pure functions here never call into the stubbed Paint.
+private val penPaint by lazy {
+    Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+}
 
 fun Canvas.drawLayer(layer: Layer) {
     save()

@@ -278,7 +278,7 @@ fun SmallIcon(icon: Int, description: String, onClick: () -> Unit) {
 @Composable
 fun AudioPanel(clip: VideoClip, vm: EditorViewModel, onAddMusic: () -> Unit, voiceover: @Composable () -> Unit) {
     // Scrolls once a few recordings are listed, so the stage keeps its room.
-    Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         PanelLabel(stringResource(R.string.video_sound))
         KSlider(R.drawable.ic_volume_up, clip.volume, 0f..1f, ::percent) { v -> vm.updateClip { copy(volume = v) } }
         PanelLabel(stringResource(R.string.music))

@@ -71,6 +71,7 @@
 - Video export: a progress ring with the percentage, a Cancel button (nothing is saved), the screen stays on while it runs, and a Video quality setting (Standard, or High for about twice the bitrate)
 - Voiceover: in the Audio panel, record your voice from the playhead while the video plays (muted, so the speaker isn't recorded); recordings stay in the project, each with its own volume and a delete button; the preview plays them and the export mixes them in. The microphone permission is asked for only on the first Record
 - Music fade in and fade out (1.5 s at the start and before the end of the video), also when the song loops
+- Smoother video preview: video layers and the blurred canvas each play in their own view, so dragging a layer moves it instantly, and a blurred-canvas project no longer stops or jumps back to 0:00 while playing; with music the picture no longer goes black
 
 ## Next
 

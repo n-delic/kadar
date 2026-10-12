@@ -103,7 +103,7 @@ fun VoiceoverSection(
         )
     }
     Text(stringResource(if (denied) R.string.voice_permission_denied else R.string.voice_hint), color = Ink.dim, fontSize = 12.sp)
-    clip.voices.forEach { voice ->
+    clip.voices.sortedBy { it.startMs }.forEach { voice ->
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(formatMs(voice.startMs), color = Ink.text, fontSize = 12.sp, modifier = Modifier.width(52.dp))
             Box(Modifier.weight(1f)) {

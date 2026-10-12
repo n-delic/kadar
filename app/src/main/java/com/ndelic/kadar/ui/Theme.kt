@@ -62,6 +62,8 @@ object Ink {
     /** Text and icons drawn on top of [accent]. */
     val onAccent = Color(0xFF0E0F11)
     val teal = Color(0xFF2DE1C2)
+    /** Video layer tracks. */
+    val violet = Color(0xFFB79CFF)
 }
 
 /** Swatches for text, outline and background: neutrals first, then warm to cool. */

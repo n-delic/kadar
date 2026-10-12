@@ -100,6 +100,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
 import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.effect.MultipleInputVideoGraph
 import androidx.media3.transformer.CompositionPlayer
 import com.ndelic.kadar.EditorUiState
 import com.ndelic.kadar.EditorViewModel
@@ -109,6 +110,8 @@ import com.ndelic.kadar.Project
 import com.ndelic.kadar.R
 import com.ndelic.kadar.TextLayer
 import com.ndelic.kadar.Transform
+import com.ndelic.kadar.VideoClip
+import com.ndelic.kadar.VideoLayer
 import com.ndelic.kadar.composition
 import com.ndelic.kadar.drawLayer
 import kotlinx.coroutines.delay
@@ -117,7 +120,7 @@ import kotlin.math.atan2
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Font, Color, Stroke, Box, Style, Adjust, Filters, Layers }
+enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Font, Color, Stroke, Box, Style, Adjust, Filters, Layers, Volume }
 
 @Composable
 fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
@@ -129,9 +132,11 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     var typing by rememberSaveable { mutableStateOf<String?>(null) }
     val image = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::addImage) }
     val music = rememberLauncherForActivityResult(OpenDocument()) { it?.let(vm::setMusic) }
-    val player = if (video != null) rememberCompositionPlayer() else null
+    val videoLayers = project.layers.filterIsInstance<VideoLayer>()
+    val player = if (video != null) rememberCompositionPlayer(multiInput = videoLayers.isNotEmpty()) else null
     var playing by remember { mutableStateOf(false) }
     var positionMs by remember { mutableLongStateOf(0L) }
+    val overlayVideo = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let { uri -> vm.addVideo(uri, positionMs) } }
     var trimming by rememberSaveable { mutableStateOf(false) }
     var erasing by remember { mutableStateOf<Pair<ImageLayer, Bitmap?>?>(null) }
     var cropping by remember { mutableStateOf<ImageLayer?>(null) }
@@ -150,14 +155,18 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         }
     }
     if (player != null && video != null) {
-        LaunchedEffect(video) {
-            player.setComposition(video.composition(null))
+        val layers by rememberUpdatedState(project.layers)
+        // Video layers' placement reaches the compositor live, so a drag doesn't rebuild the composition; anything else does.
+        LaunchedEffect(player, video, videoLayers.map { it.withTransform(Transform(0f, 0f)) }) {
+            player.setComposition(video.composition(null, videos = videoLayers, placed = { v -> (layers.firstOrNull { it.id == v.id } ?: v).t }))
             player.prepare()
             // A paused player keeps showing the old frame after a new composition; seek once it's loaded to repaint.
             delay(300)
             if (!player.isPlaying) player.seekTo(player.currentPosition)
         }
-        LaunchedEffect(playing) { player.playWhenReady = playing }
+        // A paused player only composites again on a seek.
+        LaunchedEffect(videoLayers.map { it.t }) { if (!player.isPlaying) player.seekTo(player.currentPosition) }
+        LaunchedEffect(player, playing) { player.playWhenReady = playing }
         LaunchedEffect(player) {
             while (true) {
                 positionMs = player.currentPosition
@@ -221,6 +230,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     Panel.Layers -> LayersPanel(project.layers, state.selectedId, vm)
                     Panel.VideoCanvas -> video?.let { VideoCanvasPanel(project, it, state.settings.exportSize, vm) }
                     Panel.Style -> (selected as? TextLayer)?.let { TextStylePanel(it, vm) }
+                    Panel.Volume -> (selected as? VideoLayer)?.let { VideoVolumePanel(it, vm) }
                     Panel.Adjust -> when (val l = selected) {
                         is ImageLayer -> AdjustPanel(l.adjust) { a -> vm.editImage { copy(adjust = a) } }
                         null -> video?.let { v -> AdjustPanel(v.adjust) { a -> vm.updateClip { copy(adjust = a) } } }
@@ -239,6 +249,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             null -> 0
             is TextLayer -> 1
             is ImageLayer -> 2
+            is VideoLayer -> 3
         }
         AnimatedContent(targetState = toolset, transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(100)) }, label = "tools") { tools ->
             Row(
@@ -255,6 +266,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_image, "Image") { image.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) }
                         IconTool(R.drawable.ic_language, "Web", onClick = onBrowse)
                         if (video != null) {
+                            IconTool(R.drawable.ic_movie, "Video") { overlayVideo.launch(PickVisualMediaRequest(PickVisualMedia.VideoOnly)) }
                             IconTool(R.drawable.ic_content_cut, "Trim", trimming) { trimming = !trimming }
                             IconTool(R.drawable.ic_speed, "Speed", panel == Panel.Speed) { toggle(Panel.Speed) }
                             IconTool(R.drawable.ic_aspect_ratio, "Canvas", panel == Panel.VideoCanvas) { toggle(Panel.VideoCanvas) }
@@ -274,6 +286,15 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_border_color, "Stroke", panel == Panel.Stroke) { toggle(Panel.Stroke) }
                         IconTool(R.drawable.ic_rectangle, "Box", panel == Panel.Box) { toggle(Panel.Box) }
                         IconTool(R.drawable.ic_text_fields, "Style", panel == Panel.Style) { toggle(Panel.Style) }
+                        IconTool(R.drawable.ic_content_copy, "Duplicate", onClick = vm::duplicateSelected)
+                        IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
+                        IconTool(R.drawable.ic_flip_to_back, "Back", onClick = vm::sendToBack)
+                        IconTool(R.drawable.ic_delete, "Delete", onClick = vm::deleteSelected)
+                    }
+                    3 -> {
+                        IconTool(R.drawable.ic_check, "Done") { vm.select(null) }
+                        ToolDivider()
+                        IconTool(R.drawable.ic_volume_up, "Volume", panel == Panel.Volume) { toggle(Panel.Volume) }
                         IconTool(R.drawable.ic_content_copy, "Duplicate", onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, "Back", onClick = vm::sendToBack)
@@ -693,8 +714,8 @@ private fun VideoSurface(player: CompositionPlayer, canvasWidth: Int, canvasHeig
     // The surface the player draws into right now. On a canvas change the new view attaches before the old one
     // is torn down, and clearing a surface the player isn't using throws.
     val attached = remember { arrayOfNulls<Surface>(1) }
-    // A new canvas shape needs a new buffer, so a new view.
-    key(bw, bh) {
+    // A new canvas shape needs a new buffer, so a new view; so does a new player.
+    key(bw, bh, player) {
         AndroidView(
             factory = { context ->
                 TextureView(context).apply {
@@ -736,9 +757,15 @@ private fun VideoSurface(player: CompositionPlayer, canvasWidth: Int, canvasHeig
 private const val PREVIEW_LONG_SIDE = 1280f
 
 @Composable
-private fun rememberCompositionPlayer(): CompositionPlayer {
+private fun rememberCompositionPlayer(multiInput: Boolean): CompositionPlayer {
     val context = LocalContext.current
-    val player = remember { CompositionPlayer.Builder(context).build().apply { repeatMode = Player.REPEAT_MODE_ALL } }
+    // Video layers need the compositor; projects without them keep the plain single-input preview.
+    val player = remember(multiInput) {
+        CompositionPlayer.Builder(context)
+            .apply { if (multiInput) setVideoGraphFactory(MultipleInputVideoGraph.Factory()) }
+            .build()
+            .apply { repeatMode = Player.REPEAT_MODE_ALL }
+    }
     DisposableEffect(player) { onDispose { player.release() } }
     return player
 }

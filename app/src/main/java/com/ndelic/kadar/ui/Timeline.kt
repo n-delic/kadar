@@ -67,6 +67,8 @@ import androidx.compose.ui.zIndex
 import com.ndelic.kadar.Layer
 import com.ndelic.kadar.R
 import com.ndelic.kadar.TextLayer
+import com.ndelic.kadar.VideoLayer
+import com.ndelic.kadar.ImageLayer
 import com.ndelic.kadar.VideoClip
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -246,7 +248,11 @@ private fun Track(
     val haptics = LocalHapticFeedback.current
     val xs = start + layer.startMs.coerceIn(0, total).toFloat() / total * width
     val xe = start + layer.endMs.coerceIn(0, total).toFloat() / total * width
-    val color = if (layer is TextLayer) Ink.accent else Ink.teal
+    val color = when (layer) {
+        is TextLayer -> Ink.accent
+        is ImageLayer -> Ink.teal
+        is VideoLayer -> Ink.violet
+    }
     Box(
         Modifier
             .fillMaxWidth()
@@ -352,11 +358,12 @@ private fun Track(
                     val icon = when {
                         layer.locked -> R.drawable.ic_lock
                         layer is TextLayer -> R.drawable.ic_title
+                        layer is VideoLayer -> R.drawable.ic_movie
                         else -> R.drawable.ic_image
                     }
                     KIcon(icon, Modifier.size(14.dp), Ink.onAccent)
                     Spacer(Modifier.width(6.dp))
-                    Text(if (layer is TextLayer) layer.text.lines().first() else "Image", color = Ink.onAccent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(layer.label, color = Ink.onAccent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

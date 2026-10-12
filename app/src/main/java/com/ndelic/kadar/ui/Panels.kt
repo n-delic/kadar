@@ -53,6 +53,7 @@ import com.ndelic.kadar.R
 import com.ndelic.kadar.Sticker
 import com.ndelic.kadar.TextLayer
 import com.ndelic.kadar.VideoClip
+import com.ndelic.kadar.VideoLayer
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -221,11 +222,12 @@ fun LayersPanel(layers: List<Layer>, selectedId: Long?, vm: EditorViewModel) {
                     when (l) {
                         is ImageLayer -> Image(l.bitmap.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
                         is TextLayer -> Text("T", color = Ink.text, fontFamily = FontFamily(l.font.typeface), fontSize = 18.sp)
+                        is VideoLayer -> KIcon(R.drawable.ic_movie, Modifier.size(22.dp), Ink.violet)
                     }
                 }
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    if (l is TextLayer) l.text.lines().first() else "Image",
+                    l.label,
                     color = Ink.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -239,6 +241,14 @@ fun LayersPanel(layers: List<Layer>, selectedId: Long?, vm: EditorViewModel) {
         }
     }
 }
+
+/** What the Layers panel and the timeline tracks call a layer. */
+val Layer.label: String
+    get() = when (this) {
+        is TextLayer -> text.lines().first()
+        is ImageLayer -> "Image"
+        is VideoLayer -> "Video"
+    }
 
 @Composable
 fun SmallIcon(icon: Int, description: String, onClick: () -> Unit) {
@@ -277,6 +287,14 @@ fun AudioPanel(clip: VideoClip, vm: EditorViewModel, onAddMusic: () -> Unit) {
                 vm.updateClip { copy(music = music.copy(startMs = v.toLong())) }
             }
         }
+    }
+}
+
+@Composable
+fun VideoVolumePanel(layer: VideoLayer, vm: EditorViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        PanelLabel("Overlay sound")
+        KSlider(R.drawable.ic_volume_up, layer.volume, 0f..1f, ::percent) { v -> vm.editVideo { copy(volume = v) } }
     }
 }
 

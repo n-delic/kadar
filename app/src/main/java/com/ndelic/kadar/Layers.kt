@@ -6,6 +6,7 @@ import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.net.Uri
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
@@ -99,6 +100,34 @@ data class ImageLayer(
     override fun drawContent(canvas: Canvas) = canvas.drawBitmap(bitmap, -width / 2, -height / 2, paint)
     override fun withTransform(t: Transform) = copy(t = t)
     override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = endMs)
+    override fun withFlags(hidden: Boolean, locked: Boolean) = copy(hidden = hidden, locked = locked)
+}
+
+/**
+ * Another video on top of the main clip (picture-in-picture), [videoWidth]×[videoHeight] being its display size
+ * (rotation applied). It plays from its own start, so it shows for at most [durationMs].
+ * Its pixels come only from the Media3 compositor (`VideoClip.composition`), in the preview and the export alike, so it draws
+ * nothing here (thumbnails and the bitmap overlay skip it); the stage shows its selection box like any layer.
+ */
+data class VideoLayer(
+    override val id: Long,
+    override val t: Transform,
+    val uri: Uri,
+    val durationMs: Long,
+    val videoWidth: Int,
+    val videoHeight: Int,
+    /** Its own sound, 0 to 1; muted by default so it doesn't talk over the main clip. */
+    val volume: Float = 0f,
+    override val startMs: Long = 0,
+    override val endMs: Long = startMs + durationMs,
+    override val hidden: Boolean = false,
+    override val locked: Boolean = false,
+) : Layer {
+    override val width get() = videoWidth.toFloat()
+    override val height get() = videoHeight.toFloat()
+    override fun drawContent(canvas: Canvas) = Unit
+    override fun withTransform(t: Transform) = copy(t = t)
+    override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = minOf(endMs, startMs + durationMs))
     override fun withFlags(hidden: Boolean, locked: Boolean) = copy(hidden = hidden, locked = locked)
 }
 

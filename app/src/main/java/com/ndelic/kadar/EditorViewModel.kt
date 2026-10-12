@@ -270,6 +270,18 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         addLayer { ImageLayer(it, Transform(p.width / 2f, p.height / 2f, fit), bitmap, file) }
     }
 
+    /** Picture-in-picture: another video over the clip from [atMs] (the playhead), half the canvas wide. */
+    fun addVideo(uri: Uri, atMs: Long) = work("Adding video") {
+        val p = _uiState.value.project ?: return@work
+        val clip = p.video ?: return@work
+        keepAccess(uri)
+        val info = withContext(Dispatchers.IO) { mediaInfo(app, uri) }
+        if (info.width == 0 || info.durationMs == 0L) error("Can't read this video")
+        // Too close to the end there'd be nothing left to see, so start at the beginning instead.
+        val start = if (atMs < clip.outputDurationMs - MIN_VIDEO_LAYER_MS) atMs else 0
+        addLayer { VideoLayer(it, Transform(p.width / 2f, p.height / 2f, p.width * 0.5f / info.width), uri, info.durationMs, info.width, info.height, startMs = start) }
+    }
+
     private fun addLayer(make: (Long) -> Layer) {
         val layer = make(nextId++)
         updateProject { it.copy(layers = it.layers + layer) }
@@ -286,6 +298,8 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     fun editText(change: TextLayer.() -> TextLayer) = updateSelected { if (it is TextLayer) it.change() else it }
 
     fun editImage(change: ImageLayer.() -> ImageLayer) = updateSelected { if (it is ImageLayer) it.change() else it }
+
+    fun editVideo(change: VideoLayer.() -> VideoLayer) = updateSelected { if (it is VideoLayer) it.change() else it }
 
     fun setFlags(id: Long, hidden: Boolean, locked: Boolean) = updateLayer(id) { it.withFlags(hidden, locked) }
 
@@ -321,6 +335,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             when (layer) {
                 is ImageLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
                 is TextLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
+                is VideoLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
             }
         }
     }
@@ -457,10 +472,12 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             }
             _effects.send(EditorEffect.Saved(uri, mime, share))
         } else {
-            val overlay = if (p.layers.isEmpty()) null else timedOverlay(p.width, p.height, p.layers, video.outputDurationMs)
+            // Video layers have no pixels of their own to draw; the compositor places them.
+            val drawn = p.layers.filter { it !is VideoLayer }
+            val overlay = if (drawn.isEmpty()) null else timedOverlay(p.width, p.height, drawn, video.outputDurationMs)
             val out = File(app.cacheDir, "export.mp4")
             try {
-                exportVideo(app, video.composition(overlay, shortSide), out) { pct -> _uiState.update { it.copy(busy = "Saving video $pct%") } }
+                exportVideo(app, video.composition(overlay, shortSide, p.layers.filterIsInstance<VideoLayer>()), out) { pct -> _uiState.update { it.copy(busy = "Saving video $pct%") } }
                 val uri = withContext(Dispatchers.IO) { saveToGallery(app, "video/mp4") { o -> out.inputStream().use { it.copyTo(o) } } }
                 _effects.send(EditorEffect.Saved(uri, "video/mp4", share))
             } finally {
@@ -513,5 +530,6 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         const val THUMB_SIZE = 360f
         const val MAX_UNDO = 50
         const val FILMSTRIP_FRAMES = 10
+        const val MIN_VIDEO_LAYER_MS = 1000L
     }
 }

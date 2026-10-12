@@ -48,7 +48,8 @@ app/src/main/java/com/ndelic/kadar/
   ui/Theme.kt         Ink palette, fonts, shared components (IconTool, CircleButton, KSlider, ColorRow, TextTabs, KDialog)
   ui/HomeScreen.kt    Create tiles (video / photo / blank / web), project grid
   ui/EditorScreen.kt  Top bar (close, undo/redo, save, share), Stage (canvas, handles, video preview), tool row,
-                      NLE Timeline (layer tracks + clip), TrimStrip, full-screen TextEntry
+                      full-screen TextEntry
+  ui/Timeline.kt      NLE Timeline (layer tracks + clip) and TrimStrip
   ui/Panels.kt        Tool panels: stickers, canvas, speed, audio, font
   ui/WebImportScreen.kt  WebView browser with long-press-to-import
   ui/ImageTools.kt    EraseScreen (erase/restore brush) and CropScreen for image layers

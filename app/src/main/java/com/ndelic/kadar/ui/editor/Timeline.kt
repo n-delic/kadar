@@ -9,6 +9,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -31,6 +34,7 @@ import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
@@ -42,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -49,18 +54,24 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -75,6 +86,8 @@ import com.ndelic.kadar.ui.common.KIcon
 import com.ndelic.kadar.ui.common.PanelLabel
 import com.ndelic.kadar.video.VideoClip
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.roundToInt
 
 /**
@@ -160,7 +173,9 @@ fun TrimStrip(clip: VideoClip, frames: List<Bitmap>, positionMs: Long, onSeek: (
 /**
  * The NLE timeline in output time: one track per layer (top of the stack first) above the video clip.
  * Drag a track's ends to change when it shows, its middle to move it; long-press it and drag up or down to reorder;
- * the eye and lock at its left hide and lock it; tap the clip to trim; drag empty space to scrub.
+ * the eye and lock at its left hide and lock it; tap the clip to trim; drag empty space, the ruler or the clip to scrub.
+ * Two fingers are for the view only: pinch to zoom the time axis, slide to scroll it. One finger edits and scrubs the
+ * same way at any zoom, and while playing the view pages along with the playhead.
  */
 @Composable
 fun Timeline(
@@ -180,8 +195,26 @@ fun Timeline(
     val startDp = if (layers.isEmpty()) TIMELINE_PAD else TRACK_START
     // The track being reordered and how far it's been dragged. Reset by the new layer order, so the drop doesn't flicker.
     var lift by remember(layers) { mutableStateOf<Pair<Long, Float>?>(null) }
+    var viewport by remember { mutableStateOf(TimelineViewport()) }
+    val view = viewport.fit(total)
+    LaunchedEffect(positionMs, total) { viewport = viewport.fit(total).follow(positionMs, total) }
     Column(Modifier.fillMaxWidth().background(Ink.bg).padding(vertical = 8.dp).systemGestureExclusion()) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
+        // Initial pass, so a second finger takes the gesture from the track, ruler or clip under the first one.
+        BoxWithConstraints(
+            Modifier.fillMaxWidth().pointerInput(total, startDp) {
+                awaitEachGesture {
+                    do {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.changes.count { it.pressed } < 2) continue
+                        val start = startDp.toPx()
+                        val width = size.width - start - TIMELINE_PAD.toPx()
+                        val center = event.calculateCentroid().x - start
+                        viewport = viewport.fit(total).pinch(event.calculateZoom(), center - event.calculatePan().x, center, width, total)
+                        event.changes.forEach { it.consume() }
+                    } while (event.changes.any { it.pressed })
+                }
+            },
+        ) {
             val density = LocalDensity.current
             val start = with(density) { startDp.toPx() }
             val width = constraints.maxWidth - start - with(density) { TIMELINE_PAD.toPx() }
@@ -189,7 +222,8 @@ fun Timeline(
             val tracks = layers.asReversed()
             val from = tracks.indexOfFirst { it.id == lift?.first }
             val to = if (from < 0) -1 else reorderTarget(from, lift!!.second, rowPx, tracks.size)
-            Column(Modifier.heightIn(max = 170.dp).verticalScroll(rememberScrollState())) {
+            Ruler(view, total, start, width, onSeek)
+            Column(Modifier.padding(top = RULER_HEIGHT).heightIn(max = 170.dp).verticalScroll(rememberScrollState())) {
                 tracks.forEachIndexed { i, l ->
                     key(l.id) {
                         val room by animateFloatAsState(makeRoom(i, from, to) * rowPx)
@@ -199,6 +233,7 @@ fun Timeline(
                             lifted = i == from,
                             offsetY = if (i == from) lift!!.second else if (from >= 0) room else 0f,
                             total = total,
+                            view = view,
                             start = start,
                             width = width,
                             onSeek = onSeek,
@@ -214,11 +249,11 @@ fun Timeline(
                         )
                     }
                 }
-                ClipRow(clip, frames, total, startDp, onSeek, onClipTap)
+                ClipRow(clip, frames, total, view, startDp, onSeek, onClipTap)
             }
             Canvas(Modifier.matchParentSize()) {
-                val x = start + positionMs.toFloat() / total * width
-                drawLine(Color.White, Offset(x, 0f), Offset(x, size.height), 2.dp.toPx())
+                val x = start + view.x(positionMs, width)
+                if (x in start - 1f..start + width + 1f) drawLine(Color.White, Offset(x, 0f), Offset(x, size.height), 2.dp.toPx())
             }
         }
         Row(Modifier.fillMaxWidth().padding(start = startDp, end = TIMELINE_PAD, top = 4.dp)) {
@@ -236,6 +271,7 @@ private fun Track(
     lifted: Boolean,
     offsetY: Float,
     total: Long,
+    view: TimelineViewport,
     start: Float,
     width: Float,
     onSeek: (Long) -> Unit,
@@ -250,8 +286,11 @@ private fun Track(
     val drop by rememberUpdatedState(onDrop)
     val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
-    val xs = start + layer.startMs.coerceIn(0, total).toFloat() / total * width
-    val xe = start + layer.endMs.coerceIn(0, total).toFloat() / total * width
+    // Clamped near the visible part, so a zoomed-in bar stays a sane size; the clip below hides the clamped ends.
+    val header = with(density) { TRACK_HEADER.toPx() }
+    val far = with(density) { (TIMELINE_PAD + 8.dp).toPx() }
+    val xs = (start + view.x(layer.startMs.coerceIn(0, total), width)).coerceIn(header - far, start + width + far)
+    val xe = (start + view.x(layer.endMs.coerceIn(0, total), width)).coerceIn(header - far, start + width + far)
     val color = when (layer) {
         is TextLayer -> Ink.accent
         is ImageLayer -> Ink.teal
@@ -267,13 +306,13 @@ private fun Track(
             .then(if (lifted) Modifier.shadow(8.dp, RoundedCornerShape(8.dp)).background(Ink.raised, RoundedCornerShape(8.dp)) else Modifier),
     ) {
         Box(
-            Modifier.fillMaxSize().pointerInput(total, start, width) {
+            Modifier.fillMaxSize().drawWithContent { clipRect(left = header) { this@drawWithContent.drawContent() } }.pointerInput(total, view, start, width) {
                 awaitEachGesture {
                     val l = current
                     val s0 = l.startMs.coerceIn(0, total)
                     val e0 = l.endMs.coerceIn(0, total)
-                    val x0 = start + s0.toFloat() / total * width
-                    val x1 = start + e0.toFloat() / total * width
+                    val x0 = start + view.x(s0, width)
+                    val x1 = start + view.x(e0, width)
                     val grab = 20.dp.toPx()
                     val down = awaitFirstDown()
                     val mode = when (down.position.x) {
@@ -282,12 +321,12 @@ private fun Track(
                         in x0..x1 -> TrackDrag.Move
                         else -> TrackDrag.Seek
                     }
-                    fun timeAt(x: Float) = ((x - start) / width * total).toLong().coerceIn(0, total)
+                    fun timeAt(x: Float) = view.time(x - start, width, total)
                     if (mode == TrackDrag.Seek) {
                         onSeek(timeAt(down.position.x))
                         while (true) {
                             val change = awaitPointerEvent().changes.first()
-                            if (!change.pressed) break
+                            if (!change.pressed || change.isConsumed) break
                             onSeek(timeAt(change.position.x))
                             change.consume()
                         }
@@ -315,7 +354,7 @@ private fun Track(
                         lift(dy)
                         while (true) {
                             val change = awaitPointerEvent().changes.first()
-                            if (!change.pressed) break
+                            if (!change.pressed || change.isConsumed) break
                             // Deltas, not positions: the track itself moves under the finger.
                             dy += change.positionChange().y
                             lift(dy)
@@ -328,8 +367,8 @@ private fun Track(
                     if (abs(change.position.y - down.position.y) > abs(change.position.x - down.position.x)) return@awaitEachGesture
                     var last = s0 to e0
                     var first = true
-                    while (change.pressed) {
-                        val d = ((change.position.x - down.position.x) / width * total).toLong()
+                    while (change.pressed && !change.isConsumed) {
+                        val d = ((change.position.x - down.position.x) / width * view.spanMs).toLong()
                         val next = when (mode) {
                             TrackDrag.Start -> (s0 + d).coerceIn(0, e0 - MIN_CLIP_MS) to e0
                             TrackDrag.End -> s0 to (e0 + d).coerceIn(s0 + MIN_CLIP_MS, total)
@@ -393,15 +432,39 @@ fun makeRoom(i: Int, from: Int, to: Int) = when (i) {
     else -> 0
 }
 
-/** The kept part of the video, under the layer tracks. Tap to trim, drag to scrub. */
+/** Time ticks and labels for the part in view, above the tracks; tap or drag it to scrub. */
 @Composable
-private fun ClipRow(clip: VideoClip, frames: List<Bitmap>, total: Long, start: Dp, onSeek: (Long) -> Unit, onTap: () -> Unit) {
-    val kept = if (frames.isEmpty()) frames else {
-        val from = (clip.startMs * frames.size / clip.durationMs).toInt().coerceIn(0, frames.size - 1)
-        val to = ((clip.endMs * frames.size + clip.durationMs - 1) / clip.durationMs).toInt().coerceIn(from + 1, frames.size)
-        frames.subList(from, to)
+private fun Ruler(view: TimelineViewport, total: Long, start: Float, width: Float, onSeek: (Long) -> Unit) {
+    val measurer = rememberTextMeasurer()
+    val label = TextStyle(color = Ink.dim, fontSize = 9.sp)
+    Canvas(
+        Modifier
+            .fillMaxWidth()
+            .height(RULER_HEIGHT)
+            .pointerInput(view, total, start, width) { detectTapGestures { onSeek(view.time(it.x - start, width, total)) } }
+            .pointerInput(view, total, start, width) { detectHorizontalDragGestures { change, _ -> onSeek(view.time(change.position.x - start, width, total)) } },
+    ) {
+        val step = view.rulerStepMs(width, 56.dp.toPx())
+        val half = step / 2
+        var t = ceil(view.fromMs / half).toLong() * half
+        while (t <= view.fromMs + view.spanMs) {
+            val x = start + view.x(t, width)
+            val major = t % step == 0L
+            drawLine(Ink.dim, Offset(x, size.height - (if (major) 6 else 3).dp.toPx()), Offset(x, size.height), 1.dp.toPx())
+            if (major) drawText(measurer, rulerLabel(t, step), Offset(x + 3.dp.toPx(), 0f), label)
+            t += half
+        }
     }
-    Row(
+}
+
+/**
+ * The kept part of the video, under the layer tracks. Tap to trim, drag to scrub. Frames are tiled at their own aspect
+ * and anchored in time, so they scroll with the tracks and repeat when zoomed in.
+ */
+@Composable
+private fun ClipRow(clip: VideoClip, frames: List<Bitmap>, total: Long, view: TimelineViewport, start: Dp, onSeek: (Long) -> Unit, onTap: () -> Unit) {
+    val images = remember(frames) { frames.map { it.asImageBitmap() } }
+    Canvas(
         Modifier
             .fillMaxWidth()
             .height(52.dp)
@@ -409,14 +472,24 @@ private fun ClipRow(clip: VideoClip, frames: List<Bitmap>, total: Long, start: D
             .clip(RoundedCornerShape(6.dp))
             .background(Ink.raised)
             .pointerInput(Unit) { detectTapGestures { onTap() } }
-            .pointerInput(total) { detectHorizontalDragGestures { change, _ -> onSeek((change.position.x / size.width * total).toLong().coerceIn(0, total)) } },
+            .pointerInput(total, view) { detectHorizontalDragGestures { change, _ -> onSeek(view.time(change.position.x, size.width.toFloat(), total)) } },
     ) {
-        kept.forEach { Image(it.asImageBitmap(), null, Modifier.weight(1f).fillMaxHeight(), contentScale = ContentScale.Crop) }
+        val first = images.firstOrNull() ?: return@Canvas
+        val tileWidth = size.height * first.width / first.height
+        val tileMs = tileWidth / size.width * view.spanMs
+        var k = floor(view.fromMs / tileMs)
+        while (k * tileMs < view.fromMs + view.spanMs) {
+            val image = images[filmstripIndex(clip.startMs + (k + 0.5f) * tileMs * clip.speed, clip.durationMs, images.size)]
+            val x = view.x(k * tileMs, size.width)
+            drawImage(image, dstOffset = IntOffset(x.roundToInt(), 0), dstSize = IntSize(ceil(tileWidth).toInt() + 1, size.height.roundToInt()))
+            k++
+        }
     }
 }
 
 private val TIMELINE_PAD = 28.dp
 private val TRACK_HEIGHT = 40.dp
+private val RULER_HEIGHT = 18.dp
 /** Hide and lock toggles, 40dp each. */
 private val TRACK_HEADER = 80.dp
 /** Where time 0 sits on tracks: past the header, with room left of it to grab a layer's start handle. */

@@ -2,7 +2,9 @@ package com.ndelic.kadar.video
 
 import com.ndelic.kadar.model.Transform
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VideoOverlayTest {
@@ -59,5 +61,25 @@ class VideoOverlayTest {
         assertEquals(60, outputFrameRate(59.6f))
         assertEquals(60, outputFrameRate(240f))
         assertEquals(30, outputFrameRate(0f))
+    }
+
+    @Test
+    fun sourceTimeRunsFromTheInPointOnceTheSpanStarts() {
+        assertEquals(500L, overlaySourceMs(500, 1_000L to 4_000L, 1_000))
+        assertEquals(2_500L, overlaySourceMs(500, 1_000L to 4_000L, 3_000))
+        assertNull(overlaySourceMs(500, 1_000L to 4_000L, 999))
+        assertNull(overlaySourceMs(500, 1_000L to 4_000L, 4_000))
+        assertNull(overlaySourceMs(500, null, 2_000))
+    }
+
+    @Test
+    fun seeksOnAnyOffsetWhenPausedButOnlyOnDriftWhilePlaying() {
+        assertFalse(overlayNeedsSeek(1_000, 1_000, playing = false, sinceSeekMs = 0))
+        assertTrue(overlayNeedsSeek(1_000, 1_001, playing = false, sinceSeekMs = 0))
+        assertFalse(overlayNeedsSeek(1_000, 1_080, playing = true, sinceSeekMs = 5_000))
+        assertTrue(overlayNeedsSeek(1_000, 1_081, playing = true, sinceSeekMs = 5_000))
+        assertTrue(overlayNeedsSeek(1_100, 1_000, playing = true, sinceSeekMs = 5_000))
+        // Right after a correction it gets a second to play before the next one.
+        assertFalse(overlayNeedsSeek(1_000, 2_000, playing = true, sinceSeekMs = 999))
     }
 }

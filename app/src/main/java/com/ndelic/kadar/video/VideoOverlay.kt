@@ -1,6 +1,7 @@
 package com.ndelic.kadar.video
 
 import com.ndelic.kadar.model.Transform
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -35,4 +36,21 @@ fun overlayAlpha(opacity: Float, span: Pair<Long, Long>, timeUs: Long) = if (tim
  */
 fun outputFrameRate(clipFrameRate: Float) = if (clipFrameRate > 0) clipFrameRate.roundToInt().coerceIn(1, 60) else 30
 
+/**
+ * Where in its own clip a video layer is at output time [positionMs]: it plays at normal speed from [clipStartMs] once
+ * its [span] starts, whatever the main clip's speed. Null outside the span, where it isn't shown.
+ */
+fun overlaySourceMs(clipStartMs: Long, span: Pair<Long, Long>?, positionMs: Long) =
+    if (span == null || positionMs !in span.first until span.second) null else clipStartMs + positionMs - span.first
+
+/**
+ * Whether a preview player at [actualMs] must seek to [targetMs]: paused, to show the exact frame; playing, only once
+ * it drifts past [MAX_DRIFT_MS], since every seek stalls it for a moment, and at most once per [SEEK_GAP_MS] (counted
+ * by [sinceSeekMs]), so a decoder slower than real time still plays between corrections instead of seeking forever.
+ */
+fun overlayNeedsSeek(actualMs: Long, targetMs: Long, playing: Boolean, sinceSeekMs: Long) =
+    if (playing) sinceSeekMs >= SEEK_GAP_MS && abs(actualMs - targetMs) > MAX_DRIFT_MS else actualMs != targetMs
+
 private const val MIN_OVERLAY_MS = 100L
+private const val MAX_DRIFT_MS = 80L
+private const val SEEK_GAP_MS = 1_000L

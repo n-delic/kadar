@@ -189,6 +189,8 @@
     <!-- Messages -->
     <string name="saved_to_stickers">Spremljeno u Moje stikere</string>
     <string name="error_generic">Nešto nije u redu</string>
+    <string name="preview_restarted">Pregled je stao, pa je ponovo pokrenut</string>
+    <string name="preview_failed">Pregled se trenutno ne može pustiti. Pritisni Pokreni za novi pokušaj.</string>
     <string name="error_read_video">Ovaj video se ne može pročitati</string>
     <string name="error_read_audio">Ovaj audio fajl se ne može pročitati</string>
     <string name="error_share_denied">Druga aplikacija nije dozvolila Kadru da otvori taj fajl</string>

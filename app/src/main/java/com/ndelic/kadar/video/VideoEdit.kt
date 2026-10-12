@@ -40,7 +40,6 @@ import com.ndelic.kadar.media.await
 import com.ndelic.kadar.model.Adjust
 import com.ndelic.kadar.model.Layer
 import com.ndelic.kadar.model.Steady
-import com.ndelic.kadar.model.Transform
 import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.model.animationSpans
 import com.ndelic.kadar.model.drawLayer
@@ -114,14 +113,12 @@ private const val BLUR_LONG_SIDE = 320
 /**
  * The edit as a Media3 composition: used for both the live preview and the export. [overlay] draws the text/sticker
  * layers; it sits on the composition, not the clip, so it gets output timestamps (after trim and speed) like the layers.
- * [videos] are picture-in-picture layers, each a sequence of its own; the compositor asks where they sit ([placed]) for
- * every frame, so the preview can follow a drag without rebuilding the composition.
+ * [videos] are picture-in-picture layers, each a sequence of its own (the export's; the preview draws them itself).
  */
 fun VideoClip.composition(
     overlay: TextureOverlay?,
     shortSide: Int? = null,
     videos: List<VideoLayer> = emptyList(),
-    placed: (VideoLayer) -> Transform = { it.t },
 ): Composition {
     // CompositionPlayer needs each item's full (unclipped) duration up front.
     val video = EditedMediaItem.Builder(clipped(uri, startMs, endMs))
@@ -162,7 +159,7 @@ fun VideoClip.composition(
         )
         // HDR phone footage turns washed out on most apps once posted; memes go out as plain SDR.
         .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
-        .apply { if (overlays.isNotEmpty()) setVideoCompositorSettings(overlaySettings(overlays, placed)) }
+        .apply { if (overlays.isNotEmpty()) setVideoCompositorSettings(overlaySettings(overlays)) }
         .build()
 }
 
@@ -223,14 +220,14 @@ private fun VideoLayer.sequence(span: Pair<Long, Long>, totalMs: Long): EditedMe
  * Hides the frame clock (sequence 0) and places overlay `i` (sequence `i + 1`) by its layer; the clip after them keeps
  * the default full-frame settings.
  */
-private fun VideoClip.overlaySettings(overlays: List<Pair<VideoLayer, Pair<Long, Long>>>, placed: (VideoLayer) -> Transform) =
+private fun VideoClip.overlaySettings(overlays: List<Pair<VideoLayer, Pair<Long, Long>>>) =
     object : VideoCompositorSettings {
         override fun getOutputSize(inputSizes: List<Size>) = Size(outputSize.first, outputSize.second)
 
         override fun getOverlaySettings(inputId: Int, presentationTimeUs: Long): OverlaySettings {
             if (inputId == 0) return StaticOverlaySettings.Builder().setAlphaScale(0f).build()
             val (layer, span) = overlays.getOrNull(inputId - 1) ?: return StaticOverlaySettings.Builder().build()
-            val p = overlayPlacement(placed(layer), outputSize.first, outputSize.second)
+            val p = overlayPlacement(layer.t, outputSize.first, outputSize.second)
             return StaticOverlaySettings.Builder()
                 .setBackgroundFrameAnchor(p.x, p.y)
                 .setScale(p.scale, p.scale)

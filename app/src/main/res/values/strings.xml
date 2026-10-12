@@ -190,6 +190,8 @@
     <!-- Messages -->
     <string name="saved_to_stickers">Saved to My stickers</string>
     <string name="error_generic">Something went wrong</string>
+    <string name="preview_restarted">The preview stopped, so it was restarted</string>
+    <string name="preview_failed">The preview can\'t play right now. Press play to try again.</string>
     <string name="error_read_video">Can\'t read this video</string>
     <string name="error_read_audio">Can\'t read this audio file</string>
     <string name="error_share_denied">The other app didn\'t let Kadar open that file</string>

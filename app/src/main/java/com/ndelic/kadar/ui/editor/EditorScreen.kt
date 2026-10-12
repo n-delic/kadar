@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.SurfaceTexture
 import android.graphics.Typeface
+import android.os.SystemClock
 import android.view.Surface
 import android.view.TextureView
 import androidx.activity.compose.BackHandler
@@ -99,6 +100,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
@@ -117,6 +119,7 @@ import com.ndelic.kadar.model.Layer
 import com.ndelic.kadar.model.Project
 import com.ndelic.kadar.model.TextLayer
 import com.ndelic.kadar.model.Transform
+import com.ndelic.kadar.model.UiText
 import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.model.drawLayer
 import com.ndelic.kadar.model.motionAt
@@ -146,11 +149,10 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     var typing by rememberSaveable { mutableStateOf<String?>(null) }
     val image = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::addImage) }
     val music = rememberLauncherForActivityResult(OpenDocument()) { it?.let(vm::setMusic) }
-    val videoLayers = project.layers.filterIsInstance<VideoLayer>()
-    // Bumped to swap in a fresh preview player (see the video-layer drag effect below), resuming at [resumeAt].
+    // Bumped to swap in a fresh preview player (a paused blurred preview, or one that failed), resuming at [resumeAt].
     var playerGeneration by remember { mutableIntStateOf(0) }
     val resumeAt = remember { longArrayOf(0) }
-    val player = if (video != null) rememberCompositionPlayer(multiInput = videoLayers.isNotEmpty() || video.blurred, playerGeneration) else null
+    val player = if (video != null) rememberCompositionPlayer(multiInput = video.blurred, playerGeneration) else null
     var playing by remember { mutableStateOf(false) }
     var positionMs by remember { mutableLongStateOf(0L) }
     val overlayVideo = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let { uri -> vm.addVideo(uri, positionMs) } }
@@ -175,14 +177,15 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     }
     // Long-lived gesture handlers (timeline, trim strip) must seek the current player, not one swapped out since.
     val currentPlayer by rememberUpdatedState(player)
+    // When the preview last failed and was rebuilt, to give up instead of rebuilding in a loop.
+    val lastFailure = remember { longArrayOf(-RETRY_WINDOW_MS) }
     if (player != null && video != null) {
-        val layers by rememberUpdatedState(project.layers)
-        // Video layers' placement reaches the compositor live, so a drag doesn't rebuild the composition; anything else does.
+        // Video layers aren't in the preview's composition: VideoLayerPreview draws each with its own player.
         val freshPlayer = remember(player) { booleanArrayOf(true) }
-        LaunchedEffect(player, video, videoLayers.map { it.withTransform(Transform(0f, 0f)) }) {
-            // Same Media3 limit as below: a paused multi-input player won't repaint a new composition, so use a new player.
-            if (!freshPlayer[0] && (videoLayers.isNotEmpty() || video.blurred) && !player.isPlaying) {
-                // Coalesce a drag (e.g. a video layer's track) into one rebuild instead of one per move.
+        LaunchedEffect(player, video) {
+            // A paused multi-input player (the blurred canvas) won't repaint a new composition, so use a new player.
+            if (!freshPlayer[0] && video.blurred && !player.isPlaying) {
+                // Coalesce a drag (e.g. a slider) into one rebuild instead of one per move.
                 delay(150)
                 resumeAt[0] = player.currentPosition
                 playerGeneration++
@@ -190,29 +193,30 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             }
             freshPlayer[0] = false
             val start = resumeAt[0].also { resumeAt[0] = 0 }
-            player.setComposition(video.composition(null, videos = videoLayers, placed = { v -> (layers.firstOrNull { it.id == v.id } ?: v).t }), start)
+            player.setComposition(video.composition(null), start)
             player.prepare()
             // A paused player keeps showing the old frame after a new composition; seek once it's loaded to repaint.
             delay(300)
             if (!player.isPlaying) player.seekTo(maxOf(start, player.currentPosition))
         }
-        // While playing, moved video layers follow live through `placed`. Paused, Media3's multi-input preview keeps its
-        // last composited frame through seeks, new compositions and short plays; only a fresh player paints the new
-        // placement. So once a drag rests while paused, swap in a new player at the same position.
-        val lastPlacement = remember(player) { arrayOfNulls<List<Transform>>(1) }
-        LaunchedEffect(videoLayers.map { it.t }) {
-            val placement = videoLayers.map { it.t }
-            // The first run is the player's own start, not a drag: don't rebuild for it.
-            if (lastPlacement[0] == null || lastPlacement[0] == placement) {
-                lastPlacement[0] = placement
-                return@LaunchedEffect
+        DisposableEffect(player) {
+            // A failed player stays idle whatever play is pressed; rebuild it once, and stop if the new one fails too.
+            val listener = object : Player.Listener {
+                override fun onPlayerError(error: PlaybackException) {
+                    val now = SystemClock.uptimeMillis()
+                    if (now - lastFailure[0] < RETRY_WINDOW_MS) {
+                        playing = false
+                        vm.notify(UiText.Res(R.string.preview_failed))
+                        return
+                    }
+                    lastFailure[0] = now
+                    resumeAt[0] = player.currentPosition
+                    playerGeneration++
+                    vm.notify(UiText.Res(R.string.preview_restarted))
+                }
             }
-            delay(150)
-            lastPlacement[0] = placement
-            if (!player.isPlaying && videoLayers.isNotEmpty()) {
-                resumeAt[0] = player.currentPosition
-                playerGeneration++
-            }
+            player.addListener(listener)
+            onDispose { player.removeListener(listener) }
         }
         LaunchedEffect(player, playing) { player.playWhenReady = playing }
         LaunchedEffect(player) {
@@ -254,7 +258,14 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     fontSize = 12.sp,
                     modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp),
                 )
-                Box(Modifier.size(48.dp).clip(CircleShape).background(Ink.raised).clickableNoRipple { playing = !playing }, contentAlignment = Alignment.Center) {
+                Box(Modifier.size(48.dp).clip(CircleShape).background(Ink.raised).clickableNoRipple {
+                    // A preview that gave up after failing gets a fresh player on the next press.
+                    if (!playing && player?.playerError != null) {
+                        resumeAt[0] = player.currentPosition
+                        playerGeneration++
+                    }
+                    playing = !playing
+                }, contentAlignment = Alignment.Center) {
                     KIcon(if (playing) R.drawable.ic_pause else R.drawable.ic_play_arrow, Modifier.size(30.dp), description = stringResource(if (playing) R.string.pause else R.string.play))
                 }
             }
@@ -601,6 +612,10 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
             Box(Modifier.fillMaxSize().clipToBounds().background(if (transparent) Color(0xFF3A3A3A) else Color(project.background))) {
                 if (transparent) Checkerboard()
                 player?.let { p -> VideoSurface(p, project.width, project.height, Modifier.fillMaxSize()) }
+                // Over the main video and under the canvas (text, stickers, handles), bottom layer first, like the export.
+                if (videoEnd != null) {
+                    project.layers.forEach { l -> if (l is VideoLayer && !l.hidden) key(l.id) { VideoLayerPreview(l, videoEnd, scale, player) } }
+                }
                 Canvas(
                     Modifier.fillMaxSize().pointerInput(scale, project.width, project.height) {
                         awaitEachGesture {
@@ -847,19 +862,29 @@ private fun VideoSurface(player: CompositionPlayer, canvasWidth: Int, canvasHeig
 
 private const val PREVIEW_LONG_SIDE = 1280f
 
+/** The preview player, null for the moment one is swapped for the next. */
 @Composable
-private fun rememberCompositionPlayer(multiInput: Boolean, generation: Int): CompositionPlayer {
+private fun rememberCompositionPlayer(multiInput: Boolean, generation: Int): CompositionPlayer? {
     val context = LocalContext.current
-    // Video layers and the blurred background need the compositor; other projects keep the plain single-input preview.
-    val player = remember(multiInput, generation) {
-        CompositionPlayer.Builder(context)
+    var player by remember { mutableStateOf<CompositionPlayer?>(null) }
+    // Made in the effect rather than in remember: on a new key the old player is released (onDispose) before the next
+    // one is built, so two never fight over decoders and the GPU.
+    DisposableEffect(multiInput, generation) {
+        // The blurred background needs the compositor; other projects keep the plain single-input preview.
+        val p = CompositionPlayer.Builder(context)
             .apply { if (multiInput) setVideoGraphFactory(MultipleInputVideoGraph.Factory()) }
             .build()
             .apply { repeatMode = Player.REPEAT_MODE_ALL }
+        player = p
+        onDispose {
+            player = null
+            p.release()
+        }
     }
-    DisposableEffect(player) { onDispose { player.release() } }
     return player
 }
+
+private const val RETRY_WINDOW_MS = 5_000L
 
 /** Full-screen typing: the text appears big, in its own font and color. */
 @Composable

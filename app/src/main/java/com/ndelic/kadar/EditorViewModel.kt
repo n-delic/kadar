@@ -297,6 +297,11 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun select(id: Long?) = _uiState.update { it.copy(selectedId = id) }
 
+    /** Shows [text] the way the ViewModel's own messages show, for the UI's notes (e.g. about the preview player). */
+    fun notify(text: UiText) {
+        _effects.trySend(EditorEffect.Message(text))
+    }
+
     fun addText(text: String, color: Int) {
         val p = _uiState.value.project ?: return
         // Black text gets a white outline so it stays readable; everything else gets the classic black one.

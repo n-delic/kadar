@@ -28,6 +28,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.horizontalScroll
@@ -431,7 +434,60 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
         val cy = project.height / 2f
         val snapDistance = with(density) { 10.dp.toPx() }
         val transparent = project.background == android.graphics.Color.TRANSPARENT
-        Box(Modifier.size(size)) {
+        // View zoom/pan (display only, never saved). Pan is in screen pixels from the centered position.
+        var viewZoom by remember(project.width, project.height) { mutableFloatStateOf(1f) }
+        var viewPan by remember(project.width, project.height) { mutableStateOf(Offset.Zero) }
+        val boxPx = Size(project.width * scale, project.height * scale)
+        /** Zooms by [z] around [focus] and moves by [move]; both in screen pixels relative to the stage center. */
+        fun zoomView(z: Float, focus: Offset, move: Offset) {
+            val nz = (viewZoom * z).coerceIn(1f, MAX_VIEW_ZOOM)
+            if (nz == 1f) {
+                viewZoom = 1f
+                viewPan = Offset.Zero
+                return
+            }
+            val f = nz / viewZoom
+            val p = focus - (focus - viewPan) * f + move
+            // Keep at least part of the canvas on screen.
+            val maxX = boxPx.width * nz / 2
+            val maxY = boxPx.height * nz / 2
+            viewZoom = nz
+            viewPan = Offset(p.x.coerceIn(-maxX, maxX), p.y.coerceIn(-maxY, maxY))
+        }
+        val stageCenter = Offset(constraints.maxWidth / 2f, constraints.maxHeight / 2f)
+        // Gestures that start around the canvas: tap deselects, double-tap resets the view, drag and pinch move it.
+        Box(
+            Modifier.matchParentSize().pointerInput(scale) {
+                var lastUp = 0L
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    var moved = false
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.changes.none { it.pressed }) break
+                        val pan = event.calculatePan()
+                        val zoom = event.calculateZoom()
+                        if (pan != Offset.Zero || zoom != 1f) {
+                            moved = true
+                            zoomView(zoom, event.calculateCentroid() - stageCenter, pan)
+                            event.changes.forEach { it.consume() }
+                        }
+                    }
+                    if (!moved) {
+                        if (down.uptimeMillis - lastUp < 300) zoomView(0f, Offset.Zero, Offset.Zero) else vm.select(null)
+                        lastUp = down.uptimeMillis
+                    }
+                }
+            },
+        )
+        Box(
+            Modifier.size(size).graphicsLayer {
+                scaleX = viewZoom
+                scaleY = viewZoom
+                translationX = viewPan.x
+                translationY = viewPan.y
+            },
+        ) {
             Box(Modifier.fillMaxSize().clipToBounds().background(if (transparent) Color(0xFF3A3A3A) else Color(project.background))) {
                 if (transparent) Checkerboard()
                 player?.let { p -> VideoSurface(p, project.width, project.height, Modifier.fillMaxSize()) }
@@ -439,6 +495,8 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                     Modifier.fillMaxSize().pointerInput(scale) {
                         awaitEachGesture {
                             val down = awaitFirstDown()
+                            // Gestures that start on the canvas are the canvas's, not the surrounding stage's.
+                            down.consume()
                             val sel = current?.takeUnless { it.locked }
                             val handle = sel?.let { handleAt(it, down.position, scale, handleRadius) }
                             if (sel != null && handle != null) {
@@ -467,31 +525,48 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                                 return@awaitEachGesture
                             }
                             val p = down.position / scale
-                            val hit = layers.lastOrNull { !it.locked && it.t.contains(it.width, it.height, p.x, p.y) }
-                            if (hit != null) vm.select(hit.id)
+                            val onSelected = sel != null && sel.t.contains(sel.width, sel.height, p.x, p.y)
+                            val hit = if (onSelected) sel else layers.lastOrNull { !it.locked && it.t.contains(it.width, it.height, p.x, p.y) }
+                            // What this gesture drives, decided on the first movement: the selected layer if it started on it;
+                            // otherwise a second finger means "zoom the view", one finger drags the touched layer (or pans the view).
+                            var mode = if (onSelected) GestureMode.Layer else GestureMode.Undecided
                             // Track the unsnapped placement, so a layer can be pulled back out of a snap.
-                            var raw = (hit ?: sel)?.t
+                            var raw = hit?.t
                             var moved = false
                             while (true) {
                                 val event = awaitPointerEvent()
-                                if (event.changes.none { it.pressed }) break
+                                val pressed = event.changes.count { it.pressed }
+                                if (pressed == 0) break
                                 val pan = event.calculatePan()
                                 val zoom = event.calculateZoom()
                                 val rotation = event.calculateRotation()
-                                if (pan != Offset.Zero || zoom != 1f || rotation != 0f) {
-                                    raw?.let { r ->
+                                if (pan == Offset.Zero && zoom == 1f && rotation == 0f) continue
+                                if (mode == GestureMode.Undecided) {
+                                    mode = when {
+                                        pressed > 1 || hit == null -> GestureMode.View
+                                        else -> GestureMode.Layer.also { vm.select(hit.id) }
+                                    }
+                                }
+                                when (mode) {
+                                    GestureMode.Layer -> raw?.let { r ->
                                         val next = r.copy(x = r.x + pan.x / scale, y = r.y + pan.y / scale, scale = r.scale * zoom, rotation = r.rotation + rotation)
                                         raw = next
                                         vm.setSelectedTransform(snaps.apply(next, cx, cy, snapDistance / scale), first = !moved)
                                     }
-                                    moved = true
-                                    event.changes.forEach { it.consume() }
+                                    // Positions here are in the zoomed canvas's own pixels; the view moves in screen pixels.
+                                    else -> {
+                                        val half = Offset(boxPx.width / 2, boxPx.height / 2)
+                                        val focus = (event.calculateCentroid() - half) * viewZoom + viewPan
+                                        zoomView(zoom, focus, pan * viewZoom)
+                                    }
                                 }
+                                moved = true
+                                event.changes.forEach { it.consume() }
                             }
                             snaps.clear()
                             if (!moved) {
-                                // A tap on empty canvas deselects; a second quick tap on text opens the editor.
-                                if (hit == null) vm.select(null)
+                                // A tap selects what's under it (or deselects on empty canvas); a second quick tap on text opens the editor.
+                                vm.select(hit?.id)
                                 val isDoubleTap = hit != null && lastTap[0] == hit.id && down.uptimeMillis - lastTap[1] < 350
                                 if (isDoubleTap && hit is TextLayer) editText(hit)
                                 lastTap[0] = hit?.id ?: -1
@@ -517,8 +592,26 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                 HandleDot(R.drawable.ic_open_in_full, cornerOf(l, 1f, scale), Ink.accent)
             }
         }
+        if (viewZoom > 1.01f) {
+            Text(
+                "Fit",
+                color = Ink.onAccent,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Ink.accent)
+                    .clickable { zoomView(0f, Offset.Zero, Offset.Zero) }
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+            )
+        }
     }
 }
+
+private enum class GestureMode { Undecided, Layer, View }
+
+private const val MAX_VIEW_ZOOM = 6f
 
 /** Screen position of the layer's top-left ([side] = -1) or bottom-right (+1) corner. */
 private fun cornerOf(layer: Layer, side: Float, scale: Float): Offset {

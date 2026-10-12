@@ -51,7 +51,8 @@
 ## Next
 
 - [ ] Text shadow, letter spacing, alignment
-- [ ] Drag tracks up/down to reorder
+- [ ] Video over video: add a second clip (or several) as a layer on top of the main one, picture-in-picture style. Move, resize, rotate and crop it on the stage like an image, give it its own track with start/end on the timeline, its own trim, volume and opacity, and export it with the main clip (Media3 multi-sequence composition with a video compositor)
+- [ ] Timeline tracks do everything the photo Layers panel does: drag up/down to reorder, plus hide and lock right on the track (the Layers button is photo-only now)
 - [ ] Blurred-background video canvas (Media3's blur-with-frame effect squeezed the frame on the emulator; needs another approach)
 
 ## Later / maybe

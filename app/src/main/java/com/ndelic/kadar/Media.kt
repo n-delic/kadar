@@ -3,12 +3,15 @@ package com.ndelic.kadar
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.ImageDecoder
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
 import android.provider.OpenableColumns
+import android.text.TextPaint
 import android.util.Base64
 import android.webkit.CookieManager
 import com.google.android.gms.common.moduleinstall.ModuleInstall
@@ -27,6 +30,7 @@ import java.net.URL
 import java.nio.ByteBuffer
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -85,6 +89,19 @@ fun trimTransparent(src: Bitmap): Pair<Bitmap, IntArray>? {
     src.getPixels(pixels, 0, src.width, 0, 0, src.width, src.height)
     val b = opaqueBounds(pixels, src.width, src.height) ?: return null
     return Bitmap.createBitmap(src, b[0], b[1], b[2] - b[0], b[3] - b[1]) to b
+}
+
+/** Draws [emoji] from the system emoji font into a tightly cropped bitmap. */
+fun renderEmoji(emoji: String, size: Float = 512f): Bitmap {
+    val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textSize = size }
+    val metrics = paint.fontMetricsInt
+    val bitmap = Bitmap.createBitmap(
+        ceil(paint.measureText(emoji)).toInt().coerceAtLeast(1),
+        (metrics.descent - metrics.ascent).coerceAtLeast(1),
+        Bitmap.Config.ARGB_8888,
+    )
+    Canvas(bitmap).drawText(emoji, 0f, -metrics.ascent.toFloat(), paint)
+    return trimTransparent(bitmap)?.first ?: bitmap
 }
 
 /** Display size (rotation applied) and duration; width and height are 0 for audio. */

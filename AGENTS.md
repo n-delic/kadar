@@ -13,7 +13,7 @@ The owner's phone is a Galaxy S25; it also runs on older phones, hence `minSdk 2
 - **Photo**: open a photo, blank canvas, or web image; add text (meme outline style), emoji, images and saved stickers as layers; move, pinch-resize, rotate; remove backgrounds on-device; change canvas aspect and background; export JPEG/PNG to `Pictures/Kadar`.
 - **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time; export H.264/AAC MP4 to `Movies/Kadar`.
 - **Undo / redo** for every edit (gestures and timeline drags count once per drag).
-- **Snapping** to the canvas center and 0°/90°, caption boxes behind text, a Layers panel, keep-pitch for speed changes.
+- **Snapping** to the canvas center and 0°/90°, caption boxes behind text, a Layers panel (photos only, top-bar button; video shows layers as timeline tracks), keep-pitch for speed changes.
 - **Eraser / restore brush and crop** for image layers (`ui/ImageTools.kt`). `ImageLayer.source` + `sourceX/Y` remember the untouched original and where the layer's bitmap sits in it; keep them right in any new operation that resizes or crops a bitmap.
 - **Share to Kadar**: `MainActivity` (singleTask) takes `ACTION_SEND` images and videos and calls `EditorViewModel.openShared`.
 - **Projects**: every edit autosaves into the app's private storage and shows up on the home screen; reopen or long-press to delete.

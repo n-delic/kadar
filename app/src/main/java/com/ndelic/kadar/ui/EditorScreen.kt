@@ -183,6 +183,13 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                 PillButton(R.drawable.ic_redo, "Redo", state.canRedo, vm::redo)
             }
             Spacer(Modifier.weight(1f))
+            // Photos only: video shows the stack as timeline tracks.
+            if (video == null) {
+                CircleButton(R.drawable.ic_layers, "Layers", enabled = project.layers.isNotEmpty(), active = panel == Panel.Layers) {
+                    panel = if (panel == Panel.Layers) null else Panel.Layers
+                }
+                Spacer(Modifier.width(10.dp))
+            }
             CircleButton(R.drawable.ic_download, "Save to gallery") { vm.export(share = false) }
             Spacer(Modifier.width(10.dp))
             CircleButton(R.drawable.ic_share, "Share") { vm.export(share = true) }
@@ -250,7 +257,6 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_sentiment_satisfied, "Sticker", panel == Panel.Sticker) { toggle(Panel.Sticker) }
                         IconTool(R.drawable.ic_image, "Image") { image.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) }
                         IconTool(R.drawable.ic_language, "Web", onClick = onBrowse)
-                        if (project.layers.isNotEmpty()) IconTool(R.drawable.ic_layers, "Layers", panel == Panel.Layers) { toggle(Panel.Layers) }
                         if (video != null) {
                             IconTool(R.drawable.ic_content_cut, "Trim", trimming) { trimming = !trimming }
                             IconTool(R.drawable.ic_speed, "Speed", panel == Panel.Speed) { toggle(Panel.Speed) }
@@ -270,6 +276,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_border_color, "Stroke", panel == Panel.Stroke) { toggle(Panel.Stroke) }
                         IconTool(R.drawable.ic_rectangle, "Box", panel == Panel.Box) { toggle(Panel.Box) }
                         IconTool(R.drawable.ic_text_fields, "Style", panel == Panel.Style) { toggle(Panel.Style) }
+                        IconTool(R.drawable.ic_content_copy, "Duplicate", onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, "Back", onClick = vm::sendToBack)
                         IconTool(R.drawable.ic_delete, "Delete", onClick = vm::deleteSelected)
@@ -284,6 +291,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_crop, "Crop") { cropping = state.selected as? ImageLayer }
                         IconTool(R.drawable.ic_tune, "Adjust", panel == Panel.Adjust) { toggle(Panel.Adjust) }
                         IconTool(R.drawable.ic_library_add, "Save sticker", onClick = vm::saveSticker)
+                        IconTool(R.drawable.ic_content_copy, "Duplicate", onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, "Back", onClick = vm::sendToBack)
                         IconTool(R.drawable.ic_delete, "Delete", onClick = vm::deleteSelected)

@@ -236,9 +236,11 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun addEmoji(emoji: String) {
-        val p = _uiState.value.project ?: return
-        addLayer { TextLayer(it, Transform(p.width / 2f, p.height / 2f), emoji, fonts[1], min(p.width, p.height) * 0.2f, Color.WHITE, null) }
+    /** Emoji become image stickers (drawn from the system emoji font), so they get sticker tools, not text tools. */
+    fun addEmoji(emoji: String) = work("Adding sticker") {
+        val p = _uiState.value.project ?: return@work
+        val bitmap = withContext(Dispatchers.Default) { renderEmoji(emoji) }
+        addBitmapLayer(bitmap, height = min(p.width, p.height) * 0.25f)
     }
 
     fun addImage(uri: Uri) = work("Adding image") { addBitmapLayer(withContext(Dispatchers.IO) { loadBitmap(app, uri, MAX_LAYER) }) }
@@ -249,12 +251,13 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         addBitmapLayer(withContext(Dispatchers.IO) { BitmapFactory.decodeFile(sticker.file.path) ?: error("This sticker is damaged") })
     }
 
-    private suspend fun addBitmapLayer(bitmap: Bitmap) {
+    /** Adds [bitmap] centered, at [height] canvas pixels tall, or fitted into 60% of the canvas by default. */
+    private suspend fun addBitmapLayer(bitmap: Bitmap, height: Float? = null) {
         val s = _uiState.value
         val p = s.project ?: return
         val dir = s.projectDir ?: return
         val file = withContext(Dispatchers.IO) { store.writeImage(dir, bitmap) }
-        val fit = min(p.width * 0.6f / bitmap.width, p.height * 0.6f / bitmap.height)
+        val fit = height?.let { it / bitmap.height } ?: min(p.width * 0.6f / bitmap.width, p.height * 0.6f / bitmap.height)
         addLayer { ImageLayer(it, Transform(p.width / 2f, p.height / 2f, fit), bitmap, file) }
     }
 
@@ -297,6 +300,20 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         if (from < 0) return@updateProject p
         val to = (from + by).coerceIn(0, p.layers.lastIndex)
         p.copy(layers = p.layers.toMutableList().apply { add(to, removeAt(from)) })
+    }
+
+    /** Copies the selected layer on top of the stack, nudged so it's visible, and selects the copy. Images share their file. */
+    fun duplicateSelected() {
+        val p = _uiState.value.project ?: return
+        val layer = _uiState.value.selected ?: return
+        val nudge = min(p.width, p.height) * 0.04f
+        val t = layer.t.copy(x = layer.t.x + nudge, y = layer.t.y + nudge)
+        addLayer { id ->
+            when (layer) {
+                is ImageLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
+                is TextLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
+            }
+        }
     }
 
     fun sendToBack() {

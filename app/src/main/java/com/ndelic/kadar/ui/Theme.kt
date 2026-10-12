@@ -131,16 +131,16 @@ fun IconTool(@DrawableRes icon: Int, label: String, active: Boolean = false, onC
 
 /** Round dark button used in the top bars. */
 @Composable
-fun CircleButton(@DrawableRes icon: Int, description: String, enabled: Boolean = true, onClick: () -> Unit) {
+fun CircleButton(@DrawableRes icon: Int, description: String, enabled: Boolean = true, active: Boolean = false, onClick: () -> Unit) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .size(44.dp)
             .clip(CircleShape)
-            .background(Ink.raised)
+            .background(if (active) Ink.accent else Ink.raised)
             .clickable(enabled = enabled, onClick = onClick),
     ) {
-        KIcon(icon, Modifier.size(24.dp), if (enabled) Ink.text else Ink.line, description)
+        KIcon(icon, Modifier.size(24.dp), if (active) Ink.onAccent else if (enabled) Ink.text else Ink.line, description)
     }
 }
 

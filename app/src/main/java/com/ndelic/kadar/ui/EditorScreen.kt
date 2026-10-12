@@ -5,7 +5,9 @@ package com.ndelic.kadar.ui
 import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.Typeface
-import android.view.SurfaceView
+import android.graphics.SurfaceTexture
+import android.view.Surface
+import android.view.TextureView
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -99,7 +101,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -425,16 +426,7 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
         Box(Modifier.size(size)) {
             Box(Modifier.fillMaxSize().clipToBounds().background(if (transparent) Color(0xFF3A3A3A) else Color(project.background))) {
                 if (transparent) Checkerboard()
-                player?.let { p ->
-                    var surfaceSize by remember { mutableStateOf(IntSize.Zero) }
-                    // A paused player doesn't redraw into a resized surface; seeking in place repaints the frame,
-                    // once the surface has actually been resized (it lags the layout a little).
-                    LaunchedEffect(surfaceSize) {
-                        delay(200)
-                        if (p.playbackState != Player.STATE_IDLE && !p.isPlaying) p.seekTo(p.currentPosition)
-                    }
-                    AndroidView(factory = { SurfaceView(it).also(p::setVideoSurfaceView) }, Modifier.fillMaxSize().onSizeChanged { surfaceSize = it })
-                }
+                player?.let { p -> VideoSurface(p, project.width, project.height, Modifier.fillMaxSize()) }
                 Canvas(
                     Modifier.fillMaxSize().pointerInput(scale) {
                         awaitEachGesture {
@@ -588,6 +580,61 @@ private fun android.graphics.Canvas.drawSelection(layer: Layer, viewScale: Float
     drawRect(-layer.width / 2, -layer.height / 2, layer.width / 2, layer.height / 2, selectionLine)
     restore()
 }
+
+/**
+ * CompositionPlayer sizes its output once and doesn't follow later surface resizes (panels, keyboard), which left
+ * the frame small or cropped in a corner. So the video renders into a fixed-size buffer and a TextureView scales it
+ * to the stage like any other view. The buffer has the canvas's aspect ratio, so the scaling never distorts.
+ */
+@Composable
+private fun VideoSurface(player: CompositionPlayer, canvasWidth: Int, canvasHeight: Int, modifier: Modifier) {
+    val f = PREVIEW_LONG_SIDE / maxOf(canvasWidth, canvasHeight).toFloat()
+    val bw = (canvasWidth * f).roundToInt()
+    val bh = (canvasHeight * f).roundToInt()
+    // The surface the player draws into right now. On a canvas change the new view attaches before the old one
+    // is torn down, and clearing a surface the player isn't using throws.
+    val attached = remember { arrayOfNulls<Surface>(1) }
+    // A new canvas shape needs a new buffer, so a new view.
+    key(bw, bh) {
+        AndroidView(
+            factory = { context ->
+                TextureView(context).apply {
+                    surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                        private var surface: Surface? = null
+
+                        override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
+                            texture.setDefaultBufferSize(bw, bh)
+                            surface = Surface(texture).also {
+                                player.setVideoSurface(it, androidx.media3.common.util.Size(bw, bh))
+                                attached[0] = it
+                            }
+                            // A paused player only draws on a seek.
+                            if (player.playbackState != Player.STATE_IDLE && !player.isPlaying) player.seekTo(player.currentPosition)
+                        }
+
+                        // TextureView resets the buffer to the view size on every resize; keep it fixed.
+                        override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) = texture.setDefaultBufferSize(bw, bh)
+
+                        override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
+                            if (attached[0] === surface) {
+                                // CompositionPlayer only accepts clearing the exact surface it holds.
+                                player.clearVideoSurface(surface)
+                                attached[0] = null
+                            }
+                            surface?.release()
+                            return true
+                        }
+
+                        override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
+                    }
+                }
+            },
+            modifier = modifier,
+        )
+    }
+}
+
+private const val PREVIEW_LONG_SIDE = 1280f
 
 @Composable
 private fun rememberCompositionPlayer(): CompositionPlayer {

@@ -5,6 +5,7 @@ import android.graphics.Paint
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -73,7 +74,7 @@ fun DrawScreen(project: Project, layers: List<Layer>, under: Bitmap?, onDone: (L
     val drawn = remember(strokes) { DrawLayer(0, Transform(0f, 0f), strokes) }
     val density = LocalDensity.current
     val minStep = with(density) { 1.5.dp.toPx() }
-    BackHandler(onBack = onCancel)
+    DiscardGuard(strokes.isNotEmpty(), onCancel)
 
     Column(Modifier.fillMaxSize().background(Ink.bg).blockTouches()) {
         ToolTopBar(onCancel = onCancel, onDone = { onDone(strokes) }, doneEnabled = strokes.isNotEmpty()) {
@@ -87,7 +88,8 @@ fun DrawScreen(project: Project, layers: List<Layer>, under: Bitmap?, onDone: (L
                 return Offset((p.x - center.x - pan.x) / s + w / 2, (p.y - center.y - pan.y) / s + h / 2)
             }
             Canvas(
-                Modifier.fillMaxSize().pointerInput(fit, center) {
+                // Strokes near the screen edge must draw, not trigger the system back gesture.
+                Modifier.fillMaxSize().systemGestureExclusion().pointerInput(fit, center) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
                         // Width follows the screen, so zooming in draws finer lines; the highlighter is wider and see-through.

@@ -10,6 +10,7 @@ import android.graphics.Shader
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -52,6 +53,7 @@ import com.ndelic.kadar.R
 import com.ndelic.kadar.model.ImageLayer
 import com.ndelic.kadar.ui.common.CircleButton
 import com.ndelic.kadar.ui.common.Ink
+import com.ndelic.kadar.ui.common.KDialog
 import com.ndelic.kadar.ui.common.KSlider
 import com.ndelic.kadar.ui.common.TextTabs
 import com.ndelic.kadar.ui.common.blockTouches
@@ -95,7 +97,7 @@ fun EraseScreen(layer: ImageLayer, source: Bitmap?, onDone: (Bitmap) -> Unit, on
         }
     }
     val density = LocalDensity.current
-    BackHandler(onBack = onCancel)
+    DiscardGuard(changed, onCancel)
 
     Column(Modifier.fillMaxSize().background(Ink.bg).blockTouches()) {
         ToolTopBar(onCancel = onCancel, onDone = { onDone(work) }, doneEnabled = changed)
@@ -107,7 +109,8 @@ fun EraseScreen(layer: ImageLayer, source: Bitmap?, onDone: (Bitmap) -> Unit, on
                 return Offset((p.x - center.x - pan.x) / s + work.width / 2f, (p.y - center.y - pan.y) / s + work.height / 2f)
             }
             Canvas(
-                Modifier.fillMaxSize().pointerInput(fit) {
+                // Strokes near the screen edge must paint, not trigger the system back gesture.
+                Modifier.fillMaxSize().systemGestureExclusion().pointerInput(fit) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
                         var last = toBitmap(down.position)
@@ -276,8 +279,9 @@ internal fun cropFrom(anchor: Offset, p: Offset, ratio: Float?, bw: Float, bh: F
     val sy = if (p.y >= anchor.y) 1f else -1f
     val roomX = if (sx > 0) bw - anchor.x else anchor.x
     val roomY = if (sy > 0) bh - anchor.y else anchor.y
-    var w = abs(p.x - anchor.x).coerceIn(minSize, roomX)
-    var h = abs(p.y - anchor.y).coerceIn(minSize, roomY)
+    // Past the image edge the room can be smaller than minSize; coerceIn would throw.
+    var w = abs(p.x - anchor.x).coerceIn(min(minSize, roomX), roomX)
+    var h = abs(p.y - anchor.y).coerceIn(min(minSize, roomY), roomY)
     if (ratio != null) {
         // Follow whichever side the finger moved further, then shrink both if that runs out of room.
         if (w / h > ratio) h = w / ratio else w = h * ratio
@@ -297,6 +301,25 @@ private fun centered(ratio: Float, bw: Float, bh: Float): Rect {
 }
 
 /** Cancel and apply for the full-screen tools; [middle] holds tool buttons between them. */
+/** Back asks before throwing away unsaved work in a full-screen tool; with nothing changed it just cancels. */
+@Composable
+internal fun DiscardGuard(changed: Boolean, onCancel: () -> Unit) {
+    var asking by remember { mutableStateOf(false) }
+    BackHandler { if (changed) asking = true else onCancel() }
+    if (asking) {
+        KDialog(
+            title = "Discard changes?",
+            text = "What you did here hasn't been applied yet.",
+            confirm = "Discard",
+            onConfirm = {
+                asking = false
+                onCancel()
+            },
+            onDismiss = { asking = false },
+        )
+    }
+}
+
 @Composable
 internal fun ToolTopBar(onCancel: () -> Unit, onDone: () -> Unit, doneEnabled: Boolean, middle: @Composable () -> Unit = {}) {
     Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {

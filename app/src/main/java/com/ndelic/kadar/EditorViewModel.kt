@@ -122,6 +122,8 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     private var lastSaved: Project? = null
     private var nextId = 1L
     private val undoStack = ArrayDeque<Project>()
+    /** Start of a gesture whose first update changed nothing, so its undo step is recorded on its first real change. */
+    private var gestureStart: Project? = null
     private val redoStack = ArrayDeque<Project>()
 
     private val _uiState = MutableStateFlow(EditorUiState(settings = settingsStore.load()))
@@ -221,7 +223,9 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         if (s.busy != null) return
         viewModelScope.launch {
             if (s.projectDir != null && s.project != null) {
-                if (s.project != lastSaved) save(s.projectDir, s.project)
+                // If saving fails, stay in the editor: leaving would lose the edits, and cleanUp could delete
+                // images the older project.json on disk still uses.
+                if (s.project != lastSaved && !save(s.projectDir, s.project)) return@launch
                 withContext(Dispatchers.IO) { store.cleanUp(s.projectDir, s.project) }
             }
             _uiState.update { it.copy(projectDir = null, project = null, selectedId = null) }
@@ -259,15 +263,18 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         _uiState.update { it.copy(project = target, canUndo = undoStack.isNotEmpty(), canRedo = redoStack.isNotEmpty()) }
     }
 
-    private suspend fun save(dir: File, project: Project) {
+    /** True when the project is on disk. */
+    private suspend fun save(dir: File, project: Project): Boolean {
         val thumb = renderLayers(project.width, project.height, project.background, project.layers, THUMB_SIZE / max(project.width, project.height), videoFrame)
         try {
             saveLock.withLock { withContext(Dispatchers.IO) { store.save(dir, project, thumb) } }
             lastSaved = project
+            return true
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             _effects.send(EditorEffect.Message("Could not save the project: ${e.message}"))
+            return false
         }
     }
 
@@ -559,9 +566,15 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     private fun updateProject(record: Boolean = true, change: (Project) -> Project) {
         val before = _uiState.value.project ?: return
         val after = change(before)
-        if (after == before) return
-        if (record) {
-            undoStack.addLast(before)
+        if (after == before) {
+            // A gesture's first update can be a no-op (a layer held by a snap); keep its starting point for the next change.
+            if (record) gestureStart = before
+            return
+        }
+        val recordFrom = if (record) before else gestureStart
+        gestureStart = null
+        if (recordFrom != null) {
+            undoStack.addLast(recordFrom)
             if (undoStack.size > MAX_UNDO) undoStack.removeFirst()
             redoStack.clear()
         }

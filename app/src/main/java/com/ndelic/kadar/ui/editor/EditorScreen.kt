@@ -172,6 +172,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             else -> vm.close()
         }
     }
+    // Long-lived gesture handlers (timeline, trim strip) must seek the current player, not one swapped out since.
+    val currentPlayer by rememberUpdatedState(player)
     if (player != null && video != null) {
         val layers by rememberUpdatedState(project.layers)
         // Video layers' placement reaches the compositor live, so a drag doesn't rebuild the composition; anything else does.
@@ -179,6 +181,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         LaunchedEffect(player, video, videoLayers.map { it.withTransform(Transform(0f, 0f)) }) {
             // Same Media3 limit as below: a paused multi-input player won't repaint a new composition, so use a new player.
             if (!freshPlayer[0] && (videoLayers.isNotEmpty() || video.blurred) && !player.isPlaying) {
+                // Coalesce a drag (e.g. a video layer's track) into one rebuild instead of one per move.
+                delay(150)
                 resumeAt[0] = player.currentPosition
                 playerGeneration++
                 return@LaunchedEffect
@@ -194,8 +198,16 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         // While playing, moved video layers follow live through `placed`. Paused, Media3's multi-input preview keeps its
         // last composited frame through seeks, new compositions and short plays; only a fresh player paints the new
         // placement. So once a drag rests while paused, swap in a new player at the same position.
+        val lastPlacement = remember(player) { arrayOfNulls<List<Transform>>(1) }
         LaunchedEffect(videoLayers.map { it.t }) {
+            val placement = videoLayers.map { it.t }
+            // The first run is the player's own start, not a drag: don't rebuild for it.
+            if (lastPlacement[0] == null || lastPlacement[0] == placement) {
+                lastPlacement[0] = placement
+                return@LaunchedEffect
+            }
             delay(150)
+            lastPlacement[0] = placement
             if (!player.isPlaying && videoLayers.isNotEmpty()) {
                 resumeAt[0] = player.currentPosition
                 playerGeneration++
@@ -380,7 +392,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     clip = video,
                     frames = state.filmstrip,
                     positionMs = positionMs,
-                    onSeek = { player.seekTo(it) },
+                    onSeek = { currentPlayer?.seekTo(it) },
                     onTrim = { start, end -> vm.updateClip { copy(startMs = start, endMs = end) } },
                     onDone = { trimming = false },
                 )
@@ -391,7 +403,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     selectedId = state.selectedId,
                     frames = state.filmstrip,
                     positionMs = positionMs,
-                    onSeek = { player.seekTo(it) },
+                    onSeek = { currentPlayer?.seekTo(it) },
                     onSelect = vm::select,
                     onLayerTime = vm::setLayerTime,
                     onFlags = vm::setFlags,
@@ -554,7 +566,7 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
         val stageCenter = Offset(constraints.maxWidth / 2f, constraints.maxHeight / 2f)
         // Gestures that start around the canvas: tap deselects, double-tap resets the view, drag and pinch move it.
         Box(
-            Modifier.matchParentSize().pointerInput(scale) {
+            Modifier.matchParentSize().pointerInput(scale, project.width, project.height) {
                 var lastUp = 0L
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -589,7 +601,7 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                 if (transparent) Checkerboard()
                 player?.let { p -> VideoSurface(p, project.width, project.height, Modifier.fillMaxSize()) }
                 Canvas(
-                    Modifier.fillMaxSize().pointerInput(scale) {
+                    Modifier.fillMaxSize().pointerInput(scale, project.width, project.height) {
                         awaitEachGesture {
                             val down = awaitFirstDown()
                             // Gestures that start on the canvas are the canvas's, not the surrounding stage's.

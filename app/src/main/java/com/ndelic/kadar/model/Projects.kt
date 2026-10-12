@@ -330,6 +330,10 @@ private fun JSONObject.putAdjust(a: Adjust) {
 /** Write-then-rename, so a crash mid-save never leaves a half-written project. */
 private fun writeAtomic(file: File, write: (OutputStream) -> Unit) {
     val tmp = File(file.path + ".tmp")
-    tmp.outputStream().use(write)
+    // Sync before the rename, so a power cut can't leave an empty project.json behind the new name.
+    java.io.FileOutputStream(tmp).use { out ->
+        write(out)
+        out.fd.sync()
+    }
     if (!tmp.renameTo(file)) error("Could not save ${file.name}")
 }

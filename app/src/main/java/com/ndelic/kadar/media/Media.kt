@@ -45,19 +45,7 @@ fun loadBitmap(context: Context, uri: Uri, maxSide: Int): Bitmap = decode(ImageD
 fun downloadImage(url: String, maxSide: Int): Bitmap {
     val bytes = when {
         url.startsWith("data:") && url.substringBefore(',').endsWith(";base64") -> Base64.decode(url.substringAfter(','), Base64.DEFAULT)
-        url.startsWith("https://") || url.startsWith("http://") -> {
-            val connection = URL(url).openConnection() as HttpURLConnection
-            try {
-                connection.connectTimeout = 15_000
-                connection.readTimeout = 30_000
-                CookieManager.getInstance().getCookie(url)?.let { connection.setRequestProperty("Cookie", it) }
-                if (connection.responseCode !in 200..299) error("Download failed (HTTP ${connection.responseCode})")
-                if (connection.contentLengthLong > MAX_DOWNLOAD) error("Image is too large")
-                connection.inputStream.use { it.readBytes() }
-            } finally {
-                connection.disconnect()
-            }
-        }
+        url.startsWith("https://") || url.startsWith("http://") -> fetch(url)
         else -> error("This image can't be downloaded")
     }
     return try {
@@ -68,6 +56,46 @@ fun downloadImage(url: String, maxSide: Int): Bitmap {
 }
 
 private const val MAX_DOWNLOAD = 50L * 1024 * 1024
+
+/**
+ * GETs an http(s) URL with the browser's cookies for that exact URL. Redirects are followed by hand so cookies are
+ * re-read per host instead of being carried to wherever a redirect points; the body is capped at [MAX_DOWNLOAD].
+ */
+private fun fetch(start: String): ByteArray {
+    var url = start
+    repeat(5) {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        try {
+            connection.instanceFollowRedirects = false
+            connection.connectTimeout = 15_000
+            connection.readTimeout = 30_000
+            CookieManager.getInstance().getCookie(url)?.let { connection.setRequestProperty("Cookie", it) }
+            val code = connection.responseCode
+            if (code in 300..399) {
+                val next = connection.getHeaderField("Location") ?: error("Download failed (HTTP $code)")
+                url = URL(URL(url), next).toString()
+                if (!url.startsWith("https://") && !url.startsWith("http://")) error("This image can't be downloaded")
+                return@repeat
+            }
+            if (code !in 200..299) error("Download failed (HTTP $code)")
+            if (connection.contentLengthLong > MAX_DOWNLOAD) error("Image is too large")
+            return connection.inputStream.use { input ->
+                val out = java.io.ByteArrayOutputStream()
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val n = input.read(buffer)
+                    if (n < 0) break
+                    out.write(buffer, 0, n)
+                    if (out.size() > MAX_DOWNLOAD) error("Image is too large")
+                }
+                out.toByteArray()
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+    error("Too many redirects")
+}
 
 /** Decodes into a software ARGB_8888 bitmap (drawable on a plain Canvas and readable by ML Kit), longest side at most [maxSide]. */
 private fun decode(source: ImageDecoder.Source, maxSide: Int): Bitmap {

@@ -297,7 +297,8 @@ fun AudioPanel(clip: VideoClip, vm: EditorViewModel, onAddMusic: () -> Unit) {
                 }
             }
             KSlider(R.drawable.ic_volume_up, music.volume, 0f..1f, ::percent) { v -> vm.updateClip { copy(music = music.copy(volume = v)) } }
-            KSlider(R.drawable.ic_play_arrow, music.startMs.toFloat(), 0f..music.durationMs.toFloat(), { formatMs(it.toLong()) }) { v ->
+            // Leave at least a second of song, so the looping music item is never empty.
+            KSlider(R.drawable.ic_play_arrow, music.startMs.toFloat(), 0f..maxOf(0f, music.durationMs - 1000f), { formatMs(it.toLong()) }) { v ->
                 vm.updateClip { copy(music = music.copy(startMs = v.toLong())) }
             }
         }

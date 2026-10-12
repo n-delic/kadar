@@ -370,8 +370,9 @@ private fun Track(
                     while (change.pressed && !change.isConsumed) {
                         val d = ((change.position.x - down.position.x) / width * view.spanMs).toLong()
                         val next = when (mode) {
-                            TrackDrag.Start -> (s0 + d).coerceIn(0, e0 - MIN_CLIP_MS) to e0
-                            TrackDrag.End -> s0 to (e0 + d).coerceIn(s0 + MIN_CLIP_MS, total)
+                            // Bounds can cross when the clip got shorter than the layer (trim, speed); coerceIn would throw.
+                            TrackDrag.Start -> (s0 + d).coerceIn(0, maxOf(0, e0 - MIN_CLIP_MS)) to e0
+                            TrackDrag.End -> s0 to (e0 + d).coerceIn(minOf(s0 + MIN_CLIP_MS, total), total)
                             else -> d.coerceIn(-s0, total - e0).let { s0 + it to e0 + it }
                         }
                         if (next != last) {

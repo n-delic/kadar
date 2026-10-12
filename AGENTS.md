@@ -11,7 +11,7 @@ The owner's phone is a Galaxy S25; it also runs on older phones, hence `minSdk 2
 ## What it does today
 
 - **Photo**: open a photo, blank canvas, or web image; add text (meme outline style), emoji, images and saved stickers as layers; move, pinch-resize, rotate; remove backgrounds on-device; change canvas aspect and background; export JPEG/PNG to `Pictures/Kadar`.
-- **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time; export H.264/AAC MP4 to `Movies/Kadar`.
+- **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time, an eye and a lock at its left, and long-press-drag to reorder; export H.264/AAC MP4 to `Movies/Kadar`.
 - **Undo / redo** for every edit (gestures and timeline drags count once per drag).
 - **Snapping** to the canvas center and 0°/90°, caption boxes behind text, a Layers panel (photos only, top-bar button; video shows layers as timeline tracks), keep-pitch for speed changes.
 - **Eraser / restore brush and crop** for image layers (`ui/ImageTools.kt`). `ImageLayer.source` + `sourceX/Y` remember the untouched original and where the layer's bitmap sits in it; keep them right in any new operation that resizes or crops a bitmap.
@@ -57,6 +57,7 @@ app/src/main/res/font/anton.ttf          Meme font (SIL OFL, license in third_pa
 app/src/main/res/font/jakarta.ttf        UI font, Plus Jakarta Sans variable (SIL OFL)
 scripts/add-icons.sh                     Fetches Material Symbols as vector drawables
 app/src/test/.../LayersTest.kt           JVM tests for transform math, transparent-border trimming, timeline segments
+app/src/test/.../TimelineTest.kt         JVM tests for track reorder math
 ```
 
 ## Commands

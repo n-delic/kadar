@@ -312,6 +312,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     onSeek = { player.seekTo(it) },
                     onSelect = vm::select,
                     onLayerTime = vm::setLayerTime,
+                    onFlags = vm::setFlags,
+                    onMove = vm::moveLayer,
                     onClipTap = {
                         vm.select(null)
                         trimming = true

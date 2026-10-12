@@ -239,7 +239,7 @@ fun LayersPanel(layers: List<Layer>, selectedId: Long?, vm: EditorViewModel) {
 }
 
 @Composable
-private fun SmallIcon(icon: Int, description: String, onClick: () -> Unit) {
+fun SmallIcon(icon: Int, description: String, onClick: () -> Unit) {
     Box(Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         KIcon(icon, Modifier.size(22.dp), description = description)
     }

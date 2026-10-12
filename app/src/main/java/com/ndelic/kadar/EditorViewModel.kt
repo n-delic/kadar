@@ -54,7 +54,6 @@ import com.ndelic.kadar.video.VoiceClip
 import com.ndelic.kadar.video.composition
 import com.ndelic.kadar.video.exportVideo
 import com.ndelic.kadar.video.highBitrate
-import com.ndelic.kadar.video.timedOverlay
 import java.io.File
 import kotlin.math.max
 import kotlin.math.min
@@ -632,15 +631,12 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             }
             _effects.send(EditorEffect.Saved(uri, mime, share))
         } else {
-            // Video layers have no pixels of their own to draw; the compositor places them.
-            val drawn = p.layers.filter { it !is VideoLayer }
-            val overlay = if (drawn.isEmpty()) null else timedOverlay(p.width, p.height, drawn, video.outputDurationMs)
             val out = File(app.cacheDir, "export.mp4")
             val (w, h) = video.outputSize
             val bitrate = if (_uiState.value.settings.exportQuality == ExportQuality.High) highBitrate(w, h, shortSide, video.frameRate) else null
             try {
                 _uiState.update { it.copy(busy = UiText.Res(R.string.busy_saving_video), progress = 0, cancellable = true) }
-                exportVideo(app, video.composition(overlay, shortSide, p.layers.filterIsInstance<VideoLayer>()), out, bitrate) { pct -> _uiState.update { it.copy(progress = pct) } }
+                exportVideo(app, video.composition(p.layers, shortSide), out, bitrate) { pct -> _uiState.update { it.copy(progress = pct) } }
                 // A cancel during the gallery copy would leave a half-written file there; the copy takes a moment at most.
                 _uiState.update { it.copy(cancellable = false) }
                 val uri = withContext(Dispatchers.IO) { saveToGallery(app, "video/mp4") { o -> out.inputStream().use { it.copyTo(o) } } }

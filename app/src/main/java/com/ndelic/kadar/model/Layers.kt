@@ -69,6 +69,10 @@ sealed interface Layer {
     val hidden: Boolean
     val locked: Boolean
 
+    /** Entrance and exit in a video (text and stickers only); photos ignore them. */
+    val animIn: Anim get() = Anim.None
+    val animOut: Anim get() = Anim.None
+
     fun visibleAt(ms: Long) = ms >= startMs && ms < endMs
     fun withTime(startMs: Long, endMs: Long): Layer
     fun withFlags(hidden: Boolean, locked: Boolean): Layer
@@ -96,6 +100,8 @@ data class ImageLayer(
     override val endMs: Long = Long.MAX_VALUE,
     override val hidden: Boolean = false,
     override val locked: Boolean = false,
+    override val animIn: Anim = Anim.None,
+    override val animOut: Anim = Anim.None,
 ) : Layer {
     private val paint = if (adjust.isNone) bitmapPaint else Paint(bitmapPaint).apply { colorFilter = ColorMatrixColorFilter(adjust.filterMatrix()) }
     override val width get() = bitmap.width.toFloat()
@@ -149,6 +155,14 @@ data class DrawLayer(
 ) : Layer {
     private val bounds = strokeBounds(strokes)
     private val paths by lazy { strokes.map { it.path() } }
+    // Per layer, not shared: animated video frames are drawn on the GL thread while the stage draws on the main thread.
+    private val penPaint by lazy {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+    }
     override val width get() = bounds?.let { it[2] - it[0] } ?: 0f
     override val height get() = bounds?.let { it[3] - it[1] } ?: 0f
     override fun drawContent(canvas: Canvas) = strokes.forEachIndexed { i, s ->
@@ -217,12 +231,16 @@ data class TextLayer(
     override val endMs: Long = Long.MAX_VALUE,
     override val hidden: Boolean = false,
     override val locked: Boolean = false,
+    override val animIn: Anim = Anim.None,
+    override val animOut: Anim = Anim.None,
 ) : Layer {
     private val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).also {
         it.typeface = font.typeface
         it.textSize = size
         it.letterSpacing = spacing
     }
+    // Per layer, like [paint]: the video export draws copies of animated layers off the main thread.
+    private val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val layout: StaticLayout = run {
         val w = text.lines().maxOf { paint.measureText(it) }.toInt() + 1
         val alignment = when (align) {
@@ -270,15 +288,6 @@ data class TextLayer(
 }
 
 private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
-private val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-// Lazy so JVM tests that only touch the pure functions here never call into the stubbed Paint.
-private val penPaint by lazy {
-    Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
-}
 
 fun Canvas.drawLayer(layer: Layer) {
     save()

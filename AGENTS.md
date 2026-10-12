@@ -12,6 +12,7 @@ The owner's phone is a Galaxy S25; it also runs on older phones, hence `minSdk 2
 
 - **Photo**: open a photo, blank canvas, or web image; add text (meme outline style), emoji, images and saved stickers as layers; move, pinch-resize, rotate; remove backgrounds on-device; change canvas aspect and background; export JPEG/PNG to `Pictures/Kadar`.
 - **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time, an eye and a lock at its left, and long-press-drag to reorder. Video layers (picture-in-picture) put more clips on top, placed like stickers, with their own track and volume; export H.264/AAC MP4 to `Movies/Kadar`.
+- **In/out animations** (`model/Animation.kt`, `ui/editor/AnimationPanel.kt`): video text and sticker layers get an entrance and an exit (None, Fade, Pop, Slide up), 300 ms each, at most half the layer's time. `motionAt` turns a layer and an output time into alpha, scale and offset, and `Canvas.drawLayer(layer, motion, canvasHeight)` applies it around `drawLayer`; the stage uses it with the player position (every frame while playing), the export's `timedOverlay` with each frame's timestamp.
 - **Undo / redo** for every edit (gestures and timeline drags count once per drag).
 - **Snapping** to the canvas center and 0°/90°, caption boxes behind text, a Layers panel (photos only, top-bar button; video shows layers as timeline tracks), keep-pitch for speed changes.
 - **Drawing** (`model/Strokes.kt`, `ui/editor/DrawScreen.kt`): the Draw tool opens a full-screen pad (one finger draws, two zoom/pan) with marker and highlighter pens, colors, size and undo-last-stroke. Apply makes one `DrawLayer` (strokes in its own pixels, centered on its origin by `withStrokes`, smoothed by `smoothSegments`); Draw on a selected drawing adds strokes to it.
@@ -47,6 +48,7 @@ app/src/main/java/com/ndelic/kadar/
     Layers.kt              Transform (placement + hit test), Layer / ImageLayer / TextLayer / VideoLayer / DrawLayer, Adjust,
                            drawLayer, renderLayers, opaqueBounds
     Looks.kt               Filters: Look matrices, Adjust.filterMatrix(), glRgbMatrix() for Media3
+    Animation.kt           In/out animations: Anim, motionAt() (alpha/scale/offset at a time), drawLayer with a Motion
     Strokes.kt             Freehand strokes: PenStroke, smoothing, bounds, DrawLayer.withStrokes (re-centering)
     Projects.kt            Project, ProjectStore (one folder per project: project.json, thumb.jpg, images), JSON
     ProjectList.kt         Home grid logic: default project label, search filter, ProjectSort
@@ -69,6 +71,7 @@ app/src/main/java/com/ndelic/kadar/
     Timeline.kt            NLE timeline (layer tracks + clip) and TrimStrip
     Panels.kt              Tool panels: stickers, canvas, speed, audio, font, style, adjust, layers, volume
     FiltersPanel.kt        Look tiles and strength slider
+    AnimationPanel.kt      In and Out animation choices for a video text/sticker layer
     ImageTools.kt          EraseScreen (erase/restore brush), CropScreen, ToolTopBar for full-screen tools
     DrawScreen.kt          Freehand drawing pad (marker / highlighter) that makes or extends a DrawLayer
   ui/web/
@@ -118,7 +121,7 @@ emulator -avd pixel_7_api35   # reference emulator (Google Play image, needed fo
 6. **Offline first.** No analytics, no accounts, no cloud APIs. The browser is the only feature that needs internet; don't add features that silently require it.
 7. **Treat web input as untrusted.** `downloadImage` accepts only `http(s)` and base64 `data:` URLs, caps the size, and must fail with a message, not a crash.
 8. **The preview is the export.** Video settings change `VideoClip`; `VideoClip.composition()` builds both the `CompositionPlayer` preview and the Transformer export. Add new video features there, not in only one of them. Video layers are sequences before the clip (the compositor draws sequence 0 on top and takes its frame times), padded with gaps to the clip's length; gap frames are hidden by alpha. They always sit under text and stickers (the bitmap overlay comes after compositing). The preview needs `MultipleInputVideoGraph`, so the player is rebuilt when a project gets its first video layer.
-9. **Layer times are output time** (after trim and speed), the same clock as `CompositionPlayer.currentPosition`. `endMs = Long.MAX_VALUE` means "to the end". The stage shows only layers visible at the playhead (plus the selected one); the export uses `timedOverlay`, which sits on the composition (not the clip) so it sees output timestamps.
+9. **Layer times are output time** (after trim and speed), the same clock as `CompositionPlayer.currentPosition`. `endMs = Long.MAX_VALUE` means "to the end". The stage shows only layers visible at the playhead (plus the selected one); the export uses `timedOverlay`, which sits on the composition (not the clip) so it sees output timestamps. `timedOverlay` caches one bitmap per stretch where nothing changes and draws only animated stretches per frame (one reused bitmap, from layer copies, since that runs on the GL thread); never cache per-frame bitmaps.
 10. **Every edit is undoable.** Change the project only through `updateProject`/`updateLayer`; continuous gestures pass `record = first` so one drag is one undo step.
 11. **Long tasks go through `EditorViewModel.work`.** It shows the busy overlay, runs one task at a time, and turns exceptions into a snackbar. Transformer must be called on the main thread.
 12. **Match existing patterns.** State is one `StateFlow<EditorUiState>`, one-shot messages go through the `effects` channel, panels are composables in `ui/editor/` that call the ViewModel directly. Reuse the components in `ui/common/Theme.kt` before writing new widgets.

@@ -4,6 +4,7 @@ package com.ndelic.kadar.video
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.C
@@ -36,10 +37,14 @@ import androidx.media3.transformer.Transformer
 import com.ndelic.kadar.media.await
 import com.ndelic.kadar.model.Adjust
 import com.ndelic.kadar.model.Layer
+import com.ndelic.kadar.model.Steady
 import com.ndelic.kadar.model.Transform
 import com.ndelic.kadar.model.VideoLayer
+import com.ndelic.kadar.model.animationSpans
+import com.ndelic.kadar.model.drawLayer
 import com.ndelic.kadar.model.filterMatrix
 import com.ndelic.kadar.model.glRgbMatrix
+import com.ndelic.kadar.model.motionAt
 import com.ndelic.kadar.model.renderLayers
 import com.ndelic.kadar.model.segmentBounds
 import java.io.File
@@ -172,21 +177,42 @@ private fun VideoClip.overlaySettings(overlays: List<Pair<VideoLayer, Pair<Long,
     }
 
 /**
- * Layers that come and go: one full-frame bitmap per stretch of time where the visible set doesn't change.
- * Rendered up front on the caller's (main) thread, because layer paints are shared with the on-screen editor.
- * shortcut: every stretch is a full-frame bitmap in memory (8 MB at 1080p); fine for a handful of layers, render lazily if projects get dozens.
+ * Layers that come and go: one full-frame bitmap per stretch of time where the visible set doesn't change, rendered up
+ * front on the caller's (main) thread, because layer paints are shared with the on-screen editor. Stretches where a layer
+ * animates are drawn frame by frame instead, into one reused bitmap, from copies of the layers that own their paints.
+ * shortcut: every still stretch is a full-frame bitmap in memory (8 MB at 1080p); fine for a handful of layers, render lazily if projects get dozens.
  */
 fun timedOverlay(width: Int, height: Int, layers: List<Layer>, durationMs: Long): TextureOverlay {
-    val stretches = segmentBounds(layers.map { it.startMs to it.endMs }, durationMs).mapNotNull { (start, end) ->
-        val visible = layers.filter { it.visibleAt((start + end) / 2) }
-        if (visible.isEmpty()) null else Triple(start * 1000, end * 1000, renderLayers(width, height, android.graphics.Color.TRANSPARENT, visible))
+    val shown = layers.filter { !it.hidden }
+    fun Layer.until() = minOf(endMs, durationMs)
+    val bounds = shown.flatMap { listOf(it.startMs to it.endMs) + animationSpans(it.animIn, it.animOut, it.startMs, it.until()) }
+    val stretches = segmentBounds(bounds, durationMs).mapNotNull { (start, end) ->
+        val mid = (start + end) / 2
+        val visible = shown.filter { it.visibleAt(mid) }
+        when {
+            visible.isEmpty() -> null
+            visible.any { it.motionAt(mid, it.until()) != Steady } -> Stretch(start * 1000, end * 1000, null, visible.map { it.withTransform(it.t) })
+            else -> Stretch(start * 1000, end * 1000, renderLayers(width, height, android.graphics.Color.TRANSPARENT, visible), visible)
+        }
     }
     val nothing = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+    val frame by lazy { Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888) }
     return object : BitmapOverlay() {
-        override fun getBitmap(presentationTimeUs: Long) =
-            stretches.firstOrNull { presentationTimeUs >= it.first && presentationTimeUs < it.second }?.third ?: nothing
+        // BitmapOverlay uploads again when the bitmap's generation id changes, which every redraw of [frame] does.
+        override fun getBitmap(presentationTimeUs: Long): Bitmap {
+            val s = stretches.firstOrNull { presentationTimeUs >= it.startUs && presentationTimeUs < it.endUs } ?: return nothing
+            s.bitmap?.let { return it }
+            frame.eraseColor(android.graphics.Color.TRANSPARENT)
+            val canvas = Canvas(frame)
+            val ms = presentationTimeUs / 1000
+            s.layers.forEach { canvas.drawLayer(it, it.motionAt(ms, it.until()), height) }
+            return frame
+        }
     }
 }
+
+/** A stretch of [timedOverlay]: its pre-rendered [bitmap], or null when [layers] animate and are drawn per frame. */
+private class Stretch(val startUs: Long, val endUs: Long, val bitmap: Bitmap?, val layers: List<Layer>)
 
 /** Encodes [composition] to an H.264/AAC MP4 at [out]. Must be called on the main thread. */
 suspend fun exportVideo(context: Context, composition: Composition, out: File, onProgress: (Int) -> Unit) = coroutineScope {

@@ -66,6 +66,10 @@
 - Settings: image search engine (Google, DuckDuckGo, Bing, Brave) and default export size, with a per-project override; About with the license texts
 - Home: launch animation, logo, project multi-select (duplicate, delete), PHOTO / VIDEO badges; pinch to zoom the photo canvas, tap around it to deselect
 
+## Done for the next release
+
+- Video export: a progress ring with the percentage, a Cancel button (nothing is saved), the screen stays on while it runs, and a Video quality setting (Standard, or High for about twice the bitrate)
+
 ## Next
 
 - [ ] Video layers: crop, and a way to put them above text and stickers

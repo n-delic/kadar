@@ -65,6 +65,10 @@
     <string name="settings_search_hint">Koristi je ugrađeni preglednik za Slika s weba.</string>
     <string name="settings_export">Zadana veličina izvoza</string>
     <string name="settings_export_hint">Po kraćoj strani; nikad ne povećava. Svaki projekat to može promijeniti u panelu Platno.</string>
+    <string name="settings_quality">Kvalitet videa</string>
+    <string name="settings_quality_hint">Visok daje oštriji video i veći fajl.</string>
+    <string name="quality_standard">Standardan</string>
+    <string name="quality_high">Visok</string>
     <string name="settings_about">O aplikaciji</string>
     <string name="settings_version">Verzija</string>
     <string name="settings_source">Izvorni kod</string>
@@ -183,7 +187,8 @@
     <string name="busy_removing_bg">Uklanjam pozadinu</string>
     <string name="busy_saving">Spremam</string>
     <string name="busy_saving_sticker">Spremam stiker</string>
-    <string name="busy_saving_video">Spremam video %1$d%%</string>
+    <string name="busy_saving_video">Spremam video</string>
+    <string name="export_cancelled">Izvoz otkazan</string>
     <string name="busy_cropping">Izrezujem</string>
 
     <!-- Messages -->

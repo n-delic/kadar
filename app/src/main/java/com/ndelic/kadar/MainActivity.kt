@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
@@ -32,6 +33,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +46,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -151,14 +155,21 @@ private fun App(vm: EditorViewModel) {
                     } ?: Spacer(Modifier.width(12.dp))
                 }
             }
-            state.busy?.let { BusyOverlay(it) }
+            state.busy?.let { BusyOverlay(it, state.progress, onCancel = vm::cancelWork.takeIf { state.cancellable }) }
         }
         if (intro) Intro(ready = state.projectsLoaded, onDone = { intro = false })
     }
 }
 
+/** [progress] in percent fills the ring (spins when null); [onCancel] shows a Cancel button. */
 @Composable
-private fun BusyOverlay(label: UiText) {
+private fun BusyOverlay(label: UiText, progress: Int?, onCancel: (() -> Unit)?) {
+    // A long export must not stop because the screen timed out and the phone locked.
+    val view = LocalView.current
+    DisposableEffect(view) {
+        view.keepScreenOn = true
+        onDispose { view.keepScreenOn = false }
+    }
     Box(
         Modifier
             .fillMaxSize()
@@ -172,8 +183,16 @@ private fun BusyOverlay(label: UiText) {
             verticalArrangement = Arrangement.spacedBy(18.dp),
             modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Ink.raised).padding(horizontal = 36.dp, vertical = 28.dp),
         ) {
-            CircularProgressIndicator(color = Ink.accent, trackColor = Ink.raised)
+            if (progress == null) {
+                CircularProgressIndicator(color = Ink.accent, trackColor = Ink.raised)
+            } else {
+                Box(contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(progress = { progress / 100f }, color = Ink.accent, trackColor = Ink.line, modifier = Modifier.size(64.dp))
+                    Text(stringResource(R.string.percent, progress), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+            }
             Text(label.asString(LocalResources.current), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            onCancel?.let { TextButton(onClick = it) { Text(stringResource(R.string.cancel), color = Ink.dim, fontWeight = FontWeight.Bold) } }
         }
     }
 }

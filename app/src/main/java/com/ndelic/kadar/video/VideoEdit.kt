@@ -29,6 +29,7 @@ import androidx.media3.effect.RgbMatrix
 import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.effect.TextureOverlay
 import androidx.media3.transformer.Composition
+import androidx.media3.transformer.DefaultEncoderFactory
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.Effects
@@ -36,6 +37,7 @@ import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
+import androidx.media3.transformer.VideoEncoderSettings
 import com.ndelic.kadar.media.await
 import com.ndelic.kadar.model.Adjust
 import com.ndelic.kadar.model.Layer
@@ -280,9 +282,16 @@ fun timedOverlay(width: Int, height: Int, layers: List<Layer>, durationMs: Long)
 private class Stretch(val startUs: Long, val endUs: Long, val bitmap: Bitmap?, val layers: List<Layer>)
 
 /** Encodes [composition] to an H.264/AAC MP4 at [out]. Must be called on the main thread. */
-suspend fun exportVideo(context: Context, composition: Composition, out: File, onProgress: (Int) -> Unit) = coroutineScope {
+/** [bitrate] in bits per second, or null for Media3's own pick. Cancelling the coroutine stops the export. */
+suspend fun exportVideo(context: Context, composition: Composition, out: File, bitrate: Int?, onProgress: (Int) -> Unit) = coroutineScope {
     val done = CompletableDeferred<Unit>()
     val transformer = Transformer.Builder(context)
+        .apply {
+            if (bitrate != null) {
+                val settings = VideoEncoderSettings.Builder().setBitrate(bitrate).build()
+                setEncoderFactory(DefaultEncoderFactory.Builder(context).setRequestedVideoEncoderSettings(settings).build())
+            }
+        }
         .setVideoMimeType(MimeTypes.VIDEO_H264)
         .setAudioMimeType(MimeTypes.AUDIO_AAC)
         .addListener(object : Transformer.Listener {
@@ -310,6 +319,20 @@ suspend fun exportVideo(context: Context, composition: Composition, out: File, o
         if (!done.isCompleted) transformer.cancel()
     }
 }
+
+/**
+ * Bitrate for a High quality export of a [width]×[height] canvas downscaled to [shortSide] (null keeps it): 0.28 bits
+ * per pixel per frame, twice Media3's default and about what a phone camera records 1080p at, capped at 50 Mbps.
+ * The encoder clamps it further to what it supports.
+ */
+fun highBitrate(width: Int, height: Int, shortSide: Int?, frameRate: Float): Int {
+    val scale = shortSide?.let { minOf(1f, it / minOf(width, height).toFloat()) } ?: 1f
+    val bits = width * scale * height * scale * outputFrameRate(frameRate) * HIGH_BITS_PER_PIXEL
+    return minOf(bits, MAX_BITRATE).toInt()
+}
+
+private const val HIGH_BITS_PER_PIXEL = 0.28f
+private const val MAX_BITRATE = 50_000_000f
 
 private fun VideoClip.videoEffects(): List<Effect> = buildList {
     adjustEffect()?.let(::add)

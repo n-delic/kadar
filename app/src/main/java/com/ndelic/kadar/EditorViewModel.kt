@@ -26,6 +26,7 @@ import com.ndelic.kadar.media.trimTransparent
 import com.ndelic.kadar.media.videoFrame
 import com.ndelic.kadar.model.AppSettings
 import com.ndelic.kadar.model.DrawLayer
+import com.ndelic.kadar.model.ExportQuality
 import com.ndelic.kadar.model.ExportSize
 import com.ndelic.kadar.model.Font
 import com.ndelic.kadar.model.ImageLayer
@@ -48,6 +49,7 @@ import com.ndelic.kadar.video.Music
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.composition
 import com.ndelic.kadar.video.exportVideo
+import com.ndelic.kadar.video.highBitrate
 import com.ndelic.kadar.video.timedOverlay
 import java.io.File
 import kotlin.math.max
@@ -56,6 +58,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -81,6 +84,10 @@ data class EditorUiState(
     val selectedId: Long? = null,
     /** Label of the running long task; the UI blocks input while it is set. */
     val busy: UiText? = null,
+    /** Percent done of the running task, for the overlay's ring; null when unknown. */
+    val progress: Int? = null,
+    /** Whether the running task can be stopped now ([EditorViewModel.cancelWork]). */
+    val cancellable: Boolean = false,
     val stickers: List<Sticker> = emptyList(),
     val settings: AppSettings = AppSettings(),
     val canUndo: Boolean = false,
@@ -128,6 +135,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     /** Start of a gesture whose first update changed nothing, so its undo step is recorded on its first real change. */
     private var gestureStart: Project? = null
     private val redoStack = ArrayDeque<Project>()
+    private var task: Job? = null
 
     private val _uiState = MutableStateFlow(EditorUiState(settings = settingsStore.load()))
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
@@ -553,8 +561,13 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             val drawn = p.layers.filter { it !is VideoLayer }
             val overlay = if (drawn.isEmpty()) null else timedOverlay(p.width, p.height, drawn, video.outputDurationMs)
             val out = File(app.cacheDir, "export.mp4")
+            val (w, h) = video.outputSize
+            val bitrate = if (_uiState.value.settings.exportQuality == ExportQuality.High) highBitrate(w, h, shortSide, video.frameRate) else null
             try {
-                exportVideo(app, video.composition(overlay, shortSide, p.layers.filterIsInstance<VideoLayer>()), out) { pct -> _uiState.update { it.copy(busy = UiText.Res(R.string.busy_saving_video, pct)) } }
+                _uiState.update { it.copy(busy = UiText.Res(R.string.busy_saving_video), progress = 0, cancellable = true) }
+                exportVideo(app, video.composition(overlay, shortSide, p.layers.filterIsInstance<VideoLayer>()), out, bitrate) { pct -> _uiState.update { it.copy(progress = pct) } }
+                // A cancel during the gallery copy would leave a half-written file there; the copy takes a moment at most.
+                _uiState.update { it.copy(cancellable = false) }
                 val uri = withContext(Dispatchers.IO) { saveToGallery(app, "video/mp4") { o -> out.inputStream().use { it.copyTo(o) } } }
                 _effects.send(EditorEffect.Saved(uri, "video/mp4", share))
             } finally {
@@ -590,13 +603,28 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     private fun updateLayer(id: Long, record: Boolean = true, change: (Layer) -> Layer) =
         updateProject(record) { p -> p.copy(layers = p.layers.map { if (it.id == id) change(it) else it }) }
 
-    /** Runs one long task at a time behind the busy overlay; failures become a message instead of a crash. */
+    /**
+     * Stops the running task while it's [EditorUiState.cancellable]; its `finally` blocks clean up and [work] clears the
+     * overlay. shortcut: only video export opts in (by setting `cancellable`), so the message names it; pass the message
+     * through [work] once a second task can be cancelled.
+     */
+    fun cancelWork() {
+        if (!_uiState.value.cancellable) return
+        _uiState.update { it.copy(cancellable = false) }
+        task?.cancel()
+        _effects.trySend(EditorEffect.Message(UiText.Res(R.string.export_cancelled)))
+    }
+
+    /**
+     * Runs one long task at a time behind the busy overlay; failures become a message instead of a crash. A task opts
+     * in to [cancelWork] by setting `cancellable` while stopping it is safe.
+     */
     private fun work(@StringRes label: Int, block: suspend () -> Unit) = work(UiText.Res(label), block)
 
     private fun work(label: UiText, block: suspend () -> Unit) {
         if (_uiState.value.busy != null) return
         _uiState.update { it.copy(busy = label) }
-        viewModelScope.launch {
+        task = viewModelScope.launch {
             try {
                 block()
             } catch (e: CancellationException) {
@@ -606,7 +634,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 _effects.send(EditorEffect.Message(e.message?.let(UiText::Raw) ?: UiText.Res(R.string.error_generic)))
             } finally {
-                _uiState.update { it.copy(busy = null) }
+                _uiState.update { it.copy(busy = null, progress = null, cancellable = false) }
             }
         }
     }

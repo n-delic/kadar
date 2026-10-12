@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.ndelic.kadar.BuildConfig
 import com.ndelic.kadar.R
 import com.ndelic.kadar.model.AppSettings
+import com.ndelic.kadar.model.ExportQuality
 import com.ndelic.kadar.model.ExportSize
 import com.ndelic.kadar.model.SearchEngine
 import com.ndelic.kadar.ui.common.CircleButton
@@ -88,6 +89,13 @@ fun SettingsScreen(settings: AppSettings, onChange: (AppSettings) -> Unit, onClo
             Card {
                 ExportSize.entries.forEach { s ->
                     Choice(stringResource(s.label), selected = settings.exportSize == s) { onChange(settings.copy(exportSize = s)) }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Section(stringResource(R.string.settings_quality), stringResource(R.string.settings_quality_hint))
+            Card {
+                ExportQuality.entries.forEach { q ->
+                    Choice(stringResource(q.label), selected = settings.exportQuality == q) { onChange(settings.copy(exportQuality = q)) }
                 }
             }
             Spacer(Modifier.height(12.dp))

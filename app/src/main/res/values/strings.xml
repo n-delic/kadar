@@ -65,6 +65,10 @@
     <string name="settings_search_hint">Used by the built-in browser for Image from web.</string>
     <string name="settings_export">Default export size</string>
     <string name="settings_export_hint">By the short side; never upscales. Each project can override it in its Canvas panel.</string>
+    <string name="settings_quality">Video quality</string>
+    <string name="settings_quality_hint">High makes sharper videos and bigger files.</string>
+    <string name="quality_standard">Standard</string>
+    <string name="quality_high">High</string>
     <string name="settings_about">About</string>
     <string name="settings_version">Version</string>
     <string name="settings_source">Source code</string>
@@ -184,7 +188,9 @@
     <string name="busy_removing_bg">Removing background</string>
     <string name="busy_saving">Saving</string>
     <string name="busy_saving_sticker">Saving sticker</string>
-    <string name="busy_saving_video">Saving video %1$d%%</string>
+    <string name="busy_saving_video">Saving video</string>
+    <string name="export_cancelled">Export cancelled</string>
+    <string name="percent" translatable="false">%1$d%%</string>
     <string name="busy_cropping">Cropping</string>
 
     <!-- Messages -->

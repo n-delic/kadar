@@ -22,9 +22,16 @@ enum class ExportSize(@StringRes val label: Int, val shortSide: Int?) {
     P720(R.string.export_720p, 720),
 }
 
+/** Video encoder bitrate: [Standard] is Media3's own pick, [High] about twice that (see `highBitrate`). */
+enum class ExportQuality(@StringRes val label: Int) {
+    Standard(R.string.quality_standard),
+    High(R.string.quality_high),
+}
+
 data class AppSettings(
     val search: SearchEngine = SearchEngine.Google,
     val exportSize: ExportSize = ExportSize.Original,
+    val exportQuality: ExportQuality = ExportQuality.Standard,
     val projectSort: ProjectSort = ProjectSort.Recent,
 )
 
@@ -35,18 +42,21 @@ class SettingsStore(context: Context) {
     fun load() = AppSettings(
         search = enumOr(prefs.getString(SEARCH, null), SearchEngine.Google),
         exportSize = enumOr(prefs.getString(EXPORT_SIZE, null), ExportSize.Original),
+        exportQuality = enumOr(prefs.getString(EXPORT_QUALITY, null), ExportQuality.Standard),
         projectSort = enumOr(prefs.getString(PROJECT_SORT, null), ProjectSort.Recent),
     )
 
     fun save(s: AppSettings) = prefs.edit()
         .putString(SEARCH, s.search.name)
         .putString(EXPORT_SIZE, s.exportSize.name)
+        .putString(EXPORT_QUALITY, s.exportQuality.name)
         .putString(PROJECT_SORT, s.projectSort.name)
         .apply()
 
     private companion object {
         const val SEARCH = "search"
         const val EXPORT_SIZE = "exportSize"
+        const val EXPORT_QUALITY = "exportQuality"
         const val PROJECT_SORT = "projectSort"
     }
 }

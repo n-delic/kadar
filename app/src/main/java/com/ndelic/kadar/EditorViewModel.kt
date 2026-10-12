@@ -192,6 +192,12 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         refreshProjects()
     }
 
+    /** A blank [name] goes back to the default label. */
+    fun renameProject(dir: File, name: String) = work("Renaming") {
+        saveLock.withLock { withContext(Dispatchers.IO) { store.rename(dir, name.trim().ifEmpty { null }) } }
+        refreshProjects()
+    }
+
     /** Saves right away (the autosave is debounced) and returns to the project list. */
     fun close() {
         val s = _uiState.value

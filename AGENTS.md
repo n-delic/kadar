@@ -16,9 +16,9 @@ The owner's phone is a Galaxy S25; it also runs on older phones, hence `minSdk 2
 - **Snapping** to the canvas center and 0°/90°, caption boxes behind text, a Layers panel (photos only, top-bar button; video shows layers as timeline tracks), keep-pitch for speed changes.
 - **Filters** (`model/Looks.kt`, `ui/editor/FiltersPanel.kt`): in-house looks as 4x5 color matrices, blended by a strength and stored on `Adjust` (`look`, `amount`). `Adjust.filterMatrix()` (look, then the sliders) is the one matrix for the image layer paint and, through `glRgbMatrix`, the video's Media3 `RgbMatrix`, so photos and video match.
 - **Eraser / restore brush and crop** for image layers (`ui/editor/ImageTools.kt`). `ImageLayer.source` + `sourceX/Y` remember the untouched original and where the layer's bitmap sits in it; keep them right in any new operation that resizes or crops a bitmap.
-- **Settings** (`model/Settings.kt`, `ui/home/SettingsScreen.kt`): image search engine, default export size (per-project override in the Canvas panels), About with the bundled license texts (`third_party/` is packaged as app assets).
+- **Settings** (`model/Settings.kt`, `ui/home/SettingsScreen.kt`): image search engine, default export size (per-project override in the Canvas panels), the home grid's sort order, About with the bundled license texts (`third_party/` is packaged as app assets).
 - **Share to Kadar**: `MainActivity` (singleTask) takes `ACTION_SEND` images and videos and calls `EditorViewModel.openShared`.
-- **Projects**: every edit autosaves into the app's private storage and shows up on the home screen; reopen or long-press to delete.
+- **Projects**: every edit autosaves into the app's private storage and shows up on the home screen; reopen, or long-press to select and duplicate, rename or delete. Each has an optional `name` in `project.json` (unnamed ones show "Photo · Oct 12" from the type and the folder's creation timestamp); `ProjectStore.rename` edits only that field and keeps the file's modified time. The grid sorts by Recent / Name / Type (videos first), remembered in `AppSettings.projectSort`, and gets a search field past 6 projects; the filtering and sorting is `model/ProjectList.kt`.
 - **Web images**: an in-app browser (Google Images by default). Long-press an image to download it into the project, never into the gallery.
 - **My stickers**: cut-outs saved for reuse across projects.
 
@@ -31,7 +31,7 @@ The owner's phone is a Galaxy S25; it also runs on older phones, hence `minSdk 2
 - ML Kit Subject Segmentation (Play services, on-device) for background removal
 - `org.json` for project files, Coroutines/Flow for async
 - No DI framework, no navigation library: `MainActivity` builds one `EditorViewModel` with `viewModel()` and switches screens on `uiState.project` plus a `browsing` flag
-- **Not Material-looking**: Kadar's own dark UI with a lime accent from `ui/common/Theme.kt` (`Ink` colors, Plus Jakarta Sans, `IconTool`, `CircleButton`, `KSlider`, `ColorRow`, `TextTabs`, `KDialog`). Material 3 is only the plumbing underneath; don't use stock M3 buttons, chips or top bars in screens.
+- **Not Material-looking**: Kadar's own dark UI with a lime accent from `ui/common/Theme.kt` (`Ink` colors, Plus Jakarta Sans, `IconTool`, `CircleButton`, `KSlider`, `ColorRow`, `TextTabs`, `KDialog`, `KTextField`). Material 3 is only the plumbing underneath; don't use stock M3 buttons, chips or top bars in screens.
 - Icons are Material Symbols Rounded (weight 300) vector drawables `res/drawable/ic_*.xml`, added with `scripts/add-icons.sh <name>...`
 
 Versions live in `gradle/libs.versions.toml`.
@@ -47,7 +47,8 @@ app/src/main/java/com/ndelic/kadar/
                            drawLayer, renderLayers, opaqueBounds
     Looks.kt               Filters: Look matrices, Adjust.filterMatrix(), glRgbMatrix() for Media3
     Projects.kt            Project, ProjectStore (one folder per project: project.json, thumb.jpg, images), JSON
-    Settings.kt            AppSettings (search engine, export size), SettingsStore
+    ProjectList.kt         Home grid logic: default project label, search filter, ProjectSort
+    Settings.kt            AppSettings (search engine, export size, project sort), SettingsStore
   media/
     Media.kt               Bitmap decode/download, emoji render, video info and frames, gallery export, ML Kit cut-out
   video/
@@ -55,9 +56,10 @@ app/src/main/java/com/ndelic/kadar/
     VideoOverlay.kt        Pure math for video layers: Transform to compositor coordinates, when a layer plays
   ui/common/
     Theme.kt               Ink palette, fonts, shared components (IconTool, CircleButton, KSlider, ColorRow, TextTabs,
-                           KToggle, KDialog, PanelLabel)
+                           KToggle, KDialog, KTextField, PanelLabel)
   ui/home/
-    HomeScreen.kt          Start cards, project grid, multi-select bar
+    HomeScreen.kt          Start cards, project grid (names, sort, search), multi-select bar
+    RenameDialog.kt        Project name dialog
     Intro.kt               Launch animation
     SettingsScreen.kt      Settings and About (license texts)
   ui/editor/
@@ -126,7 +128,7 @@ emulator -avd pixel_7_api35   # reference emulator (Google Play image, needed fo
 
 Several agents work on this repo in parallel, so structure matters as much as features.
 
-1. **Reuse before you write.** Search for an existing helper first: shared UI pieces live in `ui/common/Theme.kt` (`IconTool`, `CircleButton`, `KSlider`, `ColorRow`, `TextTabs`, `KToggle`, `KDialog`, `PanelLabel`), drawing in `model/Layers.kt`, media I/O in `media/Media.kt`, video in `video/VideoEdit.kt`, persistence in `model/Projects.kt`. Extend one of those instead of writing a second copy. If you need something twice, extract it once to the right file.
+1. **Reuse before you write.** Search for an existing helper first: shared UI pieces live in `ui/common/Theme.kt` (`IconTool`, `CircleButton`, `KSlider`, `ColorRow`, `TextTabs`, `KToggle`, `KDialog`, `KTextField`, `PanelLabel`), drawing in `model/Layers.kt`, media I/O in `media/Media.kt`, video in `video/VideoEdit.kt`, persistence in `model/Projects.kt`. Extend one of those instead of writing a second copy. If you need something twice, extract it once to the right file.
 2. **One responsibility per file, in the right package.** Follow "Where new code goes" above. A new screen or self-contained component gets its own file. `ui/editor/EditorScreen.kt` is the biggest file: put new editor parts (panels, timeline pieces, overlays) in their own files instead of growing it; move code out only when you are already changing it, as its own commit.
 3. **Pure logic outside composables and the ViewModel.** Math, geometry, parsing, matrix and time calculations go in plain Kotlin functions in `model/` or `video/` with a JVM test in `app/src/test` under the same package. Composables render and forward events; the ViewModel orchestrates and owns state.
 4. **Model types live with their data.** Layer types and their drawing in `model/Layers.kt`; `Project` and its JSON in `model/Projects.kt`; video settings in `video/VideoEdit.kt`; app settings in `model/Settings.kt`. A new field touches its type, its JSON read/write (with an `opt*` default) and nothing else by surprise.

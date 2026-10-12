@@ -20,7 +20,11 @@ enum class ExportSize(val label: String, val shortSide: Int?) {
     P720("720p", 720),
 }
 
-data class AppSettings(val search: SearchEngine = SearchEngine.Google, val exportSize: ExportSize = ExportSize.Original)
+data class AppSettings(
+    val search: SearchEngine = SearchEngine.Google,
+    val exportSize: ExportSize = ExportSize.Original,
+    val projectSort: ProjectSort = ProjectSort.Recent,
+)
 
 /** App-wide preferences in SharedPreferences; a handful of values read once at start. */
 class SettingsStore(context: Context) {
@@ -29,13 +33,19 @@ class SettingsStore(context: Context) {
     fun load() = AppSettings(
         search = enumOr(prefs.getString(SEARCH, null), SearchEngine.Google),
         exportSize = enumOr(prefs.getString(EXPORT_SIZE, null), ExportSize.Original),
+        projectSort = enumOr(prefs.getString(PROJECT_SORT, null), ProjectSort.Recent),
     )
 
-    fun save(s: AppSettings) = prefs.edit().putString(SEARCH, s.search.name).putString(EXPORT_SIZE, s.exportSize.name).apply()
+    fun save(s: AppSettings) = prefs.edit()
+        .putString(SEARCH, s.search.name)
+        .putString(EXPORT_SIZE, s.exportSize.name)
+        .putString(PROJECT_SORT, s.projectSort.name)
+        .apply()
 
     private companion object {
         const val SEARCH = "search"
         const val EXPORT_SIZE = "exportSize"
+        const val PROJECT_SORT = "projectSort"
     }
 }
 

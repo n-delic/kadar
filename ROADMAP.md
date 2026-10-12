@@ -51,6 +51,7 @@
 ## Done for the next release
 
 - Video over video: add more clips as layers on top of the main one, picture-in-picture style. Move, pinch-resize and rotate them on the stage, set when they show on their own timeline track, give them their own volume (muted by default), and export them with the main clip
+- Project names: unnamed projects show their type and day ("Photo · Oct 12"); select one project on the home screen and tap Rename. Sort the grid by Recent, Name or Type (videos first), remembered between launches, and search by name once there are more than 6 projects
 
 ## Next
 

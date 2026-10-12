@@ -35,6 +35,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,8 +51,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ndelic.kadar.BuildConfig
@@ -58,11 +66,15 @@ import com.ndelic.kadar.EditorUiState
 import com.ndelic.kadar.EditorViewModel
 import com.ndelic.kadar.R
 import com.ndelic.kadar.model.Project
+import com.ndelic.kadar.model.ProjectSort
 import com.ndelic.kadar.model.SavedProject
+import com.ndelic.kadar.model.arrange
 import com.ndelic.kadar.ui.common.CircleButton
 import com.ndelic.kadar.ui.common.Ink
 import com.ndelic.kadar.ui.common.KDialog
 import com.ndelic.kadar.ui.common.KIcon
+import com.ndelic.kadar.ui.common.KTextField
+import com.ndelic.kadar.ui.common.TextTabs
 import com.ndelic.kadar.ui.editor.label
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -73,13 +85,19 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, 
     // Paths of the selected projects; non-empty means selection mode.
     var selected by rememberSaveable { mutableStateOf(listOf<String>()) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf<SavedProject?>(null) }
+    var query by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
+    // A few projects fit on screen; search only earns its space beyond that.
+    val searchable = state.projects.size > 6
+    val sort = state.settings.projectSort
+    val shown = remember(state.projects, searchable, query.text, sort) { state.projects.arrange(if (searchable) query.text else "", sort) }
     val selecting = selected.isNotEmpty()
-    val picked = state.projects.filter { it.dir.path in selected }
+    val picked = shown.filter { it.dir.path in selected }
     fun toggle(p: SavedProject) {
         selected = if (p.dir.path in selected) selected - p.dir.path else selected + p.dir.path
     }
-    // Projects can disappear (deleted elsewhere); keep the selection to ones that exist.
-    LaunchedEffect(state.projects) { selected = selected.filter { path -> state.projects.any { it.dir.path == path } } }
+    // Projects can disappear (deleted elsewhere) or be filtered out; only what's on screen stays selected, so Delete never hits a hidden one.
+    LaunchedEffect(shown) { selected = selected.filter { path -> shown.any { it.dir.path == path } } }
     BackHandler(enabled = selecting) { selected = emptyList() }
 
     Box(Modifier.fillMaxSize()) {
@@ -126,14 +144,31 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Projects", color = Ink.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     if (state.projects.isNotEmpty()) Text("  ${state.projects.size}", color = Ink.dim, fontSize = 15.sp)
+                    Spacer(Modifier.weight(1f))
+                    if (state.projects.size > 1) {
+                        TextTabs(ProjectSort.entries, sort, label = { it.label }) { s -> vm.updateSettings { copy(projectSort = s) } }
+                    }
                 }
                 if (state.projects.isEmpty()) {
                     Text("Nothing yet. Everything you make is saved here automatically.", color = Ink.dim, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp))
                 }
+                if (searchable) {
+                    val focusManager = LocalFocusManager.current
+                    KTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = "Search projects",
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        icon = R.drawable.ic_search,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+                    )
+                    if (shown.isEmpty()) Text("No project matches \"${query.text.trim()}\"", color = Ink.dim, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp))
+                }
                 Spacer(Modifier.height(6.dp))
             }
         }
-        items(state.projects, key = { it.dir.path }) { p ->
+        items(shown, key = { it.dir.path }) { p ->
             val isPicked = p.dir.path in selected
             Column(
                 Modifier.combinedClickable(
@@ -149,7 +184,7 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, 
                         .background(Ink.raised)
                         .border(if (isPicked) 3.dp else 0.dp, if (isPicked) Ink.accent else Color.Transparent, RoundedCornerShape(14.dp)),
                 ) {
-                    p.thumb?.let { Image(it.asImageBitmap(), contentDescription = "Project", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
+                    p.thumb?.let { Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
                     Row(
                         Modifier
                             .align(Alignment.BottomStart)
@@ -179,11 +214,20 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, 
                     }
                 }
                 Text(
+                    p.label,
+                    color = Ink.text,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 5.dp, start = 2.dp, end = 2.dp),
+                )
+                Text(
                     DateUtils.getRelativeTimeSpanString(p.modified).toString(),
                     color = Ink.dim,
                     fontSize = 11.sp,
                     maxLines = 1,
-                    modifier = Modifier.padding(top = 4.dp, start = 2.dp),
+                    modifier = Modifier.padding(start = 2.dp),
                 )
             }
         }
@@ -208,8 +252,16 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, 
             Box(Modifier.size(44.dp).clip(CircleShape).clickable { selected = emptyList() }, contentAlignment = Alignment.Center) {
                 KIcon(R.drawable.ic_close, Modifier.size(22.dp), description = "Cancel selection")
             }
-            Text("${picked.size} selected", color = Ink.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).padding(start = 4.dp))
-            BarAction(R.drawable.ic_select_all, "All") { selected = state.projects.map { it.dir.path } }
+            // Just the count: with four actions, "N selected" wraps on a 360-400 dp wide phone.
+            Text(
+                "${picked.size}",
+                color = Ink.text,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f).padding(start = 4.dp).semantics { contentDescription = "${picked.size} selected" },
+            )
+            BarAction(R.drawable.ic_select_all, "All") { selected = shown.map { it.dir.path } }
+            if (picked.size == 1) BarAction(R.drawable.ic_edit, "Rename") { renaming = picked.single() }
             BarAction(R.drawable.ic_content_copy, "Duplicate") {
                 vm.duplicateProjects(picked.map { it.dir })
                 selected = emptyList()
@@ -217,6 +269,18 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, 
             BarAction(R.drawable.ic_delete, "Delete", tint = Color(0xFFFF5A6E)) { confirmDelete = true }
         }
     }
+    }
+
+    renaming?.let { p ->
+        RenameDialog(
+            current = p.label,
+            onRename = { name ->
+                if (name.trim() != p.label) vm.renameProject(p.dir, name)
+                selected = emptyList()
+                renaming = null
+            },
+            onDismiss = { renaming = null },
+        )
     }
 
     if (confirmDelete) {

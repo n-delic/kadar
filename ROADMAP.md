@@ -60,6 +60,7 @@
 - [x] Filters: eight in-house looks (Mono, Noir, Sepia, Warm, Cool, Vivid, Fade, Teal & Orange) with a strength slider, for image layers and the whole video
 - [x] Timeline tracks do everything the photo Layers panel does: long-press a track and drag it up/down to reorder, hide and lock with the eye and lock at its left (the Layers button is photo-only)
 - [ ] Video layers: their own trim, crop and opacity, and a way to put them above text and stickers
+- [ ] Export frame timing with video layers follows the topmost overlay clip: a 30 fps overlay makes a 60 fps main clip export at 30 fps, and an overlay with irregular frames (screen recordings) makes the whole export choppy. The main clip should drive the frame timing
 - [ ] Blurred-background video canvas (Media3's blur-with-frame effect squeezed the frame on the emulator; needs another approach)
 
 ## Later / maybe

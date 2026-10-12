@@ -1,11 +1,13 @@
 package com.ndelic.kadar.model
 
 import android.graphics.Canvas
+import androidx.annotation.StringRes
+import com.ndelic.kadar.R
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /** How a text or sticker layer enters or leaves a video. */
-enum class Anim(val label: String) { None("None"), Fade("Fade"), Pop("Pop"), SlideUp("Slide up") }
+enum class Anim(@StringRes val label: Int) { None(R.string.anim_none), Fade(R.string.anim_fade), Pop(R.string.anim_pop), SlideUp(R.string.anim_slide_up) }
 
 /** A layer's animated look at one moment: [dy] is a fraction of the canvas height added to its y. */
 data class Motion(val alpha: Float = 1f, val scale: Float = 1f, val dy: Float = 0f)

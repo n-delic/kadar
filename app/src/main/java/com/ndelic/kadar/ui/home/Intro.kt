@@ -42,9 +42,11 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ndelic.kadar.R
 import com.ndelic.kadar.ui.common.Ink
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -173,7 +175,7 @@ fun Intro(ready: Boolean, onDone: () -> Unit) {
                 }
             }
             Text(
-                "Edit anything. Keep everything.",
+                stringResource(R.string.intro_tagline),
                 color = Ink.dim,
                 fontSize = 14.sp,
                 modifier = Modifier.graphicsLayer { alpha = window(p, 0.78f, 1f) },

@@ -3,8 +3,10 @@ package com.ndelic.kadar.ui.editor
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ndelic.kadar.EditorViewModel
+import com.ndelic.kadar.R
 import com.ndelic.kadar.model.Anim
 import com.ndelic.kadar.model.ImageLayer
 import com.ndelic.kadar.model.Layer
@@ -21,9 +23,9 @@ fun AnimationPanel(layer: Layer, vm: EditorViewModel) {
         else -> {}
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        PanelLabel("In")
-        TextTabs(Anim.entries, layer.animIn, label = { it.label }) { set(it, layer.animOut) }
-        PanelLabel("Out")
-        TextTabs(Anim.entries, layer.animOut, label = { it.label }) { set(layer.animIn, it) }
+        PanelLabel(stringResource(R.string.anim_in))
+        TextTabs(Anim.entries, layer.animIn, label = { stringResource(it.label) }) { set(it, layer.animOut) }
+        PanelLabel(stringResource(R.string.anim_out))
+        TextTabs(Anim.entries, layer.animOut, label = { stringResource(it.label) }) { set(layer.animIn, it) }
     }
 }

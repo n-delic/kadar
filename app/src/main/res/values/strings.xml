@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English, the default. Every string here needs a Bosnian twin in values-bs/strings.xml (see CONTRIBUTING.md).
+     Toolbar labels (tool_*) must fit a 68dp tool at 11sp: about 11 characters. -->
+<resources>
+    <!-- Common -->
+    <string name="cancel">Cancel</string>
+    <string name="done">Done</string>
+    <string name="apply">Apply</string>
+    <string name="close">Close</string>
+    <string name="delete">Delete</string>
+    <string name="duplicate">Duplicate</string>
+    <string name="edit">Edit</string>
+    <string name="save">Save</string>
+    <string name="add">Add</string>
+    <string name="share">Share</string>
+    <string name="settings">Settings</string>
+    <string name="show">Show</string>
+    <string name="hide">Hide</string>
+    <string name="lock">Lock</string>
+    <string name="unlock">Unlock</string>
+    <string name="move_up">Move up</string>
+    <string name="move_down">Move down</string>
+    <string name="reset">Reset</string>
+    <string name="original">Original</string>
+    <string name="photo">Photo</string>
+    <string name="video">Video</string>
+    <string name="image">Image</string>
+    <string name="drawing">Drawing</string>
+    <string name="sticker">Sticker</string>
+
+    <!-- Home -->
+    <string name="home_tagline">Photos and videos, edited on your phone. No account, no watermark.</string>
+    <string name="home_photo_hint">Cut-outs, text, stickers</string>
+    <string name="home_video_hint">Trim, speed, music</string>
+    <string name="home_blank">Blank canvas</string>
+    <string name="home_web">Image from web</string>
+    <string name="projects">Projects</string>
+    <string name="projects_empty">Nothing yet. Everything you make is saved here automatically.</string>
+    <string name="projects_search">Search projects</string>
+    <string name="projects_no_match">No project matches \"%1$s\"</string>
+    <string name="sort_recent">Recent</string>
+    <string name="sort_name">Name</string>
+    <string name="sort_type">Type</string>
+    <!-- java.time pattern for the day in an unnamed project's label, "Photo · Oct 12" -->
+    <string name="project_date_pattern">MMM d</string>
+    <string name="project_selected">Selected</string>
+    <string name="selection_cancel">Cancel selection</string>
+    <plurals name="selected_count">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <string name="select_all">All</string>
+    <string name="rename">Rename</string>
+    <plurals name="delete_projects_title">
+        <item quantity="one">Delete project?</item>
+        <item quantity="other">Delete %d projects?</item>
+    </plurals>
+    <string name="delete_projects_text">Their images are deleted too. Things you saved to the gallery stay.</string>
+    <string name="rename_title">Rename project</string>
+    <string name="project_name">Project name</string>
+    <string name="intro_tagline">Edit anything. Keep everything.</string>
+
+    <!-- Settings -->
+    <string name="settings_search">Image search</string>
+    <string name="settings_search_hint">Used by the built-in browser for Image from web.</string>
+    <string name="settings_export">Default export size</string>
+    <string name="settings_export_hint">By the short side; never upscales. Each project can override it in its Canvas panel.</string>
+    <string name="settings_about">About</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_source">Source code</string>
+    <string name="settings_license">License: GPL-3.0-or-later</string>
+    <string name="settings_licenses">Open-source licenses</string>
+    <string name="settings_licenses_hint">Fonts and icons bundled in the app.</string>
+    <string name="settings_free">Kadar is free software with no ads, accounts or tracking.</string>
+
+    <!-- Editor top bar -->
+    <string name="back_to_projects">Back to projects</string>
+    <string name="undo">Undo</string>
+    <string name="redo">Redo</string>
+    <string name="layers">Layers</string>
+    <string name="save_to_gallery">Save to gallery</string>
+    <string name="saved_to_gallery">Saved to gallery</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="fit">Fit</string>
+    <string name="text_hint">Enter your text</string>
+
+    <!-- Toolbar -->
+    <string name="tool_text">Text</string>
+    <string name="tool_draw">Draw</string>
+    <string name="tool_web">Web</string>
+    <string name="tool_trim">Trim</string>
+    <string name="tool_speed">Speed</string>
+    <string name="tool_canvas">Canvas</string>
+    <string name="tool_adjust">Adjust</string>
+    <string name="tool_filters">Filters</string>
+    <string name="tool_audio">Audio</string>
+    <string name="tool_font">Font</string>
+    <string name="tool_color">Color</string>
+    <string name="tool_stroke">Stroke</string>
+    <string name="tool_box">Box</string>
+    <string name="tool_style">Style</string>
+    <string name="tool_animate">Animate</string>
+    <string name="tool_front">Front</string>
+    <string name="tool_back">Back</string>
+    <string name="tool_remove_bg">Remove BG</string>
+    <string name="tool_eraser">Eraser</string>
+    <string name="tool_crop">Crop</string>
+    <string name="tool_save_sticker">Save sticker</string>
+
+    <!-- Panels -->
+    <string name="my_stickers">My stickers</string>
+    <string name="my_stickers_empty">Remove the background of an image, then tap Save sticker to keep it here.</string>
+    <string name="delete_sticker_title">Delete sticker?</string>
+    <string name="delete_sticker_text">Projects that already use it keep their copy.</string>
+    <string name="background">Background</string>
+    <string name="brightness">Brightness</string>
+    <string name="contrast">Contrast</string>
+    <string name="saturation">Saturation</string>
+    <string name="shadow">Shadow</string>
+    <string name="spacing">Spacing</string>
+    <string name="align_left">Left</string>
+    <string name="align_center">Center</string>
+    <string name="align_right">Right</string>
+    <string name="export_size">Export size</string>
+    <string name="export_size_default">Default (%1$s)</string>
+    <string name="export_1080p" translatable="false">1080p</string>
+    <string name="export_720p" translatable="false">720p</string>
+    <string name="speed_length">Length after speed: %1$s</string>
+    <string name="keep_pitch">Keep voice pitch</string>
+    <string name="keep_pitch_hint">Off gives the chipmunk / slow-mo voice</string>
+    <string name="video_sound">Video sound</string>
+    <string name="music">Music</string>
+    <string name="music_add">Add music</string>
+    <string name="music_remove">Remove music</string>
+    <string name="anim_in">In</string>
+    <string name="anim_out">Out</string>
+    <string name="anim_none">None</string>
+    <string name="anim_fade">Fade</string>
+    <string name="anim_pop">Pop</string>
+    <string name="anim_slide_up">Slide up</string>
+    <string name="opacity">Opacity</string>
+    <string name="sound">Sound</string>
+    <string name="starts_at">Starts at</string>
+    <string name="look_none">None</string>
+    <string name="look_mono">Mono</string>
+    <string name="look_noir">Noir</string>
+    <string name="look_sepia">Sepia</string>
+    <string name="look_warm">Warm</string>
+    <string name="look_cool">Cool</string>
+    <string name="look_vivid">Vivid</string>
+    <string name="look_fade">Fade</string>
+    <string name="look_teal_orange">Teal &amp; Orange</string>
+
+    <!-- Full-screen tools -->
+    <string name="undo_stroke">Undo stroke</string>
+    <string name="pen_marker">Marker</string>
+    <string name="pen_highlighter">Highlighter</string>
+    <string name="brush_erase">Erase</string>
+    <string name="brush_restore">Restore</string>
+    <string name="crop_free">Free</string>
+
+    <!-- Web images -->
+    <string name="web_search_hint">Search images or paste a link</string>
+    <string name="web_tip">Tap a result to open it full size, then long-press it to add</string>
+    <string name="web_add_title">Add this image?</string>
+    <string name="web_add_text">It\'s saved inside the project only, not in your gallery.</string>
+
+    <!-- Busy labels -->
+    <string name="busy_opening">Opening</string>
+    <string name="busy_opening_photo">Opening photo</string>
+    <string name="busy_opening_video">Opening video</string>
+    <string name="busy_downloading">Downloading</string>
+    <string name="busy_duplicating">Duplicating</string>
+    <plurals name="busy_duplicating_projects">
+        <item quantity="one">Duplicating %d project</item>
+        <item quantity="other">Duplicating %d projects</item>
+    </plurals>
+    <string name="busy_renaming">Renaming</string>
+    <string name="busy_adding_sticker">Adding sticker</string>
+    <string name="busy_adding_image">Adding image</string>
+    <string name="busy_adding_video">Adding video</string>
+    <string name="busy_adding_music">Adding music</string>
+    <string name="busy_removing_bg">Removing background</string>
+    <string name="busy_saving">Saving</string>
+    <string name="busy_saving_sticker">Saving sticker</string>
+    <string name="busy_saving_video">Saving video %1$d%%</string>
+    <string name="busy_cropping">Cropping</string>
+
+    <!-- Messages -->
+    <string name="saved_to_stickers">Saved to My stickers</string>
+    <string name="error_generic">Something went wrong</string>
+    <string name="error_read_video">Can\'t read this video</string>
+    <string name="error_read_audio">Can\'t read this audio file</string>
+    <string name="error_share_denied">The other app didn\'t let Kadar open that file</string>
+    <string name="error_video_missing">This project\'s video is no longer on the phone</string>
+    <string name="error_save_project">Could not save the project: %1$s</string>
+    <string name="error_sticker_damaged">This sticker is damaged</string>
+    <string name="error_no_subject">No subject found</string>
+    <string name="error_nothing_to_save">Nothing to save</string>
+    <string name="error_download_http">Download failed (HTTP %1$d)</string>
+    <string name="error_image_too_large">Image is too large</string>
+    <string name="error_cant_download">This image can\'t be downloaded</string>
+    <string name="error_not_image">That link isn\'t an image Kadar can open</string>
+    <string name="error_gallery_file">Could not create a file in the gallery</string>
+    <string name="error_bg_model">The background remover is still downloading. Check the internet and try again.</string>
+</resources>

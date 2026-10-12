@@ -55,6 +55,7 @@
 - Project names: unnamed projects show their type and day ("Photo · Oct 12"); select one project on the home screen and tap Rename. Sort the grid by Recent, Name or Type (videos first), remembered between launches, and search by name once there are more than 6 projects
 - In/out animations for text and stickers in videos: None, Fade, Pop or Slide up, for the entrance and the exit separately (Animate tool); the preview plays them and the export matches
 - Eight more caption fonts, all free (OFL) and bundled, so they work offline: Tall (Bebas Neue), Narrow (Oswald), Heavy (Archivo Black), Comic (Bangers), Marker (Caveat Brush), Casual (Comic Neue), Retro (Pacifico) and Horror (Creepster). The font row scrolls and marks the chosen one in lime
+- Bosnian translation: the app follows the phone's language, or pick it per app in Android 13+ settings (App languages). Error messages and busy labels are translated too
 
 ## Next
 
@@ -72,7 +73,6 @@
 - [ ] Several video clips in a row, with transitions
 - [ ] A CC0 sticker pack
 - [ ] Templates, once it's clear which layouts get used most
-- [ ] Bosnian translation
 
 ## Not planned
 

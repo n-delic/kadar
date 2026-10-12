@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
 import androidx.annotation.OptIn
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
@@ -36,6 +37,8 @@ import com.ndelic.kadar.model.SavedProject
 import com.ndelic.kadar.model.SettingsStore
 import com.ndelic.kadar.model.TextLayer
 import com.ndelic.kadar.model.Transform
+import com.ndelic.kadar.model.UiText
+import com.ndelic.kadar.model.UserError
 import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.model.renderLayers
 import com.ndelic.kadar.model.withStrokes
@@ -77,7 +80,7 @@ data class EditorUiState(
     val project: Project? = null,
     val selectedId: Long? = null,
     /** Label of the running long task; the UI blocks input while it is set. */
-    val busy: String? = null,
+    val busy: UiText? = null,
     val stickers: List<Sticker> = emptyList(),
     val settings: AppSettings = AppSettings(),
     val canUndo: Boolean = false,
@@ -89,7 +92,7 @@ data class EditorUiState(
 }
 
 sealed interface EditorEffect {
-    data class Message(val text: String) : EditorEffect
+    data class Message(val text: UiText) : EditorEffect
     /** [share] opens the share sheet right away instead of offering it. */
     data class Saved(val uri: Uri, val mime: String, val share: Boolean) : EditorEffect
 }
@@ -143,9 +146,9 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // Projects
 
-    fun newPhoto(uri: Uri) = work("Opening photo") { newPhoto(withContext(Dispatchers.IO) { loadBitmap(app, uri, MAX_PHOTO) }) }
+    fun newPhoto(uri: Uri) = work(R.string.busy_opening_photo) { newPhoto(withContext(Dispatchers.IO) { loadBitmap(app, uri, MAX_PHOTO) }) }
 
-    fun newPhotoFromUrl(url: String) = work("Downloading") { newPhoto(withContext(Dispatchers.IO) { downloadImage(url, MAX_PHOTO) }) }
+    fun newPhotoFromUrl(url: String) = work(R.string.busy_downloading) { newPhoto(withContext(Dispatchers.IO) { downloadImage(url, MAX_PHOTO) }) }
 
     private suspend fun newPhoto(bitmap: Bitmap) {
         val dir = store.create()
@@ -156,7 +159,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun newBlank() = open(store.create(), Project(1080, 1080))
 
-    fun newVideo(uri: Uri) = work("Opening video") { newVideoNow(uri) }
+    fun newVideo(uri: Uri) = work(R.string.busy_opening_video) { newVideoNow(uri) }
 
     private suspend fun newVideoNow(shared: Uri) {
         val dir = store.create()
@@ -169,23 +172,23 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val (info, frame) = withContext(Dispatchers.IO) { mediaInfo(app, uri) to videoFrame(app, uri, 0) }
         if (info.width == 0 || info.durationMs == 0L) {
             dir.deleteRecursively()
-            error("Can't read this video")
+            throw UserError(R.string.error_read_video)
         }
         open(dir, Project(info.width, info.height, background = Color.BLACK, video = VideoClip(uri, info.durationMs, width = info.width, height = info.height, frameRate = info.frameRate)), frame)
     }
 
     /** "Share to Kadar" from the gallery or another app: saves whatever is open, then starts a project from it. */
-    fun openShared(uri: Uri, mime: String) = work("Opening") {
+    fun openShared(uri: Uri, mime: String) = work(R.string.busy_opening) {
         val s = _uiState.value
         if (s.projectDir != null && s.project != null && s.project != lastSaved) save(s.projectDir, s.project)
         try {
             if (mime.startsWith("video/")) newVideoNow(uri) else newPhoto(withContext(Dispatchers.IO) { loadBitmap(app, uri, MAX_PHOTO) })
         } catch (e: SecurityException) {
-            throw IllegalStateException("The other app didn't let Kadar open that file", e)
+            throw UserError(UiText.Res(R.string.error_share_denied), e)
         }
     }
 
-    fun openProject(dir: File) = work("Opening") {
+    fun openProject(dir: File) = work(R.string.busy_opening) {
         val project = withContext(Dispatchers.IO) {
             val p = store.load(dir)
             // Projects from before the frame rate was saved; the export with video layers runs at it.
@@ -193,7 +196,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             p.copy(video = v.copy(frameRate = runCatching { mediaInfo(app, v.uri).frameRate }.getOrDefault(0f)))
         }
         val frame = project.video?.let { v -> withContext(Dispatchers.IO) { runCatching { videoFrame(app, v.uri, v.startMs) }.getOrNull() } }
-        if (project.video != null && frame == null) _effects.send(EditorEffect.Message("This project's video is no longer on the phone"))
+        if (project.video != null && frame == null) _effects.send(EditorEffect.Message(UiText.Res(R.string.error_video_missing)))
         open(dir, project, frame, saved = true)
     }
 
@@ -204,13 +207,13 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun duplicateProjects(dirs: List<File>) = work(if (dirs.size == 1) "Duplicating" else "Duplicating ${dirs.size} projects") {
+    fun duplicateProjects(dirs: List<File>) = work(if (dirs.size == 1) UiText.Res(R.string.busy_duplicating) else UiText.Plural(R.plurals.busy_duplicating_projects, dirs.size)) {
         withContext(Dispatchers.IO) { dirs.forEach { store.duplicate(it) } }
         refreshProjects()
     }
 
     /** A blank [name] goes back to the default label. */
-    fun renameProject(dir: File, name: String) = work("Renaming") {
+    fun renameProject(dir: File, name: String) = work(R.string.busy_renaming) {
         saveLock.withLock { withContext(Dispatchers.IO) { store.rename(dir, name.trim().ifEmpty { null }) } }
         refreshProjects()
     }
@@ -267,7 +270,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            _effects.send(EditorEffect.Message("Could not save the project: ${e.message}"))
+            _effects.send(EditorEffect.Message(UiText.Res(R.string.error_save_project, e.message.orEmpty())))
         }
     }
 
@@ -299,18 +302,18 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     /** Emoji become image stickers (drawn from the system emoji font), so they get sticker tools, not text tools. */
-    fun addEmoji(emoji: String) = work("Adding sticker") {
+    fun addEmoji(emoji: String) = work(R.string.busy_adding_sticker) {
         val p = _uiState.value.project ?: return@work
         val bitmap = withContext(Dispatchers.Default) { renderEmoji(emoji) }
         addBitmapLayer(bitmap, height = min(p.width, p.height) * 0.25f)
     }
 
-    fun addImage(uri: Uri) = work("Adding image") { addBitmapLayer(withContext(Dispatchers.IO) { loadBitmap(app, uri, MAX_LAYER) }) }
+    fun addImage(uri: Uri) = work(R.string.busy_adding_image) { addBitmapLayer(withContext(Dispatchers.IO) { loadBitmap(app, uri, MAX_LAYER) }) }
 
-    fun addImageFromUrl(url: String) = work("Downloading") { addBitmapLayer(withContext(Dispatchers.IO) { downloadImage(url, MAX_LAYER) }) }
+    fun addImageFromUrl(url: String) = work(R.string.busy_downloading) { addBitmapLayer(withContext(Dispatchers.IO) { downloadImage(url, MAX_LAYER) }) }
 
-    fun addSticker(sticker: Sticker) = work("Adding sticker") {
-        addBitmapLayer(withContext(Dispatchers.IO) { BitmapFactory.decodeFile(sticker.file.path) ?: error("This sticker is damaged") })
+    fun addSticker(sticker: Sticker) = work(R.string.busy_adding_sticker) {
+        addBitmapLayer(withContext(Dispatchers.IO) { BitmapFactory.decodeFile(sticker.file.path) ?: throw UserError(R.string.error_sticker_damaged) })
     }
 
     /** Adds [bitmap] centered, at [height] canvas pixels tall, or fitted into 60% of the canvas by default. */
@@ -324,12 +327,12 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     /** Picture-in-picture: another video over the clip from [atMs] (the playhead), half the canvas wide. */
-    fun addVideo(uri: Uri, atMs: Long) = work("Adding video") {
+    fun addVideo(uri: Uri, atMs: Long) = work(R.string.busy_adding_video) {
         val p = _uiState.value.project ?: return@work
         val clip = p.video ?: return@work
         keepAccess(uri)
         val info = withContext(Dispatchers.IO) { mediaInfo(app, uri) }
-        if (info.width == 0 || info.durationMs == 0L) error("Can't read this video")
+        if (info.width == 0 || info.durationMs == 0L) throw UserError(R.string.error_read_video)
         // Too close to the end there'd be nothing left to see, so start at the beginning instead.
         val start = if (atMs < clip.outputDurationMs - MIN_VIDEO_LAYER_MS) atMs else 0
         addLayer { VideoLayer(it, Transform(p.width / 2f, p.height / 2f, p.width * 0.5f / info.width), uri, info.durationMs, info.width, info.height, startMs = start) }
@@ -415,11 +418,11 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         select(null)
     }
 
-    fun removeBackground() = work("Removing background") {
+    fun removeBackground() = work(R.string.busy_removing_bg) {
         val layer = _uiState.value.selected as? ImageLayer ?: return@work
         val dir = _uiState.value.projectDir ?: return@work
         val subject = cutOutSubject(app, layer.bitmap)
-        val (cut, b) = withContext(Dispatchers.Default) { trimTransparent(subject) } ?: error("No subject found")
+        val (cut, b) = withContext(Dispatchers.Default) { trimTransparent(subject) } ?: throw UserError(R.string.error_no_subject)
         val file = withContext(Dispatchers.IO) { store.writeImage(dir, cut) }
         // Keep the subject where it was on screen: the crop's center is off the old center.
         val t = layer.t.shiftedLocal((b[0] + b[2]) / 2f - layer.width / 2, (b[1] + b[3]) / 2f - layer.height / 2)
@@ -442,14 +445,14 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     /** Result of the eraser screen: one undo step for the whole session. Same size as before, so the source offset still holds. */
-    fun applyErase(id: Long, bitmap: Bitmap) = work("Saving") {
+    fun applyErase(id: Long, bitmap: Bitmap) = work(R.string.busy_saving) {
         val dir = _uiState.value.projectDir ?: return@work
         val file = withContext(Dispatchers.IO) { store.writeImage(dir, bitmap) }
         updateLayer(id) { (it as ImageLayer).copy(bitmap = bitmap, file = file) }
     }
 
     /** Crops the layer to `[left, top, right, bottom)` of its bitmap, keeping the kept part where it was on screen. */
-    fun applyCrop(id: Long, left: Int, top: Int, right: Int, bottom: Int) = work("Cropping") {
+    fun applyCrop(id: Long, left: Int, top: Int, right: Int, bottom: Int) = work(R.string.busy_cropping) {
         val layer = _uiState.value.project?.layers?.firstOrNull { it.id == id } as? ImageLayer ?: return@work
         val dir = _uiState.value.projectDir ?: return@work
         val cut = Bitmap.createBitmap(layer.bitmap, left, top, right - left, bottom - top)
@@ -462,15 +465,15 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // Stickers
 
-    fun saveSticker() = work("Saving sticker") {
+    fun saveSticker() = work(R.string.busy_saving_sticker) {
         val layer = _uiState.value.selected as? ImageLayer ?: return@work
         withContext(Dispatchers.IO) {
-            val (cut, _) = trimTransparent(layer.bitmap) ?: error("Nothing to save")
+            val (cut, _) = trimTransparent(layer.bitmap) ?: throw UserError(R.string.error_nothing_to_save)
             stickerDir.mkdirs()
             File(stickerDir, "${System.currentTimeMillis()}.png").outputStream().use { scaleDown(cut, 1024).compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
         loadStickers()
-        _effects.send(EditorEffect.Message("Saved to My stickers"))
+        _effects.send(EditorEffect.Message(UiText.Res(R.string.saved_to_stickers)))
     }
 
     fun deleteSticker(sticker: Sticker) {
@@ -506,10 +509,10 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun updateClip(change: VideoClip.() -> VideoClip) = updateProject { p -> p.copy(video = p.video?.change()) }
 
-    fun setMusic(uri: Uri) = work("Adding music") {
+    fun setMusic(uri: Uri) = work(R.string.busy_adding_music) {
         keepAccess(uri)
         val (info, name) = withContext(Dispatchers.IO) { mediaInfo(app, uri) to displayName(app, uri) }
-        if (info.durationMs == 0L) error("Can't read this audio file")
+        if (info.durationMs == 0L) throw UserError(R.string.error_read_audio)
         updateClip { copy(music = Music(uri, name, info.durationMs)) }
     }
 
@@ -525,7 +528,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // Export
 
-    fun export(share: Boolean) = work("Saving") {
+    fun export(share: Boolean) = work(R.string.busy_saving) {
         val p = _uiState.value.project ?: return@work
         val video = p.video
         val shortSide = (p.exportSize ?: _uiState.value.settings.exportSize).shortSide
@@ -544,7 +547,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             val overlay = if (drawn.isEmpty()) null else timedOverlay(p.width, p.height, drawn, video.outputDurationMs)
             val out = File(app.cacheDir, "export.mp4")
             try {
-                exportVideo(app, video.composition(overlay, shortSide, p.layers.filterIsInstance<VideoLayer>()), out) { pct -> _uiState.update { it.copy(busy = "Saving video $pct%") } }
+                exportVideo(app, video.composition(overlay, shortSide, p.layers.filterIsInstance<VideoLayer>()), out) { pct -> _uiState.update { it.copy(busy = UiText.Res(R.string.busy_saving_video, pct)) } }
                 val uri = withContext(Dispatchers.IO) { saveToGallery(app, "video/mp4") { o -> out.inputStream().use { it.copyTo(o) } } }
                 _effects.send(EditorEffect.Saved(uri, "video/mp4", share))
             } finally {
@@ -575,7 +578,9 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         updateProject(record) { p -> p.copy(layers = p.layers.map { if (it.id == id) change(it) else it }) }
 
     /** Runs one long task at a time behind the busy overlay; failures become a message instead of a crash. */
-    private fun work(label: String, block: suspend () -> Unit) {
+    private fun work(@StringRes label: Int, block: suspend () -> Unit) = work(UiText.Res(label), block)
+
+    private fun work(label: UiText, block: suspend () -> Unit) {
         if (_uiState.value.busy != null) return
         _uiState.update { it.copy(busy = label) }
         viewModelScope.launch {
@@ -583,8 +588,10 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
                 block()
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: UserError) {
+                _effects.send(EditorEffect.Message(e.text))
             } catch (e: Exception) {
-                _effects.send(EditorEffect.Message(e.message ?: "Something went wrong"))
+                _effects.send(EditorEffect.Message(e.message?.let(UiText::Raw) ?: UiText.Res(R.string.error_generic)))
             } finally {
                 _uiState.update { it.copy(busy = null) }
             }

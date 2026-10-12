@@ -64,6 +64,7 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -101,9 +102,9 @@ fun TrimStrip(clip: VideoClip, frames: List<Bitmap>, positionMs: Long, onSeek: (
     val clipState by rememberUpdatedState(clip)
     Column(Modifier.fillMaxWidth().background(Ink.bg).padding(vertical = 10.dp)) {
         Row(Modifier.fillMaxWidth().padding(start = TIMELINE_PAD, end = 16.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            PanelLabel("Trim")
+            PanelLabel(stringResource(R.string.tool_trim))
             Spacer(Modifier.weight(1f))
-            Text("Done", color = Ink.accent, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onDone).padding(8.dp))
+            Text(stringResource(R.string.done), color = Ink.accent, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onDone).padding(8.dp))
         }
         // Full width, so the handles in the padding still get touches, and those touches aren't taken by the
         // system back gesture at the screen edges.
@@ -414,8 +415,8 @@ private fun Track(
         }
         // On top of the track's gesture area, so taps on the toggles never start a drag.
         Row(Modifier.width(TRACK_HEADER)) {
-            SmallIcon(if (layer.hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility, if (layer.hidden) "Show" else "Hide") { onFlags(layer.id, !layer.hidden, layer.locked) }
-            SmallIcon(if (layer.locked) R.drawable.ic_lock else R.drawable.ic_lock_open, if (layer.locked) "Unlock" else "Lock") { onFlags(layer.id, layer.hidden, !layer.locked) }
+            SmallIcon(if (layer.hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility, stringResource(if (layer.hidden) R.string.show else R.string.hide)) { onFlags(layer.id, !layer.hidden, layer.locked) }
+            SmallIcon(if (layer.locked) R.drawable.ic_lock else R.drawable.ic_lock_open, stringResource(if (layer.locked) R.string.unlock else R.string.lock)) { onFlags(layer.id, layer.hidden, !layer.locked) }
         }
     }
 }

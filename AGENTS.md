@@ -53,6 +53,7 @@ app/src/main/java/com/ndelic/kadar/
     Projects.kt            Project, ProjectStore (one folder per project: project.json, thumb.jpg, images), JSON
     ProjectList.kt         Home grid logic: default project label, search filter, ProjectSort
     Settings.kt            AppSettings (search engine, export size, project sort), SettingsStore
+    UiText.kt              UiText (string resource, plural or raw text, resolved by the UI) and UserError
   media/
     Media.kt               Bitmap decode/download, emoji render, video info and frames, gallery export, ML Kit cut-out
   video/
@@ -82,6 +83,8 @@ app/src/test/java/com/ndelic/kadar/   Same packages as main: model/, video/, ui/
 app/src/main/res/font/                anton.ttf (meme font), jakarta.ttf (UI font), eight caption fonts from Google Fonts
                                       (EditorViewModel.fonts), all SIL OFL
 app/src/main/res/drawable/ic_*.xml    Material Symbols (scripts/add-icons.sh) plus ic_mark / ic_launcher_* (own work)
+app/src/main/res/values/strings.xml   All UI text in English; values-bs/strings.xml has the Bosnian twin of every entry
+app/src/main/res/xml/locales_config.xml  Languages offered in Android 13+ per-app language settings
 scripts/                              add-icons.sh, make-logo.py
 docs/                                 screenshots/ and brand/ for the README
 third_party/                          License texts, also packaged as app assets
@@ -100,8 +103,10 @@ third_party/                          License texts, also packaged as app assets
 | A new editor panel or overlay screen | Its own file in `ui/editor/` (`EditorScreen.kt` should shrink, not grow) |
 | A new top-level screen | Its own file in the `ui/` package of its area, or a new `ui/<area>/` package |
 | State and actions | `EditorViewModel` (orchestrates; delegates logic to `model/`, `media/`, `video/`) |
+| Any text the user sees | Both `res/values/strings.xml` and `res/values-bs/strings.xml`; from outside the UI as a `UiText` / `UserError` |
+| A new language | `res/values-<lang>/strings.xml` with every entry, plus a `<locale>` in `res/xml/locales_config.xml` |
 
-Dependencies point one way: `ui/*` may use `model`, `media`, `video` and `EditorViewModel`; `model/` uses nothing from the app; `media/` and `video/` use only `model/`. Never import `ui` from `model`, `media` or `video`.
+Dependencies point one way: `ui/*` may use `model`, `media`, `video` and `EditorViewModel`; `model/` uses nothing from the app (string resource ids from `R` are fine); `media/` and `video/` use only `model/`. Never import `ui` from `model`, `media` or `video`.
 
 ## Commands
 
@@ -131,7 +136,8 @@ emulator -avd pixel_7_api35   # reference emulator (Google Play image, needed fo
 13. **Edge drags need `systemGestureExclusion()`**, or the system back gesture steals them (the timeline does this).
 14. **Clean room, open assets.** Never copy, decompile or look at another editing app's code, and never take its icons, images, fonts, stickers, presets or distinctive UI design; build features from public descriptions of what they do. Every bundled asset must be openly licensed (OFL, CC0, Apache/MIT, own work) and get a row in `ATTRIBUTION.md` plus its license file in `third_party/`. Don't name other apps in the UI or store text.
 15. **Known patents to stay clear of** (checked 2026-10-12, assignee search, not a legal opinion): US11989808B2 covers recording a creator's edit steps as a "replay" others apply to their own photo; read its claims before building anything like edit-sharing templates. USD1056949S1 is a design patent on a staggered two-column card feed with a five-tab bottom bar and a central round "+"; don't build the home screen that way.
-16. **Smallest change that fully works.** No new dependencies, layers or abstractions without a clear need. UI text is English and inline for now (no translation yet).
+16. **Smallest change that fully works.** No new dependencies, layers or abstractions without a clear need.
+17. **No inline UI text.** Every user-visible string (labels, content descriptions, dialogs, snackbars) is a resource in `res/values/strings.xml` (English) and `res/values-bs/strings.xml` (Bosnian, Latin script); `lintDebug` fails on a missing translation. Composables use `stringResource` / `pluralStringResource` with format args, never concatenation. Text made outside the UI is a `UiText` (`model/UiText.kt`): busy labels and `EditorEffect.Message` carry one, and a failure the user should read is `throw UserError(R.string.x)`; other exception messages show as they are. Enum labels are `@StringRes` ids; names stored in projects or settings (enum names, `Font.name`) are data and never translated. Toolbar labels must fit a 68dp `IconTool` (about 11 characters at 11sp).
 
 ## Keep the codebase clean
 

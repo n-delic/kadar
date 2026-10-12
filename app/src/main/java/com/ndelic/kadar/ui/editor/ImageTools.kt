@@ -8,6 +8,7 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.graphics.Shader
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -45,6 +46,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -61,7 +63,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-private enum class Brush { Erase, Restore }
+private enum class Brush(@StringRes val label: Int) { Erase(R.string.brush_erase), Restore(R.string.brush_restore) }
 
 /**
  * Eraser: one finger paints, two fingers zoom and pan. Restore paints the original back
@@ -158,7 +160,7 @@ fun EraseScreen(layer: ImageLayer, source: Bitmap?, onDone: (Bitmap) -> Unit, on
             }
         }
         Column(Modifier.fullWidthPanel()) {
-            TextTabs(if (restore != null) Brush.entries else listOf(Brush.Erase), mode, label = { it.name }) { mode = it }
+            TextTabs(if (restore != null) Brush.entries else listOf(Brush.Erase), mode, label = { stringResource(it.label) }) { mode = it }
             KSlider(R.drawable.ic_ink_eraser, brushDp, 8f..120f, { "${it.roundToInt()}" }) { brushDp = it }
         }
     }
@@ -187,7 +189,8 @@ internal fun DrawScope.checker(area: Size, cell: Float) {
     }
 }
 
-private val CROP_RATIOS = listOf("Free" to null, "1:1" to 1f, "4:5" to 0.8f, "9:16" to 9f / 16, "16:9" to 16f / 9)
+// A null label is the localized "Free".
+private val CROP_RATIOS = listOf(null to null, "1:1" to 1f, "4:5" to 0.8f, "9:16" to 9f / 16, "16:9" to 16f / 9)
 
 /** Crop one image layer: drag the corners or the middle; ratios lock the shape. Returns `[left, top, right, bottom)`. */
 @Composable
@@ -195,7 +198,7 @@ fun CropScreen(layer: ImageLayer, onDone: (IntArray) -> Unit, onCancel: () -> Un
     val bw = layer.bitmap.width.toFloat()
     val bh = layer.bitmap.height.toFloat()
     var rect by remember { mutableStateOf(Rect(0f, 0f, bw, bh)) }
-    var ratio by remember { mutableStateOf<Pair<String, Float?>>(CROP_RATIOS.first()) }
+    var ratio by remember { mutableStateOf<Pair<String?, Float?>>(CROP_RATIOS.first()) }
     BackHandler(onBack = onCancel)
 
     Column(Modifier.fillMaxSize().background(Ink.bg).blockTouches()) {
@@ -261,7 +264,7 @@ fun CropScreen(layer: ImageLayer, onDone: (IntArray) -> Unit, onCancel: () -> Un
             }
         }
         Box(Modifier.fullWidthPanel(), contentAlignment = Alignment.Center) {
-            TextTabs(CROP_RATIOS, ratio, label = { it.first }) { r ->
+            TextTabs(CROP_RATIOS, ratio, label = { it.first ?: stringResource(R.string.crop_free) }) { r ->
                 ratio = r
                 rect = r.second?.let { centered(it, bw, bh) } ?: Rect(0f, 0f, bw, bh)
             }
@@ -300,10 +303,10 @@ private fun centered(ratio: Float, bw: Float, bh: Float): Rect {
 @Composable
 internal fun ToolTopBar(onCancel: () -> Unit, onDone: () -> Unit, doneEnabled: Boolean, middle: @Composable () -> Unit = {}) {
     Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        CircleButton(R.drawable.ic_close, "Cancel", onClick = onCancel)
+        CircleButton(R.drawable.ic_close, stringResource(R.string.cancel), onClick = onCancel)
         Spacer(Modifier.weight(1f))
         middle()
         Spacer(Modifier.weight(1f))
-        CircleButton(R.drawable.ic_check, "Apply", enabled = doneEnabled, onClick = onDone)
+        CircleButton(R.drawable.ic_check, stringResource(R.string.apply), enabled = doneEnabled, onClick = onDone)
     }
 }

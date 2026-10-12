@@ -11,6 +11,8 @@ import android.net.Uri
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import androidx.annotation.StringRes
+import com.ndelic.kadar.R
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.composition
 import kotlin.math.abs
@@ -218,7 +220,7 @@ data class Adjust(
     }
 }
 
-enum class TextAlign { Left, Center, Right }
+enum class TextAlign(@StringRes val label: Int) { Left(R.string.align_left), Center(R.string.align_center), Right(R.string.align_right) }
 
 data class TextLayer(
     override val id: Long,

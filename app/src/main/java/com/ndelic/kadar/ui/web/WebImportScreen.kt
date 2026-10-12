@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -54,7 +55,7 @@ fun WebImportScreen(engine: SearchEngine, onPick: (String) -> Unit, onClose: () 
 
     Column(Modifier.fillMaxSize().background(Ink.bg).imePadding()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
-            CircleButton(R.drawable.ic_close, "Close", onClick = onClose)
+            CircleButton(R.drawable.ic_close, stringResource(R.string.close), onClick = onClose)
             Spacer(Modifier.width(10.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -72,14 +73,14 @@ fun WebImportScreen(engine: SearchEngine, onPick: (String) -> Unit, onClose: () 
                     keyboardActions = KeyboardActions(onSearch = { if (query.isNotBlank()) webView?.loadUrl(searchUrl(engine, query)) }),
                     modifier = Modifier.weight(1f),
                     decorationBox = { field ->
-                        if (query.isEmpty()) Text("Search images or paste a link", color = Ink.dim, fontSize = 15.sp)
+                        if (query.isEmpty()) Text(stringResource(R.string.web_search_hint), color = Ink.dim, fontSize = 15.sp)
                         field()
                     },
                 )
             }
         }
         Text(
-            "Tap a result to open it full size, then long-press it to add",
+            stringResource(R.string.web_tip),
             color = Ink.dim,
             fontSize = 12.sp,
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
@@ -107,9 +108,9 @@ fun WebImportScreen(engine: SearchEngine, onPick: (String) -> Unit, onClose: () 
 
     picked?.let { url ->
         KDialog(
-            title = "Add this image?",
-            text = "It's saved inside the project only, not in your gallery.",
-            confirm = "Add",
+            title = stringResource(R.string.web_add_title),
+            text = stringResource(R.string.web_add_text),
+            confirm = stringResource(R.string.add),
             onConfirm = {
                 picked = null
                 onPick(url)

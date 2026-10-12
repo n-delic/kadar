@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asComposeColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ndelic.kadar.media.scaleDown
@@ -63,7 +64,7 @@ fun FiltersPanel(source: Bitmap?, adjust: Adjust, onChange: (Adjust) -> Unit) {
                         }
                     }
                     Spacer(Modifier.height(4.dp))
-                    Text(look.label, color = if (active) Ink.accent else Ink.dim, fontSize = 11.sp, maxLines = 1)
+                    Text(stringResource(look.label), color = if (active) Ink.accent else Ink.dim, fontSize = 11.sp, maxLines = 1)
                 }
             }
         }

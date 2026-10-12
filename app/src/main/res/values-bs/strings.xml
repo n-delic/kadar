@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bosnian (Latin script). Short and natural; toolbar labels (tool_*) fit about 11 characters. -->
+<resources>
+    <!-- Common -->
+    <string name="cancel">Otkaži</string>
+    <string name="done">Gotovo</string>
+    <string name="apply">Primijeni</string>
+    <string name="close">Zatvori</string>
+    <string name="delete">Obriši</string>
+    <string name="duplicate">Dupliraj</string>
+    <string name="edit">Uredi</string>
+    <string name="save">Spremi</string>
+    <string name="add">Dodaj</string>
+    <string name="share">Podijeli</string>
+    <string name="settings">Postavke</string>
+    <string name="show">Prikaži</string>
+    <string name="hide">Sakrij</string>
+    <string name="lock">Zaključaj</string>
+    <string name="unlock">Otključaj</string>
+    <string name="move_up">Pomjeri gore</string>
+    <string name="move_down">Pomjeri dolje</string>
+    <string name="reset">Resetuj</string>
+    <string name="original">Original</string>
+    <string name="photo">Foto</string>
+    <string name="video">Video</string>
+    <string name="image">Slika</string>
+    <string name="drawing">Crtež</string>
+    <string name="sticker">Stiker</string>
+
+    <!-- Home -->
+    <string name="home_tagline">Fotografije i videi, uređeni na telefonu. Bez računa, bez vodenog žiga.</string>
+    <string name="home_photo_hint">Isječci, tekst, stikeri</string>
+    <string name="home_video_hint">Rezanje, brzina, muzika</string>
+    <string name="home_blank">Prazno platno</string>
+    <string name="home_web">Slika s weba</string>
+    <string name="projects">Projekti</string>
+    <string name="projects_empty">Još ništa. Sve što napraviš automatski se sprema ovdje.</string>
+    <string name="projects_search">Traži projekte</string>
+    <string name="projects_no_match">Nijedan projekat ne sadrži \"%1$s\"</string>
+    <string name="sort_recent">Nedavno</string>
+    <string name="sort_name">Naziv</string>
+    <string name="sort_type">Vrsta</string>
+    <string name="project_date_pattern">d. MMM</string>
+    <string name="project_selected">Odabrano</string>
+    <string name="selection_cancel">Poništi odabir</string>
+    <plurals name="selected_count">
+        <item quantity="one">%d odabran</item>
+        <item quantity="few">%d odabrana</item>
+        <item quantity="other">%d odabranih</item>
+    </plurals>
+    <string name="select_all">Sve</string>
+    <string name="rename">Preimenuj</string>
+    <plurals name="delete_projects_title">
+        <item quantity="one">Obrisati %d projekat?</item>
+        <item quantity="few">Obrisati %d projekta?</item>
+        <item quantity="other">Obrisati %d projekata?</item>
+    </plurals>
+    <string name="delete_projects_text">Brišu se i njihove slike. Ono što je spremljeno u galeriju ostaje.</string>
+    <string name="rename_title">Preimenuj projekat</string>
+    <string name="project_name">Naziv projekta</string>
+    <string name="intro_tagline">Uredi bilo šta. Zadrži sve.</string>
+
+    <!-- Settings -->
+    <string name="settings_search">Pretraga slika</string>
+    <string name="settings_search_hint">Koristi je ugrađeni preglednik za Slika s weba.</string>
+    <string name="settings_export">Zadana veličina izvoza</string>
+    <string name="settings_export_hint">Po kraćoj strani; nikad ne povećava. Svaki projekat to može promijeniti u panelu Platno.</string>
+    <string name="settings_about">O aplikaciji</string>
+    <string name="settings_version">Verzija</string>
+    <string name="settings_source">Izvorni kod</string>
+    <string name="settings_license">Licenca: GPL-3.0-or-later</string>
+    <string name="settings_licenses">Licence otvorenog koda</string>
+    <string name="settings_licenses_hint">Fontovi i ikone uključeni u aplikaciju.</string>
+    <string name="settings_free">Kadar je slobodan softver bez reklama, računa i praćenja.</string>
+
+    <!-- Editor top bar -->
+    <string name="back_to_projects">Nazad na projekte</string>
+    <string name="undo">Poništi</string>
+    <string name="redo">Ponovi</string>
+    <string name="layers">Slojevi</string>
+    <string name="save_to_gallery">Spremi u galeriju</string>
+    <string name="saved_to_gallery">Spremljeno u galeriju</string>
+    <string name="play">Pokreni</string>
+    <string name="pause">Pauza</string>
+    <string name="fit">Uklopi</string>
+    <string name="text_hint">Upiši tekst</string>
+
+    <!-- Toolbar -->
+    <string name="tool_text">Tekst</string>
+    <string name="tool_draw">Crtaj</string>
+    <string name="tool_web">Web</string>
+    <string name="tool_trim">Skrati</string>
+    <string name="tool_speed">Brzina</string>
+    <string name="tool_canvas">Platno</string>
+    <string name="tool_adjust">Podesi</string>
+    <string name="tool_filters">Filteri</string>
+    <string name="tool_audio">Zvuk</string>
+    <string name="tool_font">Font</string>
+    <string name="tool_color">Boja</string>
+    <string name="tool_stroke">Obrub</string>
+    <string name="tool_box">Podloga</string>
+    <string name="tool_style">Stil</string>
+    <string name="tool_animate">Animacija</string>
+    <string name="tool_front">Naprijed</string>
+    <string name="tool_back">Nazad</string>
+    <string name="tool_remove_bg">Izdvoji</string>
+    <string name="tool_eraser">Gumica</string>
+    <string name="tool_crop">Izreži</string>
+    <string name="tool_save_sticker">U stikere</string>
+
+    <!-- Panels -->
+    <string name="my_stickers">Moji stikeri</string>
+    <string name="my_stickers_empty">Ukloni pozadinu slike alatom Izdvoji, pa dodirni U stikere da je sačuvaš ovdje.</string>
+    <string name="delete_sticker_title">Obrisati stiker?</string>
+    <string name="delete_sticker_text">Projekti koji ga već koriste zadržavaju svoju kopiju.</string>
+    <string name="background">Pozadina</string>
+    <string name="brightness">Svjetlina</string>
+    <string name="contrast">Kontrast</string>
+    <string name="saturation">Zasićenost</string>
+    <string name="shadow">Sjenka</string>
+    <string name="spacing">Razmak</string>
+    <string name="align_left">Lijevo</string>
+    <string name="align_center">Sredina</string>
+    <string name="align_right">Desno</string>
+    <string name="export_size">Veličina izvoza</string>
+    <string name="export_size_default">Zadano (%1$s)</string>
+    <string name="speed_length">Trajanje nakon brzine: %1$s</string>
+    <string name="keep_pitch">Zadrži visinu glasa</string>
+    <string name="keep_pitch_hint">Isključeno daje glas vjeverice / usporeni glas</string>
+    <string name="video_sound">Zvuk videa</string>
+    <string name="music">Muzika</string>
+    <string name="music_add">Dodaj muziku</string>
+    <string name="music_remove">Ukloni muziku</string>
+    <string name="anim_in">Ulaz</string>
+    <string name="anim_out">Izlaz</string>
+    <string name="anim_none">Bez</string>
+    <string name="anim_fade">Blijeđenje</string>
+    <string name="anim_pop">Iskoči</string>
+    <string name="anim_slide_up">Klizi gore</string>
+    <string name="opacity">Neprozirnost</string>
+    <string name="sound">Zvuk</string>
+    <string name="starts_at">Počinje od</string>
+    <string name="look_none">Bez</string>
+    <string name="look_mono">Mono</string>
+    <string name="look_noir">Noir</string>
+    <string name="look_sepia">Sepija</string>
+    <string name="look_warm">Toplo</string>
+    <string name="look_cool">Hladno</string>
+    <string name="look_vivid">Živo</string>
+    <string name="look_fade">Blijedo</string>
+    <string name="look_teal_orange">Kino</string>
+
+    <!-- Full-screen tools -->
+    <string name="undo_stroke">Poništi potez</string>
+    <string name="pen_marker">Marker</string>
+    <string name="pen_highlighter">Signir</string>
+    <string name="brush_erase">Briši</string>
+    <string name="brush_restore">Vrati</string>
+    <string name="crop_free">Slobodno</string>
+
+    <!-- Web images -->
+    <string name="web_search_hint">Traži slike ili zalijepi link</string>
+    <string name="web_tip">Dodirni rezultat da ga otvoriš u punoj veličini, pa ga dugo pritisni da ga dodaš</string>
+    <string name="web_add_title">Dodati ovu sliku?</string>
+    <string name="web_add_text">Sprema se samo u projekat, ne u tvoju galeriju.</string>
+
+    <!-- Busy labels -->
+    <string name="busy_opening">Otvaram</string>
+    <string name="busy_opening_photo">Otvaram fotografiju</string>
+    <string name="busy_opening_video">Otvaram video</string>
+    <string name="busy_downloading">Preuzimam</string>
+    <string name="busy_duplicating">Dupliram</string>
+    <plurals name="busy_duplicating_projects">
+        <item quantity="one">Dupliram %d projekat</item>
+        <item quantity="few">Dupliram %d projekta</item>
+        <item quantity="other">Dupliram %d projekata</item>
+    </plurals>
+    <string name="busy_renaming">Preimenujem</string>
+    <string name="busy_adding_sticker">Dodajem stiker</string>
+    <string name="busy_adding_image">Dodajem sliku</string>
+    <string name="busy_adding_video">Dodajem video</string>
+    <string name="busy_adding_music">Dodajem muziku</string>
+    <string name="busy_removing_bg">Uklanjam pozadinu</string>
+    <string name="busy_saving">Spremam</string>
+    <string name="busy_saving_sticker">Spremam stiker</string>
+    <string name="busy_saving_video">Spremam video %1$d%%</string>
+    <string name="busy_cropping">Izrezujem</string>
+
+    <!-- Messages -->
+    <string name="saved_to_stickers">Spremljeno u Moje stikere</string>
+    <string name="error_generic">Nešto nije u redu</string>
+    <string name="error_read_video">Ovaj video se ne može pročitati</string>
+    <string name="error_read_audio">Ovaj audio fajl se ne može pročitati</string>
+    <string name="error_share_denied">Druga aplikacija nije dozvolila Kadru da otvori taj fajl</string>
+    <string name="error_video_missing">Video ovog projekta više nije na telefonu</string>
+    <string name="error_save_project">Projekat nije spremljen: %1$s</string>
+    <string name="error_sticker_damaged">Ovaj stiker je oštećen</string>
+    <string name="error_no_subject">Nije pronađen nijedan objekat</string>
+    <string name="error_nothing_to_save">Nema šta spremiti</string>
+    <string name="error_download_http">Preuzimanje nije uspjelo (HTTP %1$d)</string>
+    <string name="error_image_too_large">Slika je prevelika</string>
+    <string name="error_cant_download">Ova slika se ne može preuzeti</string>
+    <string name="error_not_image">Taj link nije slika koju Kadar može otvoriti</string>
+    <string name="error_gallery_file">Nije moguće napraviti fajl u galeriji</string>
+    <string name="error_bg_model">Alat za uklanjanje pozadine se još preuzima. Provjeri internet i pokušaj ponovo.</string>
+</resources>

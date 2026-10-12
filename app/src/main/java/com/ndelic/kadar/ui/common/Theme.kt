@@ -44,6 +44,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.ExperimentalTextApi
@@ -158,7 +159,7 @@ fun CircleButton(@DrawableRes icon: Int, description: String, enabled: Boolean =
 
 /** Text-only tabs with a dot under the selected one. */
 @Composable
-fun <T> TextTabs(options: List<T>, selected: T?, label: (T) -> String, onSelect: (T) -> Unit) {
+fun <T> TextTabs(options: List<T>, selected: T?, label: @Composable (T) -> String, onSelect: (T) -> Unit) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         items(options) { o ->
             val active = o == selected
@@ -265,7 +266,7 @@ fun KDialog(title: String, confirm: String, onConfirm: () -> Unit, onDismiss: ()
         title = { Text(title, color = Ink.text) },
         text = content,
         confirmButton = { TextButton(onClick = onConfirm) { Text(confirm, color = Ink.accent, fontWeight = FontWeight.Bold) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = Ink.dim) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel), color = Ink.dim) } },
     )
 }
 

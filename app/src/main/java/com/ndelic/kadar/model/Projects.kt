@@ -174,6 +174,7 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
                 endMs = end,
                 opacity = j.optDouble("opacity", 1.0).toFloat(),
                 clipStartMs = j.optLong("clipStartMs"),
+                crop = j.optJSONArray("crop")?.let { c -> CropRect(c.getDouble(0).toFloat(), c.getDouble(1).toFloat(), c.getDouble(2).toFloat(), c.getDouble(3).toFloat()) } ?: CropRect(),
             )
             // Versions before drawings skip this type too.
             "draw" -> DrawLayer(
@@ -288,6 +289,7 @@ private fun Layer.toJson() = JSONObject().apply {
             put("volume", layer.volume.toDouble())
             put("opacity", layer.opacity.toDouble())
             put("clipStartMs", layer.clipStartMs)
+            layer.crop.run { put("crop", JSONArray(listOf(left.toDouble(), top.toDouble(), right.toDouble(), bottom.toDouble()))) }
         }
         is DrawLayer -> {
             put("type", "draw")

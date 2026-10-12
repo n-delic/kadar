@@ -1,6 +1,8 @@
 package com.ndelic.kadar.video
 
+import com.ndelic.kadar.model.CropRect
 import com.ndelic.kadar.model.Transform
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -81,5 +83,12 @@ class VideoOverlayTest {
         assertTrue(overlayNeedsSeek(1_100, 1_000, playing = true, sinceSeekMs = 5_000))
         // Right after a correction it gets a second to play before the next one.
         assertFalse(overlayNeedsSeek(1_000, 2_000, playing = true, sinceSeekMs = 999))
+    }
+
+    @Test
+    fun cropMapsToDeviceCoordinatesWithYUp() {
+        assertArrayEquals(floatArrayOf(-1f, 1f, -1f, 1f), cropNdc(CropRect()), 0.0001f)
+        // The right half's lower half: x 0.5..1, y 0.5..1 down = -1..0 up.
+        assertArrayEquals(floatArrayOf(0f, 1f, -1f, 0f), cropNdc(CropRect(0.5f, 0.5f, 1f, 1f)), 0.0001f)
     }
 }

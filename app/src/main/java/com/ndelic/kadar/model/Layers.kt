@@ -114,9 +114,19 @@ data class ImageLayer(
     override fun withFlags(hidden: Boolean, locked: Boolean) = copy(hidden = hidden, locked = locked)
 }
 
+/** Part of a frame, as fractions (0 to 1) of its width and height. */
+data class CropRect(val left: Float = 0f, val top: Float = 0f, val right: Float = 1f, val bottom: Float = 1f) {
+    val width get() = right - left
+    val height get() = bottom - top
+}
+
+/** This transform moved so that a [width]×[height] frame showing [to] instead of [from] keeps the part it still shows in place. */
+fun Transform.recropped(from: CropRect, to: CropRect, width: Int, height: Int) =
+    shiftedLocal((to.left + to.right - from.left - from.right) / 2 * width, (to.top + to.bottom - from.top - from.bottom) / 2 * height)
+
 /**
  * Another video on top of the main clip (picture-in-picture), [videoWidth]×[videoHeight] being its display size
- * (rotation applied). It plays its clip from [clipStartMs] on, so it shows for at most [playableMs].
+ * (rotation applied), of which it shows only [crop]. It plays its clip from [clipStartMs] on, so it shows for at most [playableMs].
  * Its pixels come only from the Media3 compositor (`VideoClip.composition`), in the preview and the export alike, so it draws
  * nothing here (thumbnails and the bitmap overlay skip it); the stage shows its selection box like any layer.
  */
@@ -137,9 +147,10 @@ data class VideoLayer(
     val opacity: Float = 1f,
     /** Where in its own clip it starts playing. */
     val clipStartMs: Long = 0,
+    val crop: CropRect = CropRect(),
 ) : Layer {
-    override val width get() = videoWidth.toFloat()
-    override val height get() = videoHeight.toFloat()
+    override val width get() = videoWidth * crop.width
+    override val height get() = videoHeight * crop.height
     val playableMs get() = durationMs - clipStartMs
     override fun drawContent(canvas: Canvas) = Unit
     override fun withTransform(t: Transform) = copy(t = t)
@@ -147,6 +158,9 @@ data class VideoLayer(
 
     /** Plays the clip from [ms] on; the track gets shorter if less is left than it was long. */
     fun withClipStart(ms: Long) = copy(clipStartMs = ms).let { it.withTime(it.startMs, it.endMs) }
+
+    /** Shows only [c] of the frame; the part still shown stays where it was on the canvas. */
+    fun withCrop(c: CropRect) = copy(crop = c, t = t.recropped(crop, c, videoWidth, videoHeight))
     override fun withFlags(hidden: Boolean, locked: Boolean) = copy(hidden = hidden, locked = locked)
 }
 

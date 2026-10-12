@@ -76,4 +76,16 @@ class LayersTest {
         // 4K is capped so the phone's encoder can keep up.
         assertEquals(1080 to 1920, canvasSize(3840, 2160, 9f / 16))
     }
+
+    @Test
+    fun recropKeepsTheShownPartInPlace() {
+        val t = Transform(500f, 500f, scale = 0.5f)
+        // Keep the right half of a 1000×2000 frame: the center moves right by a quarter of the frame, at half scale.
+        val right = t.recropped(CropRect(), CropRect(left = 0.5f), 1000, 2000)
+        assertEquals(625f, right.x, 0.001f)
+        assertEquals(500f, right.y, 0.001f)
+        assertEquals(0.5f, CropRect(left = 0.5f).width, 0.001f)
+        // Back to the whole frame puts it where it started.
+        assertEquals(500f, right.recropped(CropRect(left = 0.5f), CropRect(), 1000, 2000).x, 0.001f)
+    }
 }

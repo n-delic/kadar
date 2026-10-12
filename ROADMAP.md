@@ -65,7 +65,7 @@
 - [x] Export frame timing with video layers follows the main clip's frame rate (at most 60 fps), not the topmost overlay's, so a 30 fps or screen-recorded overlay no longer makes the export choppy
 - [ ] Video layers: crop, and a way to put them above text and stickers
 - [ ] Overlay clips with long frame gaps (screen recordings that only emit frames when the screen changes) make Media3's compositor draw a stretched copy of the overlay over the main clip during the gap. Constant-frame-rate clips (phone camera) are fine. Fix idea: re-time such overlays to a constant rate before compositing
-- [ ] Blurred-background video canvas (Media3's blur-with-frame effect squeezed the frame on the emulator; needs another approach)
+- [x] Blurred-background video canvas: on a 1:1, 4:5, 9:16 or 16:9 canvas, Canvas > Blur fills the bars with a blurred, darkened, zoomed copy of the video instead of black (the same clip as a second compositor sequence underneath)
 
 ## Later / maybe
 

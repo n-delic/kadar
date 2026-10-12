@@ -21,6 +21,8 @@ import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.Size
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
+import androidx.media3.effect.Brightness
+import androidx.media3.effect.GaussianBlur
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.Presentation
 import androidx.media3.effect.RgbMatrix
@@ -70,8 +72,10 @@ data class VideoClip(
     /** The video's own display size (rotation applied). */
     val width: Int = 0,
     val height: Int = 0,
-    /** Output aspect ratio (width / height), or null to keep the video's own; the rest is black. */
+    /** Output aspect ratio (width / height), or null to keep the video's own; the rest is black, or [blur]. */
     val canvas: Float? = null,
+    /** Fills the canvas around the video with a blurred, zoomed copy of it instead of black. */
+    val blur: Boolean = false,
     val adjust: Adjust = Adjust(),
     /** The video's average frames per second, 0 when unknown. */
     val frameRate: Float = 0f,
@@ -80,6 +84,9 @@ data class VideoClip(
 
     /** Output frame size; also the project canvas, so layers line up with the exported frame. */
     val outputSize get() = canvasSize(width, height, canvas)
+
+    /** Whether the composition gets the blurred copy as a second sequence (so the preview needs the compositor too). */
+    val blurred get() = blur && canvas != null
 }
 
 /**
@@ -92,6 +99,17 @@ fun canvasSize(w: Int, h: Int, ratio: Float?): Pair<Int, Int> {
     fun even(v: Float) = (v / 2).roundToInt() * 2
     return if (ratio >= 1) even(long.toFloat()) to even(long / ratio) else even(long * ratio) to even(long.toFloat())
 }
+
+/**
+ * Size the blurred background of a [w]×[h] canvas is blurred at, long side [BLUR_LONG_SIDE]: blurring a small frame and
+ * scaling it up looks the same as a wide blur at full size, at a fraction of the GPU work.
+ */
+fun blurSize(w: Int, h: Int): Pair<Int, Int> {
+    val s = BLUR_LONG_SIDE / maxOf(w, h).toFloat()
+    return maxOf(2, (w * s).roundToInt()) to maxOf(2, (h * s).roundToInt())
+}
+
+private const val BLUR_LONG_SIDE = 320
 
 /**
  * The edit as a Media3 composition: used for both the live preview and the export. [overlay] draws the text/sticker
@@ -114,12 +132,14 @@ fun VideoClip.composition(
         .build()
     // Media3's compositor takes every output frame time from sequence 0 and draws it on top, then the others in order.
     // So sequence 0 is an invisible frame clock at the clip's rate, then the overlays (topmost layer first), each padded
-    // with gaps to the clip's full length, and the clip last.
+    // with gaps to the clip's full length, then the clip, and under it the blurred background. The clip's letterbox
+    // bars are transparent (Media3 clears to transparent black), so the background shows through them.
     val overlays = videos.asReversed().filter { !it.hidden }.mapNotNull { v -> overlaySpan(v.startMs, v.endMs, v.playableMs, outputDurationMs)?.let { v to it } }
     val sequences = mutableListOf<EditedMediaItemSequence>()
     if (overlays.isNotEmpty()) sequences += frameClock()
     sequences += overlays.map { (v, span) -> v.sequence(span, outputDurationMs) }
     sequences += EditedMediaItemSequence.Builder(video).build()
+    if (blurred) sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItem(blurredBackground()).build()
     music?.let { m ->
         val track = EditedMediaItem.Builder(clipped(m.uri, m.startMs, C.TIME_END_OF_SOURCE))
             .setDurationUs(m.durationMs * 1000)
@@ -155,6 +175,29 @@ private fun VideoClip.frameClock(): EditedMediaItemSequence {
     val item = EditedMediaItem.Builder(still).setDurationUs(outputDurationMs * 1000).setFrameRate(outputFrameRate(frameRate)).build()
     return EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItem(item).build()
 }
+
+/** The clip again, muted, with the same trim and speed so it stays in sync, cropped to fill the canvas, blurred and darkened. */
+private fun VideoClip.blurredBackground(): EditedMediaItem {
+    val (w, h) = outputSize
+    val (bw, bh) = blurSize(w, h)
+    val effects = listOfNotNull(
+        adjustEffect(),
+        Presentation.createForWidthAndHeight(bw, bh, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP),
+        GaussianBlur(BLUR_SIGMA),
+        // Darker, so captions over the background stay readable.
+        Brightness(-0.15f),
+        Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_STRETCH_TO_FIT),
+    )
+    return EditedMediaItem.Builder(clipped(uri, startMs, endMs))
+        .setDurationUs(durationMs * 1000)
+        .setRemoveAudio(true)
+        .setSpeed(ConstantSpeed(speed))
+        .setEffects(Effects(emptyList(), effects))
+        .build()
+}
+
+/** In pixels of [blurSize]'s frame: about 5% of the canvas's long side. */
+private const val BLUR_SIGMA = 16f
 
 /** A transparent 2×2 PNG. */
 private const val BLANK_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAC0lEQVR4nGNgQAcAABIAAXfx+gAAAAAASUVORK5CYII="
@@ -269,13 +312,15 @@ suspend fun exportVideo(context: Context, composition: Composition, out: File, o
 }
 
 private fun VideoClip.videoEffects(): List<Effect> = buildList {
-    // The same matrix as an image layer's paint, so a look or adjustment matches between photo and video.
-    if (!adjust.isNone) glRgbMatrix(adjust.filterMatrix()).let { m -> add(RgbMatrix { _, _ -> m }) }
+    adjustEffect()?.let(::add)
     if (canvas != null) {
         val (w, h) = outputSize
         add(Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_SCALE_TO_FIT))
     }
 }
+
+/** The same matrix as an image layer's paint, so a look or adjustment matches between photo and video. */
+private fun VideoClip.adjustEffect() = if (adjust.isNone) null else glRgbMatrix(adjust.filterMatrix()).let { m -> RgbMatrix { _, _ -> m } }
 
 private fun clipped(uri: Uri, startMs: Long, endMs: Long) = MediaItem.Builder()
     .setUri(uri)

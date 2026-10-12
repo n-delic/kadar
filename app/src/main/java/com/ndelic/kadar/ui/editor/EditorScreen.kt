@@ -149,7 +149,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     // Bumped to swap in a fresh preview player (see the video-layer drag effect below), resuming at [resumeAt].
     var playerGeneration by remember { mutableIntStateOf(0) }
     val resumeAt = remember { longArrayOf(0) }
-    val player = if (video != null) rememberCompositionPlayer(multiInput = videoLayers.isNotEmpty(), playerGeneration) else null
+    val player = if (video != null) rememberCompositionPlayer(multiInput = videoLayers.isNotEmpty() || video.blurred, playerGeneration) else null
     var playing by remember { mutableStateOf(false) }
     var positionMs by remember { mutableLongStateOf(0L) }
     val overlayVideo = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let { uri -> vm.addVideo(uri, positionMs) } }
@@ -178,7 +178,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         val freshPlayer = remember(player) { booleanArrayOf(true) }
         LaunchedEffect(player, video, videoLayers.map { it.withTransform(Transform(0f, 0f)) }) {
             // Same Media3 limit as below: a paused multi-input player won't repaint a new composition, so use a new player.
-            if (!freshPlayer[0] && videoLayers.isNotEmpty() && !player.isPlaying) {
+            if (!freshPlayer[0] && (videoLayers.isNotEmpty() || video.blurred) && !player.isPlaying) {
                 resumeAt[0] = player.currentPosition
                 playerGeneration++
                 return@LaunchedEffect
@@ -837,7 +837,7 @@ private const val PREVIEW_LONG_SIDE = 1280f
 @Composable
 private fun rememberCompositionPlayer(multiInput: Boolean, generation: Int): CompositionPlayer {
     val context = LocalContext.current
-    // Video layers need the compositor; projects without them keep the plain single-input preview.
+    // Video layers and the blurred background need the compositor; other projects keep the plain single-input preview.
     val player = remember(multiInput, generation) {
         CompositionPlayer.Builder(context)
             .apply { if (multiInput) setVideoGraphFactory(MultipleInputVideoGraph.Factory()) }

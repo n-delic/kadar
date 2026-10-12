@@ -16,6 +16,15 @@ class VideoOverlayTest {
         assertPlacement(OverlayPlacement(0.5f, -0.5f, 0.5f, -30f), overlayPlacement(Transform(810f, 1440f, 0.5f, 30f), 1080, 1920))
     }
 
+    @Test
+    fun blurSizeKeepsTheCanvasShapeAtASmallSize() {
+        assertEquals(180 to 320, blurSize(1080, 1920))
+        assertEquals(320 to 320, blurSize(1920, 1920))
+        assertEquals(320 to 180, blurSize(1920, 1080))
+        // A very thin canvas still gets a usable frame.
+        assertEquals(320 to 2, blurSize(1920, 4))
+    }
+
     // Component-wise, since data class equality tells 0f from -0f.
     private fun assertPlacement(expected: OverlayPlacement, actual: OverlayPlacement) {
         assertEquals(expected.x, actual.x, 1e-4f)

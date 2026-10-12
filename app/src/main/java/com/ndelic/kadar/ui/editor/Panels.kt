@@ -139,6 +139,7 @@ fun VideoCanvasPanel(project: Project, clip: VideoClip, defaultExport: ExportSiz
                 AspectTile(label, ratio ?: (clip.width / clip.height.toFloat()), active) { vm.setVideoCanvas(ratio) }
             }
         }
+        if (clip.canvas != null) TextTabs(listOf(false, true), clip.blur, label = { if (it) "Blur" else "Black" }) { b -> vm.updateClip { copy(blur = b) } }
         ExportSizeRow(project, defaultExport, vm)
     }
 }

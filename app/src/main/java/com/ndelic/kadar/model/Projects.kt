@@ -202,6 +202,7 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
         width = j.optInt("videoWidth", projectWidth),
         height = j.optInt("videoHeight", projectHeight),
         canvas = if (j.has("canvas")) j.getDouble("canvas").toFloat() else null,
+        blur = j.optBoolean("blur"),
         adjust = adjustFromJson(j),
         music = j.optJSONObject("music")?.let {
             Music(Uri.parse(it.getString("uri")), it.getString("name"), it.getLong("durationMs"), it.getLong("startMs"), it.getDouble("volume").toFloat())
@@ -297,6 +298,7 @@ private fun VideoClip.toJson() = JSONObject().apply {
     put("videoWidth", width)
     put("videoHeight", height)
     canvas?.let { put("canvas", it.toDouble()) }
+    put("blur", blur)
     putAdjust(adjust)
     music?.let { m ->
         put("music", JSONObject().apply {

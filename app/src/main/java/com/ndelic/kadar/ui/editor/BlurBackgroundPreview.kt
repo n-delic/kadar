@@ -1,5 +1,3 @@
-@file:OptIn(UnstableApi::class)
-
 package com.ndelic.kadar.ui.editor
 
 import android.graphics.ColorMatrixColorFilter
@@ -8,7 +6,6 @@ import android.graphics.Shader
 import android.os.Build
 import android.os.SystemClock
 import android.view.TextureView
-import androidx.annotation.OptIn
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.wrapContentSize
@@ -31,7 +28,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.ndelic.kadar.model.filterMatrix
 import com.ndelic.kadar.video.VideoClip
@@ -54,23 +50,22 @@ fun BlurBackgroundPreview(clip: VideoClip, canvasWidth: Int, canvasHeight: Int, 
         }
     }
     DisposableEffect(player) { onDispose { player.release() } }
+    val gate = rememberFrameGate(player)
     LaunchedEffect(player, clip.speed) { player.playbackParameters = PlaybackParameters(clip.speed) }
     val current by rememberUpdatedState(clip)
     LaunchedEffect(player, main) {
         if (main == null) return@LaunchedEffect
         var lastSeek = 0L
-        var drawn = false
         while (true) {
             val c = current
             val play = main.isPlaying
             player.playWhenReady = play
             val want = (c.startMs + (main.currentPosition * c.speed).toLong()).coerceAtMost(c.endMs)
             val now = SystemClock.uptimeMillis()
-            // A paused player draws nothing into a view that got its surface after the player was ready, until it seeks.
-            val firstDraw = !drawn && player.playbackState == Player.STATE_READY && player.surfaceSize.width > 0
-            if (firstDraw || player.playbackState != Player.STATE_BUFFERING && overlayNeedsSeek(player.currentPosition, want, play, now - lastSeek)) {
-                drawn = drawn || firstDraw
-                player.seekTo(want)
+            val firstFrame = gate.due(player, now - lastSeek)
+            if (firstFrame || player.playbackState != Player.STATE_BUFFERING && overlayNeedsSeek(player.currentPosition, want, play, now - lastSeek)) {
+                player.seekTo(if (firstFrame) gate.nudge(player, want) else want)
+                gate.seeked = true
                 lastSeek = now
             }
             if (play) withFrameMillis {} else delay(POLL_MS)

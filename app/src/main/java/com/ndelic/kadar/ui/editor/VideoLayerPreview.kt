@@ -1,10 +1,7 @@
-@file:OptIn(UnstableApi::class)
-
 package com.ndelic.kadar.ui.editor
 
 import android.os.SystemClock
 import android.view.TextureView
-import androidx.annotation.OptIn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -28,7 +25,6 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.video.overlayNeedsSeek
@@ -51,13 +47,13 @@ fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Play
         }
     }
     DisposableEffect(player) { onDispose { player.release() } }
+    val gate = rememberFrameGate(player)
     LaunchedEffect(player, layer.volume) { player.volume = layer.volume }
     var showing by remember { mutableStateOf(false) }
     val current by rememberUpdatedState(layer)
     LaunchedEffect(player, main, totalMs) {
         if (main == null) return@LaunchedEffect
         var lastSeek = 0L
-        var drawn = false
         while (true) {
             val l = current
             val target = overlaySourceMs(l.clipStartMs, overlaySpan(l.startMs, l.endMs, l.playableMs, totalMs), main.currentPosition)
@@ -68,11 +64,10 @@ fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Play
             val want = target ?: l.clipStartMs
             val now = SystemClock.uptimeMillis()
             // While a seek is still loading, its position says nothing about drift; seeking again would only stall it.
-            // A paused player draws nothing into a view that got its surface after the player was ready, until it seeks.
-            val firstDraw = !drawn && player.playbackState == Player.STATE_READY && player.surfaceSize.width > 0
-            if (firstDraw || player.playbackState != Player.STATE_BUFFERING && overlayNeedsSeek(player.currentPosition, want, play, now - lastSeek)) {
-                drawn = drawn || firstDraw
-                player.seekTo(want)
+            val firstFrame = gate.due(player, now - lastSeek)
+            if (firstFrame || player.playbackState != Player.STATE_BUFFERING && overlayNeedsSeek(player.currentPosition, want, play, now - lastSeek)) {
+                player.seekTo(if (firstFrame) gate.nudge(player, want) else want)
+                gate.seeked = true
                 lastSeek = now
             }
             if (main.isPlaying) withFrameMillis {} else delay(POLL_MS)
@@ -108,4 +103,44 @@ fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Play
     }
 }
 
+/**
+ * Whether a stage player still owes its view a frame. A paused player draws nothing into a view that gets its surface
+ * after it is ready, and the frame it renders on its own when it gets ready can stay black, so after every new surface
+ * (the view re-attaches when the stage's layers change) the previews seek, and again every [FRAME_RETRY_MS] until a
+ * frame rendered after a seek arrives. A seek to the position the player is already at does nothing, hence [nudge].
+ */
+class FrameGate {
+    var surface = false
+    var seeked = false
+    var shown = false
+
+    /** Whether to seek now for a first frame. */
+    fun due(player: Player, sinceSeekMs: Long) = surface && !shown && player.playbackState == Player.STATE_READY && sinceSeekMs >= FRAME_RETRY_MS
+
+    /** [ms], moved off the player's position so the seek really happens; the drift check then brings it back. */
+    fun nudge(player: Player, ms: Long) = if (player.currentPosition == ms) ms + 1 else ms
+}
+
+@Composable
+fun rememberFrameGate(player: Player): FrameGate {
+    val gate = remember(player) { FrameGate() }
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onRenderedFirstFrame() {
+                if (gate.seeked) gate.shown = true
+            }
+
+            override fun onSurfaceSizeChanged(width: Int, height: Int) {
+                gate.surface = width > 0 && height > 0
+                gate.seeked = false
+                gate.shown = false
+            }
+        }
+        player.addListener(listener)
+        onDispose { player.removeListener(listener) }
+    }
+    return gate
+}
+
 private const val POLL_MS = 32L
+const val FRAME_RETRY_MS = 500L

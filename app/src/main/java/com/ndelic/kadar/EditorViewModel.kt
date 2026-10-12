@@ -171,7 +171,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             dir.deleteRecursively()
             error("Can't read this video")
         }
-        open(dir, Project(info.width, info.height, background = Color.BLACK, video = VideoClip(uri, info.durationMs, width = info.width, height = info.height)), frame)
+        open(dir, Project(info.width, info.height, background = Color.BLACK, video = VideoClip(uri, info.durationMs, width = info.width, height = info.height, frameRate = info.frameRate)), frame)
     }
 
     /** "Share to Kadar" from the gallery or another app: saves whatever is open, then starts a project from it. */
@@ -186,7 +186,12 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     fun openProject(dir: File) = work("Opening") {
-        val project = withContext(Dispatchers.IO) { store.load(dir) }
+        val project = withContext(Dispatchers.IO) {
+            val p = store.load(dir)
+            // Projects from before the frame rate was saved; the export with video layers runs at it.
+            val v = p.video?.takeIf { it.frameRate == 0f } ?: return@withContext p
+            p.copy(video = v.copy(frameRate = runCatching { mediaInfo(app, v.uri).frameRate }.getOrDefault(0f)))
+        }
         val frame = project.video?.let { v -> withContext(Dispatchers.IO) { runCatching { videoFrame(app, v.uri, v.startMs) }.getOrNull() } }
         if (project.video != null && frame == null) _effects.send(EditorEffect.Message("This project's video is no longer on the phone"))
         open(dir, project, frame, saved = true)

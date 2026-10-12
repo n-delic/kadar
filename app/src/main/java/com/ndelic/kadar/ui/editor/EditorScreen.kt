@@ -133,7 +133,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Font, Color, Stroke, Box, Style, Adjust, Filters, Layers, Volume, Animate }
+enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Font, Color, Stroke, Box, Style, Adjust, Filters, Layers, Overlay, Animate }
 
 @Composable
 fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
@@ -265,7 +265,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     Panel.Layers -> LayersPanel(project.layers, state.selectedId, vm)
                     Panel.VideoCanvas -> video?.let { VideoCanvasPanel(project, it, state.settings.exportSize, vm) }
                     Panel.Style -> (selected as? TextLayer)?.let { TextStylePanel(it, vm) }
-                    Panel.Volume -> (selected as? VideoLayer)?.let { VideoVolumePanel(it, vm) }
+                    Panel.Overlay -> (selected as? VideoLayer)?.let { VideoLayerPanel(it, vm) }
                     Panel.Animate -> selected?.let { AnimationPanel(it, vm) }
                     Panel.Adjust -> when (val l = selected) {
                         is ImageLayer -> AdjustPanel(l.adjust) { a -> vm.editImage { copy(adjust = a) } }
@@ -347,7 +347,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     3 -> {
                         IconTool(R.drawable.ic_check, "Done") { vm.select(null) }
                         ToolDivider()
-                        IconTool(R.drawable.ic_volume_up, "Volume", panel == Panel.Volume) { toggle(Panel.Volume) }
+                        IconTool(R.drawable.ic_tune, "Edit", panel == Panel.Overlay) { toggle(Panel.Overlay) }
                         IconTool(R.drawable.ic_content_copy, "Duplicate", onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, "Back", onClick = vm::sendToBack)

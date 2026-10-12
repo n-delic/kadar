@@ -11,7 +11,7 @@ The owner's phone is a Galaxy S25; it also runs on older phones, hence `minSdk 2
 ## What it does today
 
 - **Photo**: open a photo, blank canvas, or web image; add text (meme outline style), emoji, images and saved stickers as layers; move, pinch-resize, rotate; remove backgrounds on-device; change canvas aspect and background; export JPEG/PNG to `Pictures/Kadar`.
-- **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time, an eye and a lock at its left, and long-press-drag to reorder. Pinch the timeline to zoom, slide two fingers to scroll (view-only, `TimelineViewport`); one finger always edits or scrubs. Video layers (picture-in-picture) put more clips on top, placed like stickers, with their own track and volume; export H.264/AAC MP4 to `Movies/Kadar`.
+- **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time, an eye and a lock at its left, and long-press-drag to reorder. Pinch the timeline to zoom, slide two fingers to scroll (view-only, `TimelineViewport`); one finger always edits or scrubs. Video layers (picture-in-picture) put more clips on top, placed like stickers, with their own track, opacity, volume and in-point (`clipStartMs`, the Edit panel `ui/editor/VideoLayerPanel.kt`); export H.264/AAC MP4 to `Movies/Kadar`.
 - **In/out animations** (`model/Animation.kt`, `ui/editor/AnimationPanel.kt`): video text and sticker layers get an entrance and an exit (None, Fade, Pop, Slide up), 300 ms each, at most half the layer's time. `motionAt` turns a layer and an output time into alpha, scale and offset, and `Canvas.drawLayer(layer, motion, canvasHeight)` applies it around `drawLayer`; the stage uses it with the player position (every frame while playing), the export's `timedOverlay` with each frame's timestamp.
 - **Undo / redo** for every edit (gestures and timeline drags count once per drag).
 - **Snapping** to the canvas center and 0°/90°, caption boxes behind text, a Layers panel (photos only, top-bar button; video shows layers as timeline tracks), keep-pitch for speed changes.
@@ -57,7 +57,7 @@ app/src/main/java/com/ndelic/kadar/
     Media.kt               Bitmap decode/download, emoji render, video info and frames, gallery export, ML Kit cut-out
   video/
     VideoEdit.kt           VideoClip / Music, VideoClip.composition() (preview + export), exportVideo()
-    VideoOverlay.kt        Pure math for video layers: Transform to compositor coordinates, when a layer plays
+    VideoOverlay.kt        Pure math for video layers: Transform to compositor coordinates, when a layer plays, alpha, frame rate
   ui/common/
     Theme.kt               Ink palette, fonts, shared components (IconTool, CircleButton, KSlider, ColorRow, TextTabs,
                            KToggle, KDialog, KTextField, PanelLabel)
@@ -70,9 +70,10 @@ app/src/main/java/com/ndelic/kadar/
     EditorScreen.kt        Top bar, Stage (canvas, gestures, handles, view zoom, video preview), tool row, TextEntry
     Timeline.kt            NLE timeline (layer tracks + clip) and TrimStrip
     TimelineMath.kt        TimelineViewport (zoom/scroll: time to x, pinch, follow the playhead), ruler steps, filmstrip frames
-    Panels.kt              Tool panels: stickers, canvas, speed, audio, font, style, adjust, layers, volume
+    Panels.kt              Tool panels: stickers, canvas, speed, audio, font, style, adjust, layers
     FiltersPanel.kt        Look tiles and strength slider
     AnimationPanel.kt      In and Out animation choices for a video text/sticker layer
+    VideoLayerPanel.kt     Opacity, sound and "Starts at" (in-point) of the selected video layer
     ImageTools.kt          EraseScreen (erase/restore brush), CropScreen, ToolTopBar for full-screen tools
     DrawScreen.kt          Freehand drawing pad (marker / highlighter) that makes or extends a DrawLayer
   ui/web/
@@ -122,7 +123,7 @@ emulator -avd pixel_7_api35   # reference emulator (Google Play image, needed fo
 5. **Nothing goes to the gallery except an export.** Web downloads, cut-outs and stickers stay in app storage. Exports go to `Pictures/Kadar` or `Movies/Kadar` through `saveToGallery` (no storage permission needed).
 6. **Offline first.** No analytics, no accounts, no cloud APIs. The browser is the only feature that needs internet; don't add features that silently require it.
 7. **Treat web input as untrusted.** `downloadImage` accepts only `http(s)` and base64 `data:` URLs, caps the size, and must fail with a message, not a crash.
-8. **The preview is the export.** Video settings change `VideoClip`; `VideoClip.composition()` builds both the `CompositionPlayer` preview and the Transformer export. Add new video features there, not in only one of them. Video layers are sequences before the clip (the compositor draws sequence 0 on top and takes its frame times), padded with gaps to the clip's length; gap frames are hidden by alpha. They always sit under text and stickers (the bitmap overlay comes after compositing). The preview needs `MultipleInputVideoGraph`, so the player is rebuilt when a project gets its first video layer.
+8. **The preview is the export.** Video settings change `VideoClip`; `VideoClip.composition()` builds both the `CompositionPlayer` preview and the Transformer export. Add new video features there, not in only one of them. Media3's `DefaultVideoCompositor` takes every output frame time from its primary input (sequence 0) and always draws it on top, so with video layers sequence 0 is `frameClock()`, a blank still at the clip's frame rate (`VideoClip.frameRate`) drawn at alpha 0; then the video layers (topmost first), padded with gaps to the clip's length, gap frames hidden by alpha; then the clip. They always sit under text and stickers (the bitmap overlay comes after compositing). The preview needs `MultipleInputVideoGraph`, so the player is rebuilt when a project gets its first video layer.
 9. **Layer times are output time** (after trim and speed), the same clock as `CompositionPlayer.currentPosition`. `endMs = Long.MAX_VALUE` means "to the end". The stage shows only layers visible at the playhead (plus the selected one); the export uses `timedOverlay`, which sits on the composition (not the clip) so it sees output timestamps. `timedOverlay` caches one bitmap per stretch where nothing changes and draws only animated stretches per frame (one reused bitmap, from layer copies, since that runs on the GL thread); never cache per-frame bitmaps.
 10. **Every edit is undoable.** Change the project only through `updateProject`/`updateLayer`; continuous gestures pass `record = first` so one drag is one undo step.
 11. **Long tasks go through `EditorViewModel.work`.** It shows the busy overlay, runs one task at a time, and turns exceptions into a snackbar. Transformer must be called on the main thread.

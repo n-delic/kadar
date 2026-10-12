@@ -73,6 +73,8 @@ data class VideoClip(
     /** Output aspect ratio (width / height), or null to keep the video's own; the rest is black. */
     val canvas: Float? = null,
     val adjust: Adjust = Adjust(),
+    /** The video's average frames per second, 0 when unknown. */
+    val frameRate: Float = 0f,
 ) {
     val outputDurationMs get() = ((endMs - startMs) / speed).toLong()
 
@@ -110,10 +112,13 @@ fun VideoClip.composition(
         .setSpeed(ConstantSpeed(speed))
         .setEffects(Effects(listOfNotNull(gain(volume), pitchFix(speed).takeIf { keepPitch && speed != 1f }), videoEffects()))
         .build()
-    // The compositor draws sequence 0 on top and takes its frame times, so overlays come first (topmost layer first),
-    // each padded with gaps to the clip's full length, and the clip last.
-    val overlays = videos.asReversed().filter { !it.hidden }.mapNotNull { v -> overlaySpan(v.startMs, v.endMs, v.durationMs, outputDurationMs)?.let { v to it } }
-    val sequences = overlays.map { (v, span) -> v.sequence(span, outputDurationMs) }.toMutableList()
+    // Media3's compositor takes every output frame time from sequence 0 and draws it on top, then the others in order.
+    // So sequence 0 is an invisible frame clock at the clip's rate, then the overlays (topmost layer first), each padded
+    // with gaps to the clip's full length, and the clip last.
+    val overlays = videos.asReversed().filter { !it.hidden }.mapNotNull { v -> overlaySpan(v.startMs, v.endMs, v.playableMs, outputDurationMs)?.let { v to it } }
+    val sequences = mutableListOf<EditedMediaItemSequence>()
+    if (overlays.isNotEmpty()) sequences += frameClock()
+    sequences += overlays.map { (v, span) -> v.sequence(span, outputDurationMs) }
     sequences += EditedMediaItemSequence.Builder(video).build()
     music?.let { m ->
         val track = EditedMediaItem.Builder(clipped(m.uri, m.startMs, C.TIME_END_OF_SOURCE))
@@ -141,10 +146,23 @@ fun VideoClip.composition(
         .build()
 }
 
-/** One overlay's sequence: a gap until it starts, its clip from the beginning, then a gap to [totalMs]. */
+/**
+ * Sequence 0 when there are video layers: a blank still repeated at the clip's frame rate, which the compositor hides
+ * (alpha 0). It makes the output frame times steady and the clip's own, whatever the overlays' frame rates.
+ */
+private fun VideoClip.frameClock(): EditedMediaItemSequence {
+    val still = MediaItem.Builder().setUri(BLANK_PNG).setMimeType(MimeTypes.IMAGE_PNG).setImageDurationMs(outputDurationMs).build()
+    val item = EditedMediaItem.Builder(still).setDurationUs(outputDurationMs * 1000).setFrameRate(outputFrameRate(frameRate)).build()
+    return EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItem(item).build()
+}
+
+/** A transparent 2×2 PNG. */
+private const val BLANK_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAC0lEQVR4nGNgQAcAABIAAXfx+gAAAAAASUVORK5CYII="
+
+/** One overlay's sequence: a gap until it starts, its clip from [VideoLayer.clipStartMs], then a gap to [totalMs]. */
 private fun VideoLayer.sequence(span: Pair<Long, Long>, totalMs: Long): EditedMediaItemSequence {
     val (start, end) = span
-    val clip = EditedMediaItem.Builder(clipped(uri, 0, end - start))
+    val clip = EditedMediaItem.Builder(clipped(uri, clipStartMs, clipStartMs + end - start))
         .setDurationUs(durationMs * 1000)
         .setRemoveAudio(volume == 0f)
         // Presented at the layer's own size, so the compositor's scale is the layer's scale.
@@ -158,20 +176,24 @@ private fun VideoLayer.sequence(span: Pair<Long, Long>, totalMs: Long): EditedMe
         .build()
 }
 
-/** Places overlay `i` (sequence `i`) by its layer; the clip after them keeps the default full-frame settings. */
+/**
+ * Hides the frame clock (sequence 0) and places overlay `i` (sequence `i + 1`) by its layer; the clip after them keeps
+ * the default full-frame settings.
+ */
 private fun VideoClip.overlaySettings(overlays: List<Pair<VideoLayer, Pair<Long, Long>>>, placed: (VideoLayer) -> Transform) =
     object : VideoCompositorSettings {
         override fun getOutputSize(inputSizes: List<Size>) = Size(outputSize.first, outputSize.second)
 
         override fun getOverlaySettings(inputId: Int, presentationTimeUs: Long): OverlaySettings {
-            val (layer, span) = overlays.getOrNull(inputId) ?: return StaticOverlaySettings.Builder().build()
+            if (inputId == 0) return StaticOverlaySettings.Builder().setAlphaScale(0f).build()
+            val (layer, span) = overlays.getOrNull(inputId - 1) ?: return StaticOverlaySettings.Builder().build()
             val p = overlayPlacement(placed(layer), outputSize.first, outputSize.second)
             return StaticOverlaySettings.Builder()
                 .setBackgroundFrameAnchor(p.x, p.y)
                 .setScale(p.scale, p.scale)
                 .setRotationDegrees(p.rotation)
                 // Gaps are filled with small black frames; only the clip's own frames may show.
-                .setAlphaScale(if (presentationTimeUs in span.first * 1000 until span.second * 1000) 1f else 0f)
+                .setAlphaScale(overlayAlpha(layer.opacity, span, presentationTimeUs))
                 .build()
         }
     }

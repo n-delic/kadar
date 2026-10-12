@@ -167,6 +167,8 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
                 locked = j.optBoolean("locked"),
                 startMs = start,
                 endMs = end,
+                opacity = j.optDouble("opacity", 1.0).toFloat(),
+                clipStartMs = j.optLong("clipStartMs"),
             )
             // Versions before drawings skip this type too.
             "draw" -> DrawLayer(
@@ -196,6 +198,7 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
         speed = j.getDouble("speed").toFloat(),
         volume = j.getDouble("volume").toFloat(),
         keepPitch = j.optBoolean("keepPitch", true),
+        frameRate = j.optDouble("frameRate", 0.0).toFloat(),
         width = j.optInt("videoWidth", projectWidth),
         height = j.optInt("videoHeight", projectHeight),
         canvas = if (j.has("canvas")) j.getDouble("canvas").toFloat() else null,
@@ -265,6 +268,8 @@ private fun Layer.toJson() = JSONObject().apply {
             put("videoWidth", layer.videoWidth)
             put("videoHeight", layer.videoHeight)
             put("volume", layer.volume.toDouble())
+            put("opacity", layer.opacity.toDouble())
+            put("clipStartMs", layer.clipStartMs)
         }
         is DrawLayer -> {
             put("type", "draw")
@@ -288,6 +293,7 @@ private fun VideoClip.toJson() = JSONObject().apply {
     put("speed", speed.toDouble())
     put("volume", volume.toDouble())
     put("keepPitch", keepPitch)
+    put("frameRate", frameRate.toDouble())
     put("videoWidth", width)
     put("videoHeight", height)
     canvas?.let { put("canvas", it.toDouble()) }

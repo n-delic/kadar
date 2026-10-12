@@ -93,6 +93,8 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
         // Absent in projects saved before layers had timing: they show for the whole video.
         val start = j.optLong("startMs", 0)
         val end = j.optLong("endMs", Long.MAX_VALUE)
+        val animIn = enumOr(j.optString("animIn"), Anim.None)
+        val animOut = enumOr(j.optString("animOut"), Anim.None)
         return when (j.getString("type")) {
             "image" -> {
                 val file = j.getString("file")
@@ -108,6 +110,8 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
                         locked = j.optBoolean("locked"),
                         startMs = start,
                         endMs = end,
+                        animIn = animIn,
+                        animOut = animOut,
                     )
                 }
             }
@@ -127,6 +131,8 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
                 locked = j.optBoolean("locked"),
                 startMs = start,
                 endMs = end,
+                animIn = animIn,
+                animOut = animOut,
             )
             // Versions before video layers skip this type (the `else` below) rather than fail the whole project.
             "video" -> VideoLayer(
@@ -190,6 +196,8 @@ private fun Layer.toJson() = JSONObject().apply {
     put("endMs", endMs)
     put("hidden", hidden)
     put("locked", locked)
+    if (animIn != Anim.None) put("animIn", animIn.name)
+    if (animOut != Anim.None) put("animOut", animOut.name)
     when (val layer = this@toJson) {
         is ImageLayer -> {
             put("type", "image")

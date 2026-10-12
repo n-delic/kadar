@@ -51,6 +51,7 @@
 ## Done for the next release
 
 - Video over video: add more clips as layers on top of the main one, picture-in-picture style. Move, pinch-resize and rotate them on the stage, set when they show on their own timeline track, give them their own volume (muted by default), and export them with the main clip
+- In/out animations for text and stickers in videos: None, Fade, Pop or Slide up, for the entrance and the exit separately (Animate tool); the preview plays them and the export matches
 
 ## Next
 

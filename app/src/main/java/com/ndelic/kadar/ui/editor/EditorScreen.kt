@@ -65,6 +65,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -107,6 +108,7 @@ import com.ndelic.kadar.EditorViewModel
 import com.ndelic.kadar.R
 import com.ndelic.kadar.Sticker
 import com.ndelic.kadar.model.Adjust
+import com.ndelic.kadar.model.Anim
 import com.ndelic.kadar.model.Font
 import com.ndelic.kadar.model.ImageLayer
 import com.ndelic.kadar.model.Layer
@@ -115,6 +117,7 @@ import com.ndelic.kadar.model.TextLayer
 import com.ndelic.kadar.model.Transform
 import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.model.drawLayer
+import com.ndelic.kadar.model.motionAt
 import com.ndelic.kadar.ui.common.CircleButton
 import com.ndelic.kadar.ui.common.ColorRow
 import com.ndelic.kadar.ui.common.IconTool
@@ -129,7 +132,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Font, Color, Stroke, Box, Style, Adjust, Filters, Layers, Volume }
+enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Font, Color, Stroke, Box, Style, Adjust, Filters, Layers, Volume, Animate }
 
 @Composable
 fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
@@ -260,6 +263,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     Panel.VideoCanvas -> video?.let { VideoCanvasPanel(project, it, state.settings.exportSize, vm) }
                     Panel.Style -> (selected as? TextLayer)?.let { TextStylePanel(it, vm) }
                     Panel.Volume -> (selected as? VideoLayer)?.let { VideoVolumePanel(it, vm) }
+                    Panel.Animate -> selected?.let { AnimationPanel(it, vm) }
                     Panel.Adjust -> when (val l = selected) {
                         is ImageLayer -> AdjustPanel(l.adjust) { a -> vm.editImage { copy(adjust = a) } }
                         null -> video?.let { v -> AdjustPanel(v.adjust) { a -> vm.updateClip { copy(adjust = a) } } }
@@ -315,6 +319,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_border_color, "Stroke", panel == Panel.Stroke) { toggle(Panel.Stroke) }
                         IconTool(R.drawable.ic_rectangle, "Box", panel == Panel.Box) { toggle(Panel.Box) }
                         IconTool(R.drawable.ic_text_fields, "Style", panel == Panel.Style) { toggle(Panel.Style) }
+                        if (video != null) IconTool(R.drawable.ic_animation, "Animate", panel == Panel.Animate) { toggle(Panel.Animate) }
                         IconTool(R.drawable.ic_content_copy, "Duplicate", onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, "Back", onClick = vm::sendToBack)
@@ -339,6 +344,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_crop, "Crop") { cropping = state.selected as? ImageLayer }
                         IconTool(R.drawable.ic_tune, "Adjust", panel == Panel.Adjust) { toggle(Panel.Adjust) }
                         IconTool(R.drawable.ic_filter_vintage, "Filters", panel == Panel.Filters) { toggle(Panel.Filters) }
+                        if (video != null) IconTool(R.drawable.ic_animation, "Animate", panel == Panel.Animate) { toggle(Panel.Animate) }
                         IconTool(R.drawable.ic_library_add, "Save sticker", onClick = vm::saveSticker)
                         IconTool(R.drawable.ic_content_copy, "Duplicate", onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
@@ -473,6 +479,18 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
         val size = with(density) { DpSize((project.width * scale).toDp(), (project.height * scale).toDp()) }
         val handleRadius = with(density) { 24.dp.toPx() }
         val layers by rememberUpdatedState(shown)
+        // Entrances and exits follow the player on every frame while it plays; [timeMs] only updates every 50 ms.
+        val videoEnd = project.video?.outputDurationMs
+        val animated = player != null && videoEnd != null && project.layers.any { it.animIn != Anim.None || it.animOut != Anim.None }
+        val clock = remember { mutableLongStateOf(0L) }
+        if (animated && player != null) {
+            LaunchedEffect(player) {
+                while (true) {
+                    clock.longValue = player.currentPosition
+                    if (player.isPlaying) withFrameMillis {} else delay(50)
+                }
+            }
+        }
         val current by rememberUpdatedState(selected)
         val editText by rememberUpdatedState(onEditText)
         val lastTap = remember { longArrayOf(-1, 0) } // layer id, time
@@ -627,7 +645,7 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                         val c = canvas.nativeCanvas
                         c.save()
                         c.scale(scale, scale)
-                        shown.forEach { c.drawLayer(it) }
+                        shown.forEach { if (animated && videoEnd != null) c.drawLayer(it, it.motionAt(clock.longValue, minOf(it.endMs, videoEnd)), project.height) else c.drawLayer(it) }
                         selected?.let { c.drawSelection(it, scale) }
                         if (snaps.x) c.drawLine(cx, 0f, cx, project.height.toFloat(), guidePaint.also { it.strokeWidth = 2 / scale })
                         if (snaps.y) c.drawLine(0f, cy, project.width.toFloat(), cy, guidePaint.also { it.strokeWidth = 2 / scale })

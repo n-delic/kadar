@@ -11,7 +11,7 @@ The owner's phone is a Galaxy S25; it also runs on older phones, hence `minSdk 2
 ## What it does today
 
 - **Photo**: open a photo, blank canvas, or web image; add text (meme outline style), emoji, images and saved stickers as layers; move, pinch-resize, rotate; remove backgrounds on-device; change canvas aspect and background; export JPEG/PNG to `Pictures/Kadar`.
-- **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time; export H.264/AAC MP4 to `Movies/Kadar`.
+- **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time, an eye and a lock at its left, and long-press-drag to reorder; export H.264/AAC MP4 to `Movies/Kadar`.
 - **Undo / redo** for every edit (gestures and timeline drags count once per drag).
 - **Snapping** to the canvas center and 0°/90°, caption boxes behind text, a Layers panel (photos only, top-bar button; video shows layers as timeline tracks), keep-pitch for speed changes.
 - **Filters** (`Looks.kt`, `ui/FiltersPanel.kt`): in-house looks as 4x5 color matrices, blended by a strength and stored on `Adjust` (`look`, `amount`). `Adjust.filterMatrix()` (look, then the sliders) is the one matrix for the image layer paint and, through `glRgbMatrix`, the video's Media3 `RgbMatrix`, so photos and video match.
@@ -50,7 +50,8 @@ app/src/main/java/com/ndelic/kadar/
   ui/Theme.kt         Ink palette, fonts, shared components (IconTool, CircleButton, KSlider, ColorRow, TextTabs, KDialog)
   ui/HomeScreen.kt    Create tiles (video / photo / blank / web), project grid
   ui/EditorScreen.kt  Top bar (close, undo/redo, save, share), Stage (canvas, handles, video preview), tool row,
-                      NLE Timeline (layer tracks + clip), TrimStrip, full-screen TextEntry
+                      full-screen TextEntry
+  ui/Timeline.kt      NLE Timeline (layer tracks + clip) and TrimStrip
   ui/Panels.kt        Tool panels: stickers, canvas, speed, audio, font, adjust
   ui/FiltersPanel.kt  Look tiles previewed on the image or a video frame, plus the strength slider
   ui/WebImportScreen.kt  WebView browser with long-press-to-import
@@ -60,6 +61,7 @@ app/src/main/res/font/jakarta.ttf        UI font, Plus Jakarta Sans variable (SI
 scripts/add-icons.sh                     Fetches Material Symbols as vector drawables
 app/src/test/.../LayersTest.kt           JVM tests for transform math, transparent-border trimming, timeline segments
 app/src/test/.../LooksTest.kt            JVM tests for look/adjust matrix composition and the Media3 matrix conversion
+app/src/test/.../TimelineTest.kt         JVM tests for track reorder math
 ```
 
 ## Commands

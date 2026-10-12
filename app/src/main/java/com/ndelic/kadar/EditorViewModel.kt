@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
+import android.media.MediaRecorder
 import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.annotation.StringRes
@@ -22,6 +23,7 @@ import com.ndelic.kadar.media.mediaInfo
 import com.ndelic.kadar.media.renderEmoji
 import com.ndelic.kadar.media.saveToGallery
 import com.ndelic.kadar.media.scaleDown
+import com.ndelic.kadar.media.startVoiceRecording
 import com.ndelic.kadar.media.trimTransparent
 import com.ndelic.kadar.media.videoFrame
 import com.ndelic.kadar.model.AppSettings
@@ -46,6 +48,7 @@ import com.ndelic.kadar.ui.editor.Timeline
 import com.ndelic.kadar.ui.editor.label
 import com.ndelic.kadar.video.Music
 import com.ndelic.kadar.video.VideoClip
+import com.ndelic.kadar.video.VoiceClip
 import com.ndelic.kadar.video.composition
 import com.ndelic.kadar.video.exportVideo
 import com.ndelic.kadar.video.timedOverlay
@@ -87,6 +90,8 @@ data class EditorUiState(
     val canRedo: Boolean = false,
     /** Evenly spaced frames of the video, for the timeline. */
     val filmstrip: List<Bitmap> = emptyList(),
+    /** Output time the running voice recording started at; null when not recording. */
+    val recordingFromMs: Long? = null,
 ) {
     val selected get() = project?.layers?.firstOrNull { it.id == selectedId }
 }
@@ -128,6 +133,8 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     /** Start of a gesture whose first update changed nothing, so its undo step is recorded on its first real change. */
     private var gestureStart: Project? = null
     private val redoStack = ArrayDeque<Project>()
+    /** The running voice recording and its file; here rather than in the UI so it survives rotation. */
+    private var recorder: Pair<MediaRecorder, File>? = null
 
     private val _uiState = MutableStateFlow(EditorUiState(settings = settingsStore.load()))
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
@@ -222,9 +229,10 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** Saves right away (the autosave is debounced) and returns to the project list. */
     fun close() {
-        val s = _uiState.value
-        if (s.busy != null) return
+        if (_uiState.value.busy != null) return
         viewModelScope.launch {
+            finishVoice()
+            val s = _uiState.value
             if (s.projectDir != null && s.project != null) {
                 // If saving fails, stay in the editor: leaving would lose the edits, and cleanUp could delete
                 // images the older project.json on disk still uses.
@@ -521,6 +529,57 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val (info, name) = withContext(Dispatchers.IO) { mediaInfo(app, uri) to displayName(app, uri) }
         if (info.durationMs == 0L) throw UserError(R.string.error_read_audio)
         updateClip { copy(music = Music(uri, name, info.durationMs)) }
+    }
+
+    /** Starts recording a voiceover that will play from [atMs] (output time). False when the microphone can't be used. */
+    fun startVoice(atMs: Long): Boolean {
+        val dir = _uiState.value.projectDir ?: return false
+        if (recorder != null) return true
+        val file = store.newVoiceFile(dir)
+        try {
+            recorder = startVoiceRecording(app, file) to file
+        } catch (e: Exception) {
+            // IOException, or IllegalStateException/RuntimeException from a microphone another app holds.
+            file.delete()
+            _effects.trySend(EditorEffect.Message(UiText.Res(R.string.error_microphone)))
+            return false
+        }
+        _uiState.update { it.copy(recordingFromMs = atMs) }
+        return true
+    }
+
+    fun stopVoice() {
+        viewModelScope.launch { finishVoice() }
+    }
+
+    /** Stops the recording, if any, and adds it to the clip as one undo step. */
+    private suspend fun finishVoice() {
+        val (r, file) = recorder ?: return
+        recorder = null
+        val start = _uiState.value.recordingFromMs ?: 0
+        _uiState.update { it.copy(recordingFromMs = null) }
+        val stopped = try {
+            r.stop()
+            true
+        } catch (e: RuntimeException) {
+            // stop() throws when no audio arrived yet (stopped right after starting).
+            false
+        } finally {
+            r.release()
+        }
+        val durationMs = if (stopped) withContext(Dispatchers.IO) { runCatching { mediaInfo(app, Uri.fromFile(file)).durationMs }.getOrDefault(0) } else 0
+        // Another project opened meanwhile (a share into Kadar): the file isn't this project's.
+        if (durationMs <= 0 || file.parentFile != _uiState.value.projectDir) {
+            file.delete()
+            _effects.send(EditorEffect.Message(UiText.Res(R.string.error_nothing_recorded)))
+            return
+        }
+        updateClip { copy(voices = voices + VoiceClip(file, start, durationMs)) }
+    }
+
+    override fun onCleared() {
+        // The unfinished file stays unreferenced, so the project's next cleanUp removes it.
+        recorder?.first?.release()
     }
 
     // Settings

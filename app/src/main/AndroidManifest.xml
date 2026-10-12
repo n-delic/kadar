@@ -3,6 +3,9 @@
 
     <!-- Only the in-app image browser goes online; editing and export are fully offline. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Voiceovers; asked for only when the user taps Record. The recording stays in the project. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <application
         android:icon="@mipmap/ic_launcher"

@@ -270,7 +270,11 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     Panel.Sticker -> StickerPanel(state.stickers, vm)
                     Panel.Canvas -> CanvasPanel(project, state.settings.exportSize, vm)
                     Panel.Speed -> video?.let { SpeedPanel(it, vm) }
-                    Panel.Audio -> video?.let { AudioPanel(it, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }) }
+                    Panel.Audio -> video?.let { v ->
+                        AudioPanel(v, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }) {
+                            VoiceoverSection(v, state.recordingFromMs, positionMs, playing, player, vm, onPlay = { playing = it })
+                        }
+                    }
                     Panel.Font -> (selected as? TextLayer)?.let { FontPanel(it, vm) }
                     Panel.Color -> (selected as? TextLayer)?.let { t -> ColorRow(t.color, allowNone = false) { c -> c?.let { vm.editText { copy(color = it) } } } }
                     Panel.Stroke -> (selected as? TextLayer)?.let { t -> ColorRow(t.outline, allowNone = true) { vm.editText { copy(outline = it) } } }

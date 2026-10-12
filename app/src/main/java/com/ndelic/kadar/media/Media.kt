@@ -7,7 +7,9 @@ import android.graphics.Canvas
 import android.graphics.ImageDecoder
 import android.graphics.Paint
 import android.media.MediaMetadataRetriever
+import android.media.MediaRecorder
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.provider.OpenableColumns
@@ -25,6 +27,7 @@ import com.ndelic.kadar.model.UiText
 import com.ndelic.kadar.model.UserError
 import com.ndelic.kadar.model.opaqueBounds
 import com.ndelic.kadar.video.Music
+import java.io.File
 import java.io.IOException
 import java.io.OutputStream
 import java.net.HttpURLConnection
@@ -155,6 +158,27 @@ fun mediaInfo(context: Context, uri: Uri): MediaInfo = MediaMetadataRetriever().
 fun videoFrame(context: Context, uri: Uri, timeMs: Long): Bitmap? = MediaMetadataRetriever().use { r ->
     r.setDataSource(context, uri)
     r.getScaledFrameAtTime(timeMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 480, 480)
+}
+
+/** Starts recording the microphone into [file] as AAC in an MP4 container; the caller stops and releases the recorder. */
+fun startVoiceRecording(context: Context, file: File): MediaRecorder {
+    val recorder = if (Build.VERSION.SDK_INT >= 31) MediaRecorder(context) else @Suppress("DEPRECATION") MediaRecorder()
+    try {
+        recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+        recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+        recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+        recorder.setAudioChannels(1)
+        recorder.setAudioSamplingRate(44_100)
+        recorder.setAudioEncodingBitRate(128_000)
+        recorder.setOutputFile(file)
+        recorder.prepare()
+        recorder.start()
+    } catch (e: Exception) {
+        // A busy or missing microphone fails here; don't leak the recorder.
+        recorder.release()
+        throw e
+    }
+    return recorder
 }
 
 fun displayName(context: Context, uri: Uri): String =

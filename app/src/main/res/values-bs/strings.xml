@@ -131,6 +131,14 @@
     <string name="music">Muzika</string>
     <string name="music_add">Dodaj muziku</string>
     <string name="music_remove">Ukloni muziku</string>
+    <string name="music_fade_in">Pojačavanje</string>
+    <string name="music_fade_out">Stišavanje</string>
+    <string name="voiceover">Glas</string>
+    <string name="voice_record">Snimaj od %1$s</string>
+    <string name="voice_recording">Snimam %1$s · dodirni za stop</string>
+    <string name="voice_hint">Video ide bez zvuka dok snimaš, da se ne snimi i zvučnik. Pauziraj za kraj.</string>
+    <string name="voice_permission_denied">Kadar treba mikrofon za snimanje glasa. Dozvoli ga u Postavkama telefona: Aplikacije, Kadar, Dozvole.</string>
+    <string name="voice_remove">Obriši snimak</string>
     <string name="anim_in">Ulaz</string>
     <string name="anim_out">Izlaz</string>
     <string name="anim_none">Bez</string>
@@ -197,6 +205,8 @@
     <string name="error_sticker_damaged">Ovaj stiker je oštećen</string>
     <string name="error_no_subject">Nije pronađen nijedan objekat</string>
     <string name="error_nothing_to_save">Nema šta spremiti</string>
+    <string name="error_microphone">Mikrofon trenutno nije dostupan</string>
+    <string name="error_nothing_recorded">Ništa nije snimljeno</string>
     <string name="error_download_http">Preuzimanje nije uspjelo (HTTP %1$d)</string>
     <string name="error_image_too_large">Slika je prevelika</string>
     <string name="error_cant_download">Ova slika se ne može preuzeti</string>

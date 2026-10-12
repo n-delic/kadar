@@ -66,6 +66,11 @@
 - Settings: image search engine (Google, DuckDuckGo, Bing, Brave) and default export size, with a per-project override; About with the license texts
 - Home: launch animation, logo, project multi-select (duplicate, delete), PHOTO / VIDEO badges; pinch to zoom the photo canvas, tap around it to deselect
 
+## Done for the next release
+
+- Voiceover: in the Audio panel, record your voice from the playhead while the video plays (muted, so the speaker isn't recorded); recordings stay in the project, each with its own volume and a delete button; the preview plays them and the export mixes them in. The microphone permission is asked for only on the first Record
+- Music fade in and fade out (1.5 s at the start and before the end of the video), also when the song loops
+
 ## Next
 
 - [ ] Video layers: crop, and a way to put them above text and stickers

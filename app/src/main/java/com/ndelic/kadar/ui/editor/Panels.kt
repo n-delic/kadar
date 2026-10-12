@@ -25,7 +25,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -274,8 +276,9 @@ fun SmallIcon(icon: Int, description: String, onClick: () -> Unit) {
 }
 
 @Composable
-fun AudioPanel(clip: VideoClip, vm: EditorViewModel, onAddMusic: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+fun AudioPanel(clip: VideoClip, vm: EditorViewModel, onAddMusic: () -> Unit, voiceover: @Composable () -> Unit) {
+    // Scrolls once a few recordings are listed, so the stage keeps its room.
+    Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         PanelLabel(stringResource(R.string.video_sound))
         KSlider(R.drawable.ic_volume_up, clip.volume, 0f..1f, ::percent) { v -> vm.updateClip { copy(volume = v) } }
         PanelLabel(stringResource(R.string.music))
@@ -303,7 +306,16 @@ fun AudioPanel(clip: VideoClip, vm: EditorViewModel, onAddMusic: () -> Unit) {
             KSlider(R.drawable.ic_play_arrow, music.startMs.toFloat(), 0f..maxOf(0f, music.durationMs - 1000f), { formatMs(it.toLong()) }) { v ->
                 vm.updateClip { copy(music = music.copy(startMs = v.toLong())) }
             }
+            Row {
+                Box(Modifier.weight(1f)) {
+                    KToggle(stringResource(R.string.music_fade_in), null, music.fadeIn) { on -> vm.updateClip { copy(music = music.copy(fadeIn = on)) } }
+                }
+                Box(Modifier.weight(1f)) {
+                    KToggle(stringResource(R.string.music_fade_out), null, music.fadeOut) { on -> vm.updateClip { copy(music = music.copy(fadeOut = on)) } }
+                }
+            }
         }
+        voiceover()
     }
 }
 

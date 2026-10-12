@@ -7,7 +7,7 @@
     <application
         android:icon="@mipmap/ic_launcher"
         android:label="Kadar"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:theme="@style/Theme.Kadar">
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -19,7 +19,7 @@ data class Project(
     val video: VideoClip? = null,
 )
 
-data class SavedProject(val dir: File, val modified: Long, val thumb: Bitmap?)
+data class SavedProject(val dir: File, val modified: Long, val thumb: Bitmap?, val isVideo: Boolean)
 
 /**
  * One folder per project under [root]: `project.json`, a thumbnail, and every image the project uses
@@ -33,7 +33,9 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
     fun list(): List<SavedProject> = root.listFiles().orEmpty()
         .mapNotNull { dir ->
             val json = File(dir, PROJECT)
-            if (!json.exists()) null else SavedProject(dir, json.lastModified(), BitmapFactory.decodeFile(File(dir, THUMB).path))
+            if (!json.exists()) return@mapNotNull null
+            val isVideo = runCatching { JSONObject(json.readText()).has("video") }.getOrDefault(false)
+            SavedProject(dir, json.lastModified(), BitmapFactory.decodeFile(File(dir, THUMB).path), isVideo)
         }
         .sortedByDescending { it.modified }
 
@@ -66,11 +68,14 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
     private fun layerFromJson(dir: File, j: JSONObject): Layer? {
         val t = Transform(j.getDouble("x").toFloat(), j.getDouble("y").toFloat(), j.getDouble("scale").toFloat(), j.getDouble("rotation").toFloat())
         val id = j.getLong("id")
+        // Absent in projects saved before layers had timing: they show for the whole video.
+        val start = j.optLong("startMs", 0)
+        val end = j.optLong("endMs", Long.MAX_VALUE)
         return when (j.getString("type")) {
             "image" -> {
                 val file = j.getString("file")
                 // A missing image drops that one layer rather than the whole project.
-                BitmapFactory.decodeFile(File(dir, file).path)?.let { ImageLayer(id, t, it, file) }
+                BitmapFactory.decodeFile(File(dir, file).path)?.let { ImageLayer(id, t, it, file, start, end) }
             }
             "text" -> TextLayer(
                 id = id,
@@ -80,6 +85,8 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
                 size = j.getDouble("size").toFloat(),
                 color = j.getInt("color"),
                 outline = if (j.has("outline")) j.getInt("outline") else null,
+                startMs = start,
+                endMs = end,
             )
             else -> null
         }
@@ -119,6 +126,8 @@ private fun Layer.toJson() = JSONObject().apply {
     put("y", t.y.toDouble())
     put("scale", t.scale.toDouble())
     put("rotation", t.rotation.toDouble())
+    put("startMs", startMs)
+    put("endMs", endMs)
     when (val layer = this@toJson) {
         is ImageLayer -> {
             put("type", "image")

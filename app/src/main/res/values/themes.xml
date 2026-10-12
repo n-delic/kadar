@@ -1,0 +1,6 @@
+<resources>
+    <!-- Dark window from the first frame, so launch never flashes white. -->
+    <style name="Theme.Kadar" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/ink</item>
+    </style>
+</resources>

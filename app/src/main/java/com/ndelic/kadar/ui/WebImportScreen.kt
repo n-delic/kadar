@@ -4,22 +4,21 @@ import android.annotation.SuppressLint
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,9 +27,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.ndelic.kadar.R
 import java.net.URLEncoder
 
 /** A plain browser: search or open any page, long-press an image to download it into the project (never the gallery). */
@@ -43,23 +47,37 @@ fun WebImportScreen(onPick: (String) -> Unit, onClose: () -> Unit) {
 
     BackHandler { webView?.takeIf { it.canGoBack() }?.goBack() ?: onClose() }
 
-    Column(Modifier.fillMaxSize()) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
-            IconButton(onClick = onClose) { Icon(Icons.Default.Close, contentDescription = "Close") }
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = { Text("Search images or paste a link") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { if (query.isNotBlank()) webView?.loadUrl(searchUrl(query)) }),
-                modifier = Modifier.weight(1f),
-            )
+    Column(Modifier.fillMaxSize().background(Ink.bg)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
+            CircleButton(R.drawable.ic_close, "Close", onClick = onClose)
+            Spacer(Modifier.width(10.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(22.dp)).background(Ink.raised).padding(horizontal = 14.dp),
+            ) {
+                KIcon(R.drawable.ic_search, Modifier.size(20.dp), Ink.dim)
+                Spacer(Modifier.width(10.dp))
+                BasicTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    textStyle = TextStyle(color = Ink.text, fontSize = 15.sp),
+                    cursorBrush = SolidColor(Ink.accent),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { if (query.isNotBlank()) webView?.loadUrl(searchUrl(query)) }),
+                    modifier = Modifier.weight(1f),
+                    decorationBox = { field ->
+                        if (query.isEmpty()) Text("Search images or paste a link", color = Ink.dim, fontSize = 15.sp)
+                        field()
+                    },
+                )
+            }
         }
         Text(
             "Tap a result to open it full size, then long-press it to add",
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            color = Ink.dim,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
         )
         AndroidView(
             factory = { context ->
@@ -83,17 +101,15 @@ fun WebImportScreen(onPick: (String) -> Unit, onClose: () -> Unit) {
     }
 
     picked?.let { url ->
-        AlertDialog(
-            onDismissRequest = { picked = null },
-            title = { Text("Add this image?") },
-            text = { Text("It's saved inside the project only, not in your gallery.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    picked = null
-                    onPick(url)
-                }) { Text("Add") }
+        KDialog(
+            title = "Add this image?",
+            text = "It's saved inside the project only, not in your gallery.",
+            confirm = "Add",
+            onConfirm = {
+                picked = null
+                onPick(url)
             },
-            dismissButton = { TextButton(onClick = { picked = null }) { Text("Cancel") } },
+            onDismiss = { picked = null },
         )
     }
 }

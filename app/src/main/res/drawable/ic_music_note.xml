@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material Symbols Rounded "music_note", weight 300 (Apache 2.0). Added by scripts/add-icons.sh. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <group android:translateY="960">
+        <path android:fillColor="#FFFFFFFF" android:pathData="M401.15-143.85q-57.75 0-98.87-41.12-41.12-41.13-41.12-98.88 0-57.75 41.12-98.87 41.12-41.12 98.87-41.12 23 0 43.08 6.84 20.08 6.85 36.92 20.54V-780q0-15.36 10.44-25.76 10.44-10.39 25.88-10.39h145.25q15.43 0 25.78 10.39 10.34 10.4 10.34 25.76v58.46q0 15.37-10.39 25.76-10.39 10.39-25.76 10.39H541.15v401.54q0 57.75-41.12 98.88-41.13 41.12-98.88 41.12Z" />
+    </group>
+</vector>

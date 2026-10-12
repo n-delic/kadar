@@ -1,0 +1,235 @@
+package com.ndelic.kadar.ui
+
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.Typography
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.text.font.FontWeight
+import com.ndelic.kadar.R
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+/** Kadar's palette: a near-black editor like PicsArt and InShot, one accent. */
+object Ink {
+    val bg = Color(0xFF111113)
+    val panel = Color(0xFF1C1C1F)
+    val raised = Color(0xFF2A2A2E)
+    val line = Color(0xFF3A3A40)
+    val text = Color(0xFFFFFFFF)
+    val dim = Color(0xFF9A9AA2)
+    val accent = Color(0xFFB04CFF)
+}
+
+/** Swatches for text, outline and background, roughly PicsArt's order. */
+val SWATCHES = listOf(
+    0xFFFFFFFF, 0xFF000000, 0xFF9E9E9E, 0xFF424242, 0xFFFFCDD2, 0xFFFF8A80, 0xFFFF5252, 0xFFFF1744,
+    0xFFD50000, 0xFFFF9100, 0xFFFFEA00, 0xFF00E676, 0xFF1DE9B6, 0xFF00B0FF, 0xFF2979FF, 0xFF3D5AFE,
+    0xFFD500F9, 0xFFF50057, 0xFF8D6E63,
+).map { it.toInt() }
+
+@OptIn(ExperimentalTextApi::class)
+private fun jakarta(weight: Int) = Font(R.font.jakarta, FontWeight(weight), variationSettings = FontVariation.Settings(FontVariation.weight(weight)))
+
+/** Plus Jakarta Sans (variable, OFL) for all UI text; layer text keeps its own fonts. */
+val UiFont = FontFamily(listOf(400, 500, 600, 700, 800).map(::jakarta))
+
+private val KadarType = Typography().run {
+    fun TextStyle.ui() = copy(fontFamily = UiFont)
+    Typography(
+        displayLarge.ui(), displayMedium.ui(), displaySmall.ui(), headlineLarge.ui(), headlineMedium.ui(), headlineSmall.ui(),
+        titleLarge.ui(), titleMedium.ui(), titleSmall.ui(), bodyLarge.ui(), bodyMedium.ui(), bodySmall.ui(),
+        labelLarge.ui(), labelMedium.ui(), labelSmall.ui(),
+    )
+}
+
+@Composable
+fun KadarTheme(content: @Composable () -> Unit) {
+    MaterialTheme(
+        typography = KadarType,
+        colorScheme = darkColorScheme(
+            primary = Ink.accent,
+            onPrimary = Ink.text,
+            background = Ink.bg,
+            onBackground = Ink.text,
+            surface = Ink.bg,
+            onSurface = Ink.text,
+            surfaceVariant = Ink.raised,
+            onSurfaceVariant = Ink.dim,
+            surfaceContainerHigh = Ink.raised,
+            outline = Ink.line,
+        ),
+        content = content,
+    )
+}
+
+@Composable
+fun KIcon(@DrawableRes icon: Int, modifier: Modifier = Modifier, tint: Color = Ink.text, description: String? = null) {
+    Icon(painterResource(icon), contentDescription = description, tint = tint, modifier = modifier)
+}
+
+/** A bottom-toolbar entry: line icon over a small label. */
+@Composable
+fun IconTool(@DrawableRes icon: Int, label: String, active: Boolean = false, onClick: () -> Unit) {
+    val tint = if (active) Ink.accent else Ink.text
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(68.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+    ) {
+        KIcon(icon, Modifier.size(26.dp), tint)
+        Spacer(Modifier.height(6.dp))
+        Text(label, color = if (active) Ink.accent else Ink.dim, fontSize = 11.sp, maxLines = 1)
+    }
+}
+
+/** Round dark button used in the top bars. */
+@Composable
+fun CircleButton(@DrawableRes icon: Int, description: String, enabled: Boolean = true, onClick: () -> Unit) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(Ink.raised)
+            .clickable(enabled = enabled, onClick = onClick),
+    ) {
+        KIcon(icon, Modifier.size(24.dp), if (enabled) Ink.text else Ink.line, description)
+    }
+}
+
+/** Text-only tabs with a dot under the selected one, as in InShot's text style tabs. */
+@Composable
+fun <T> TextTabs(options: List<T>, selected: T?, label: (T) -> String, onSelect: (T) -> Unit) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        items(options) { o ->
+            val active = o == selected
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onSelect(o) }.padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(label(o), color = if (active) Ink.text else Ink.dim, fontSize = 15.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium)
+                Box(Modifier.padding(top = 4.dp).size(4.dp).clip(CircleShape).background(if (active) Ink.text else Color.Transparent))
+            }
+        }
+    }
+}
+
+/** A row of color dots; [allowNone] adds a crossed-out dot that picks null. */
+@Composable
+fun ColorRow(selected: Int?, allowNone: Boolean, onPick: (Int?) -> Unit) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (allowNone) item { ColorDot(null, selected == null) { onPick(null) } }
+        items(SWATCHES) { c -> ColorDot(c, selected == c) { onPick(c) } }
+    }
+}
+
+@Composable
+private fun ColorDot(color: Int?, active: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(40.dp)
+            .border(2.dp, if (active) Ink.accent else Color.Transparent, CircleShape)
+            .padding(4.dp)
+            .clip(CircleShape)
+            .background(color?.let { Color(it) } ?: Ink.raised)
+            .border(1.dp, Ink.line, CircleShape)
+            .drawBehind {
+                if (color == null) drawLine(Color(0xFFFF5252), Offset(size.width * 0.2f, size.height * 0.8f), Offset(size.width * 0.8f, size.height * 0.2f), 2.dp.toPx())
+            }
+            .clickable(onClick = onClick),
+    )
+}
+
+/** Thin-track slider that reports only when the finger lifts, so the video preview isn't rebuilt on every pixel. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun KSlider(@DrawableRes icon: Int?, value: Float, range: ClosedFloatingPointRange<Float>, valueLabel: (Float) -> String, onCommit: (Float) -> Unit) {
+    var current by remember(value) { mutableFloatStateOf(value) }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        icon?.let { KIcon(it, Modifier.size(22.dp), Ink.dim) }
+        Slider(
+            value = current,
+            onValueChange = { current = it },
+            valueRange = range,
+            onValueChangeFinished = { onCommit(current) },
+            modifier = Modifier.weight(1f),
+            thumb = { Box(Modifier.size(18.dp).clip(CircleShape).background(Ink.text)) },
+            track = { state ->
+                SliderDefaults.Track(
+                    sliderState = state,
+                    modifier = Modifier.height(3.dp),
+                    colors = SliderDefaults.colors(activeTrackColor = Ink.text, inactiveTrackColor = Ink.line),
+                    drawStopIndicator = null,
+                    thumbTrackGapSize = 0.dp,
+                )
+            },
+        )
+        Text(valueLabel(current), color = Ink.dim, fontSize = 12.sp, modifier = Modifier.width(48.dp))
+    }
+}
+
+@Composable
+fun PanelLabel(text: String) {
+    Text(text.uppercase(), color = Ink.dim, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)
+}
+
+@Composable
+fun KDialog(title: String, text: String, confirm: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Ink.raised,
+        title = { Text(title, color = Ink.text) },
+        text = { Text(text, color = Ink.dim) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(confirm, color = Ink.accent, fontWeight = FontWeight.Bold) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = Ink.dim) } },
+    )
+}
+
+/** Makes a full-screen layer swallow touches meant for what's underneath. */
+fun Modifier.blockTouches() = clickable(interactionSource = null, indication = null) {}
+
+fun Modifier.fullWidthPanel() = fillMaxWidth().background(Ink.panel).padding(horizontal = 16.dp, vertical = 12.dp)

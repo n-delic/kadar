@@ -40,13 +40,18 @@ data class EditorUiState(
     /** Label of the running long task; the UI blocks input while it is set. */
     val busy: String? = null,
     val stickers: List<Sticker> = emptyList(),
+    val canUndo: Boolean = false,
+    val canRedo: Boolean = false,
+    /** Evenly spaced frames of the video, for the timeline. */
+    val filmstrip: List<Bitmap> = emptyList(),
 ) {
     val selected get() = project?.layers?.firstOrNull { it.id == selectedId }
 }
 
 sealed interface EditorEffect {
     data class Message(val text: String) : EditorEffect
-    data class Saved(val uri: Uri, val mime: String) : EditorEffect
+    /** [share] opens the share sheet right away instead of offering it. */
+    data class Saved(val uri: Uri, val mime: String, val share: Boolean) : EditorEffect
 }
 
 class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
@@ -63,7 +68,11 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     private val stickerDir = File(app.filesDir, "stickers")
     private val saveLock = Mutex()
     private var videoFrame: Bitmap? = null
+    /** What's on disk for the open project, so just opening one doesn't rewrite it (and bump it to the top). */
+    private var lastSaved: Project? = null
     private var nextId = 1L
+    private val undoStack = ArrayDeque<Project>()
+    private val redoStack = ArrayDeque<Project>()
 
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
@@ -77,7 +86,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             @OptIn(FlowPreview::class)
             uiState.map { it.projectDir to it.project }.distinctUntilChanged().debounce(800).collect { (dir, project) ->
-                if (dir != null && project != null) save(dir, project)
+                if (dir != null && project != null && project != lastSaved) save(dir, project)
             }
         }
     }
@@ -108,7 +117,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val project = withContext(Dispatchers.IO) { store.load(dir) }
         val frame = project.video?.let { v -> withContext(Dispatchers.IO) { runCatching { videoFrame(app, v.uri, v.startMs) }.getOrNull() } }
         if (project.video != null && frame == null) _effects.send(EditorEffect.Message("This project's video is no longer on the phone"))
-        open(dir, project, frame)
+        open(dir, project, frame, saved = true)
     }
 
     fun deleteProject(dir: File) {
@@ -123,22 +132,47 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val s = _uiState.value
         if (s.busy != null) return
         viewModelScope.launch {
-            if (s.projectDir != null && s.project != null) save(s.projectDir, s.project)
+            if (s.projectDir != null && s.project != null && s.project != lastSaved) save(s.projectDir, s.project)
             _uiState.update { it.copy(projectDir = null, project = null, selectedId = null) }
             refreshProjects()
         }
     }
 
-    private fun open(dir: File, project: Project, frame: Bitmap? = null) {
+    private fun open(dir: File, project: Project, frame: Bitmap? = null, saved: Boolean = false) {
         videoFrame = frame
+        lastSaved = if (saved) project else null
         nextId = (project.layers.maxOfOrNull { it.id } ?: 0) + 1
-        _uiState.update { it.copy(projectDir = dir, project = project, selectedId = null) }
+        undoStack.clear()
+        redoStack.clear()
+        _uiState.update { it.copy(projectDir = dir, project = project, selectedId = null, canUndo = false, canRedo = false, filmstrip = emptyList()) }
+        project.video?.let { v ->
+            viewModelScope.launch {
+                val frames = withContext(Dispatchers.IO) {
+                    runCatching { (0 until FILMSTRIP_FRAMES).mapNotNull { videoFrame(app, v.uri, v.durationMs * it / FILMSTRIP_FRAMES) } }.getOrDefault(emptyList())
+                }
+                _uiState.update { if (it.projectDir == dir) it.copy(filmstrip = frames) else it }
+            }
+        }
+    }
+
+    // Undo
+
+    fun undo() = step(from = undoStack, to = redoStack)
+
+    fun redo() = step(from = redoStack, to = undoStack)
+
+    private fun step(from: ArrayDeque<Project>, to: ArrayDeque<Project>) {
+        val current = _uiState.value.project ?: return
+        val target = from.removeLastOrNull() ?: return
+        to.addLast(current)
+        _uiState.update { it.copy(project = target, canUndo = undoStack.isNotEmpty(), canRedo = redoStack.isNotEmpty()) }
     }
 
     private suspend fun save(dir: File, project: Project) {
         val thumb = renderLayers(project.width, project.height, project.background, project.layers, THUMB_SIZE / max(project.width, project.height), videoFrame)
         try {
             saveLock.withLock { withContext(Dispatchers.IO) { store.save(dir, project, thumb) } }
+            lastSaved = project
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -162,9 +196,11 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun select(id: Long?) = _uiState.update { it.copy(selectedId = id) }
 
-    fun addText(text: String) {
+    fun addText(text: String, color: Int) {
         val p = _uiState.value.project ?: return
-        addLayer { TextLayer(it, Transform(p.width / 2f, p.height / 2f), text, fonts.first(), min(p.width, p.height) * 0.1f, Color.WHITE, Color.BLACK) }
+        // Black text gets a white outline so it stays readable; everything else gets the classic black one.
+        val outline = if (color == Color.BLACK) Color.WHITE else Color.BLACK
+        addLayer { TextLayer(it, Transform(p.width / 2f, p.height / 2f), text, fonts.first(), min(p.width, p.height) * 0.1f, color, outline) }
     }
 
     fun addEmoji(emoji: String) {
@@ -195,9 +231,12 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         select(layer.id)
     }
 
-    fun transformSelected(dx: Float, dy: Float, zoom: Float, rotation: Float) = updateSelected {
+    /** Live gesture updates; only the first update of a gesture ([first]) becomes an undo step. */
+    fun transformSelected(dx: Float, dy: Float, zoom: Float, rotation: Float, first: Boolean) = updateSelected(record = first) {
         it.withTransform(it.t.copy(x = it.t.x + dx, y = it.t.y + dy, scale = (it.t.scale * zoom).coerceIn(0.02f, 50f), rotation = it.t.rotation + rotation))
     }
+
+    fun setSelectedTransform(t: Transform, first: Boolean) = updateSelected(record = first) { it.withTransform(t.copy(scale = t.scale.coerceIn(0.02f, 50f))) }
 
     fun editText(change: TextLayer.() -> TextLayer) = updateSelected { if (it is TextLayer) it.change() else it }
 
@@ -205,6 +244,14 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val layer = _uiState.value.selected ?: return
         updateProject { p -> p.copy(layers = p.layers.filter { it.id != layer.id } + layer) }
     }
+
+    fun sendToBack() {
+        val layer = _uiState.value.selected ?: return
+        updateProject { p -> p.copy(layers = listOf(layer) + p.layers.filter { it.id != layer.id }) }
+    }
+
+    /** Timeline drags; like gestures, only the first update of a drag ([first]) becomes an undo step. */
+    fun setLayerTime(id: Long, startMs: Long, endMs: Long, first: Boolean) = updateLayer(id, record = first) { it.withTime(startMs, endMs) }
 
     fun deleteSelected() {
         val id = _uiState.value.selectedId ?: return
@@ -278,7 +325,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // Export
 
-    fun export() = work("Saving") {
+    fun export(share: Boolean) = work("Saving") {
         val p = _uiState.value.project ?: return@work
         val video = p.video
         if (video == null) {
@@ -288,14 +335,14 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             val uri = withContext(Dispatchers.IO) {
                 saveToGallery(app, mime) { bitmap.compress(if (transparent) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG, 95, it) }
             }
-            _effects.send(EditorEffect.Saved(uri, mime))
+            _effects.send(EditorEffect.Saved(uri, mime, share))
         } else {
-            val overlay = if (p.layers.isEmpty()) null else renderLayers(p.width, p.height, Color.TRANSPARENT, p.layers)
+            val overlay = if (p.layers.isEmpty()) null else timedOverlay(p.width, p.height, p.layers, video.outputDurationMs)
             val out = File(app.cacheDir, "export.mp4")
             try {
                 exportVideo(app, video.composition(overlay), out) { pct -> _uiState.update { it.copy(busy = "Saving video $pct%") } }
                 val uri = withContext(Dispatchers.IO) { saveToGallery(app, "video/mp4") { o -> out.inputStream().use { it.copyTo(o) } } }
-                _effects.send(EditorEffect.Saved(uri, "video/mp4"))
+                _effects.send(EditorEffect.Saved(uri, "video/mp4", share))
             } finally {
                 out.delete()
             }
@@ -304,12 +351,24 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // Helpers
 
-    private fun updateProject(change: (Project) -> Project) = _uiState.update { s -> s.project?.let { s.copy(project = change(it)) } ?: s }
+    /** Every edit goes through here; [record] = false is for the middle of a gesture. */
+    private fun updateProject(record: Boolean = true, change: (Project) -> Project) {
+        val before = _uiState.value.project ?: return
+        val after = change(before)
+        if (after == before) return
+        if (record) {
+            undoStack.addLast(before)
+            if (undoStack.size > MAX_UNDO) undoStack.removeFirst()
+            redoStack.clear()
+        }
+        _uiState.update { it.copy(project = after, canUndo = undoStack.isNotEmpty(), canRedo = redoStack.isNotEmpty()) }
+    }
 
-    private fun updateSelected(change: (Layer) -> Layer) = _uiState.value.selectedId?.let { updateLayer(it, change) }
+    private fun updateSelected(record: Boolean = true, change: (Layer) -> Layer) =
+        _uiState.value.selectedId?.let { updateLayer(it, record, change) }
 
-    private fun updateLayer(id: Long, change: (Layer) -> Layer) =
-        updateProject { p -> p.copy(layers = p.layers.map { if (it.id == id) change(it) else it }) }
+    private fun updateLayer(id: Long, record: Boolean = true, change: (Layer) -> Layer) =
+        updateProject(record) { p -> p.copy(layers = p.layers.map { if (it.id == id) change(it) else it }) }
 
     /** Runs one long task at a time behind the busy overlay; failures become a message instead of a crash. */
     private fun work(label: String, block: suspend () -> Unit) {
@@ -332,5 +391,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         const val MAX_PHOTO = 2160
         const val MAX_LAYER = 1440
         const val THUMB_SIZE = 360f
+        const val MAX_UNDO = 50
+        const val FILMSTRIP_FRAMES = 10
     }
 }

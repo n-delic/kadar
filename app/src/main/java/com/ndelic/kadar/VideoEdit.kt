@@ -15,6 +15,7 @@ import androidx.media3.common.audio.SpeedProvider
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.OverlayEffect
+import androidx.media3.effect.TextureOverlay
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
@@ -44,19 +45,17 @@ data class VideoClip(
     val outputDurationMs get() = ((endMs - startMs) / speed).toLong()
 }
 
-/** The edit as a Media3 composition: used for both the live preview and the export. [overlay] is the rendered text/sticker layers. */
-fun VideoClip.composition(overlay: Bitmap?): Composition {
+/**
+ * The edit as a Media3 composition: used for both the live preview and the export. [overlay] draws the text/sticker
+ * layers; it sits on the composition, not the clip, so it gets output timestamps (after trim and speed) like the layers.
+ */
+fun VideoClip.composition(overlay: TextureOverlay?): Composition {
     // CompositionPlayer needs each item's full (unclipped) duration up front.
     val video = EditedMediaItem.Builder(clipped(uri, startMs, endMs))
         .setDurationUs(durationMs * 1000)
         .setRemoveAudio(volume == 0f)
         .setSpeed(ConstantSpeed(speed))
-        .setEffects(
-            Effects(
-                listOf(gain(volume)),
-                listOfNotNull(overlay?.let { OverlayEffect(listOf(BitmapOverlay.createStaticBitmapOverlay(it))) }),
-            ),
-        )
+        .setEffects(Effects(listOf(gain(volume)), emptyList()))
         .build()
     val sequences = mutableListOf(EditedMediaItemSequence.Builder(video).build())
     music?.let { m ->
@@ -69,9 +68,27 @@ fun VideoClip.composition(overlay: Bitmap?): Composition {
         sequences += EditedMediaItemSequence.Builder(track).setIsLooping(true).build()
     }
     return Composition.Builder(sequences)
+        .setEffects(Effects(emptyList(), listOfNotNull(overlay?.let { OverlayEffect(listOf(it)) })))
         // HDR phone footage turns washed out on most apps once posted; memes go out as plain SDR.
         .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
         .build()
+}
+
+/**
+ * Layers that come and go: one full-frame bitmap per stretch of time where the visible set doesn't change.
+ * Rendered up front on the caller's (main) thread, because layer paints are shared with the on-screen editor.
+ * shortcut: every stretch is a full-frame bitmap in memory (8 MB at 1080p); fine for a handful of layers, render lazily if projects get dozens.
+ */
+fun timedOverlay(width: Int, height: Int, layers: List<Layer>, durationMs: Long): TextureOverlay {
+    val stretches = segmentBounds(layers.map { it.startMs to it.endMs }, durationMs).mapNotNull { (start, end) ->
+        val visible = layers.filter { it.visibleAt((start + end) / 2) }
+        if (visible.isEmpty()) null else Triple(start * 1000, end * 1000, renderLayers(width, height, android.graphics.Color.TRANSPARENT, visible))
+    }
+    val nothing = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+    return object : BitmapOverlay() {
+        override fun getBitmap(presentationTimeUs: Long) =
+            stretches.firstOrNull { presentationTimeUs >= it.first && presentationTimeUs < it.second }?.third ?: nothing
+    }
 }
 
 /** Encodes [composition] to an H.264/AAC MP4 at [out]. Must be called on the main thread. */

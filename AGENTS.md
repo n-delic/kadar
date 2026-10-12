@@ -11,7 +11,8 @@ The owner's phone is a Galaxy S25. It also gets installed on older family phones
 ## What it does today
 
 - **Photo**: open a photo, blank canvas, or web image; add text (meme outline style), emoji, images and saved stickers as layers; move, pinch-resize, rotate; remove backgrounds on-device; change canvas aspect and background; export JPEG/PNG to `Pictures/Kadar`.
-- **Video**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit), and the same text/sticker layers burned in; export H.264/AAC MP4 to `Movies/Kadar`.
+- **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time; export H.264/AAC MP4 to `Movies/Kadar`.
+- **Undo / redo** for every edit (gestures and timeline drags count once per drag).
 - **Projects**: every edit autosaves into the app's private storage and shows up on the home screen; reopen or long-press to delete.
 - **Web images**: an in-app browser (Google Images by default). Long-press an image to download it into the project, never into the gallery.
 - **My stickers**: cut-outs saved for reuse across projects.
@@ -25,6 +26,8 @@ The owner's phone is a Galaxy S25. It also gets installed on older family phones
 - ML Kit Subject Segmentation (Play services, on-device) for background removal
 - `org.json` for project files, Coroutines/Flow for async
 - No DI framework, no navigation library: `MainActivity` builds one `EditorViewModel` with `viewModel()` and switches screens on `uiState.project` plus a `browsing` flag
+- **Not Material-looking**: dark PicsArt/InShot-style UI from `ui/Theme.kt` (`Ink` colors, Plus Jakarta Sans, `IconTool`, `CircleButton`, `KSlider`, `ColorRow`, `TextTabs`, `KDialog`). Material 3 is only the plumbing underneath; don't use stock M3 buttons, chips or top bars in screens.
+- Icons are Material Symbols Rounded (weight 300) vector drawables `res/drawable/ic_*.xml`, added with `scripts/add-icons.sh <name>...`
 
 Versions live in `gradle/libs.versions.toml`.
 
@@ -38,12 +41,16 @@ app/src/main/java/com/ndelic/kadar/
   VideoEdit.kt        VideoClip / Music, VideoClip.composition(), exportVideo() via Transformer
   EditorViewModel.kt  Single ViewModel: projects, layers, stickers, canvas, video settings, export, autosave
   MainActivity.kt     Theme, screen switching, snackbars (effects), busy overlay, share sheet
-  ui/HomeScreen.kt    New photo / video / blank / web, project grid
-  ui/EditorScreen.kt  Stage (canvas + gestures + video preview), tool row, text dialog
-  ui/Panels.kt        Tool panels: stickers, canvas, trim, speed, audio, font, color
+  ui/Theme.kt         Ink palette, fonts, shared components (IconTool, CircleButton, KSlider, ColorRow, TextTabs, KDialog)
+  ui/HomeScreen.kt    Create tiles (video / photo / blank / web), project grid
+  ui/EditorScreen.kt  Top bar (close, undo/redo, save, share), Stage (canvas, handles, video preview), tool row,
+                      NLE Timeline (layer tracks + clip), TrimStrip, full-screen TextEntry
+  ui/Panels.kt        Tool panels: stickers, canvas, speed, audio, font
   ui/WebImportScreen.kt  WebView browser with long-press-to-import
 app/src/main/res/font/anton.ttf          Meme font (SIL OFL, license in third_party/)
-app/src/test/.../LayersTest.kt           JVM tests for transform math and transparent-border trimming
+app/src/main/res/font/jakarta.ttf        UI font, Plus Jakarta Sans variable (SIL OFL)
+scripts/add-icons.sh                     Fetches Material Symbols as vector drawables
+app/src/test/.../LayersTest.kt           JVM tests for transform math, transparent-border trimming, timeline segments
 ```
 
 ## Commands
@@ -66,10 +73,13 @@ emulator -avd pixel_7_api35   # reference emulator (Google Play image, needed fo
 6. **Offline first.** No analytics, no accounts, no cloud APIs. The browser is the only feature that needs internet; don't add features that silently require it.
 7. **Treat web input as untrusted.** `downloadImage` accepts only `http(s)` and base64 `data:` URLs, caps the size, and must fail with a message, not a crash.
 8. **The preview is the export.** Video settings change `VideoClip`; `VideoClip.composition()` builds both the `CompositionPlayer` preview and the Transformer export. Add new video features there, not in only one of them.
-9. **Long tasks go through `EditorViewModel.work`.** It shows the busy overlay, runs one task at a time, and turns exceptions into a snackbar. Transformer must be called on the main thread.
-10. **Match existing patterns.** State is one `StateFlow<EditorUiState>`, one-shot messages go through the `effects` channel, panels are composables in `ui/Panels.kt` that call the ViewModel directly. Reuse `Tool`, `ChipRow`, `CommitSlider`, `Swatch` before writing new widgets.
-11. **No copyrighted assets.** Fonts, stickers and icons must be free to redistribute (OFL, CC0, own work). Never copy assets out of PicsArt, InShot or similar apps; copy behavior, not content.
-12. **Smallest change that fully works.** No new dependencies, layers or abstractions without a clear need. UI text is English and inline for now (no translation yet).
+9. **Layer times are output time** (after trim and speed), the same clock as `CompositionPlayer.currentPosition`. `endMs = Long.MAX_VALUE` means "to the end". The stage shows only layers visible at the playhead (plus the selected one); the export uses `timedOverlay`, which sits on the composition (not the clip) so it sees output timestamps.
+10. **Every edit is undoable.** Change the project only through `updateProject`/`updateLayer`; continuous gestures pass `record = first` so one drag is one undo step.
+11. **Long tasks go through `EditorViewModel.work`.** It shows the busy overlay, runs one task at a time, and turns exceptions into a snackbar. Transformer must be called on the main thread.
+12. **Match existing patterns.** State is one `StateFlow<EditorUiState>`, one-shot messages go through the `effects` channel, panels are composables in `ui/Panels.kt` that call the ViewModel directly. Reuse the components in `ui/Theme.kt` before writing new widgets.
+13. **Edge drags need `systemGestureExclusion()`**, or the system back gesture steals them (the timeline does this).
+14. **No copyrighted assets.** Fonts, stickers and icons must be free to redistribute (OFL, CC0, own work). Never copy assets out of PicsArt, InShot or similar apps; copy behavior, not content.
+15. **Smallest change that fully works.** No new dependencies, layers or abstractions without a clear need. UI text is English and inline for now (no translation yet).
 
 ## Verifying a change
 

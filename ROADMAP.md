@@ -12,14 +12,23 @@
 - In-app image browser: long-press to download into the project
 - Export to gallery (JPEG, PNG for transparent, MP4 H.264/AAC) with a Share button
 
+## v0.2: done
+
+- New UI modeled on PicsArt and InShot: dark editor, icon toolbar, round top-bar buttons, gradient create tiles, Plus Jakarta Sans, new app icon, dark launch screen
+- Selected layer handles: delete (top-left), scale + rotate with one finger (bottom-right); double-tap text to edit
+- Full-screen text entry with color dots
+- Undo / redo
+- NLE timeline for video: a track per text/sticker with its own start and end, drag to move or resize, tap the clip to trim, scrub anywhere
+- Layer order: Front and Back
+- Share button exports and opens the share sheet directly
+
 ## Next
 
-- [ ] Undo / redo
 - [ ] Keep pitch when changing video speed (today 2x also raises the pitch)
 - [ ] Manual eraser / restore brush to fix background-removal edges
 - [ ] Crop a single image layer
 - [ ] Text background box (caption style), shadow, letter spacing, alignment
-- [ ] Layer list (reorder, hide, lock)
+- [ ] Layer list for photos (reorder by drag, hide, lock); drag tracks up/down to reorder in video
 - [ ] Snap to center and to 0°/90° while moving and rotating
 - [ ] "Share to Kadar" from the gallery and other apps (open a photo or video directly)
 - [ ] Clean up unused images inside a project folder
@@ -27,7 +36,7 @@
 ## Later / maybe
 
 - [ ] Several video clips in a row, with transitions
-- [ ] Text that appears only for part of the video
+- [ ] Zoomable timeline for long videos
 - [ ] Filters and adjustments (brightness, contrast, saturation)
 - [ ] Video canvas aspect (fit a landscape clip into 9:16 with a blurred or colored background)
 - [ ] More free fonts (Google Fonts, OFL) and a CC0 sticker pack

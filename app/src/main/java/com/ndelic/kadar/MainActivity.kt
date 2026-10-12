@@ -2,14 +2,12 @@ package com.ndelic.kadar
 
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,15 +15,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,7 +37,18 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import com.ndelic.kadar.ui.EditorScreen
+import com.ndelic.kadar.ui.Ink
+import com.ndelic.kadar.ui.KadarTheme
+import com.ndelic.kadar.ui.blockTouches
 import com.ndelic.kadar.ui.HomeScreen
 import com.ndelic.kadar.ui.WebImportScreen
 import kotlinx.coroutines.launch
@@ -51,10 +56,10 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // Light status and navigation icons: the app is always dark, whatever the system theme.
+        enableEdgeToEdge(SystemBarStyle.dark(android.graphics.Color.TRANSPARENT), SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
         setContent {
-            val colors = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) dynamicDarkColorScheme(this) else darkColorScheme()
-            MaterialTheme(colorScheme = colors) {
+            KadarTheme {
                 App(viewModel())
             }
         }
@@ -76,7 +81,9 @@ private fun App(vm: EditorViewModel) {
                 launch {
                     when (effect) {
                         is EditorEffect.Message -> snackbar.showSnackbar(effect.text)
-                        is EditorEffect.Saved -> {
+                        is EditorEffect.Saved -> if (effect.share) {
+                            share(context, effect)
+                        } else {
                             val result = snackbar.showSnackbar("Saved to gallery", actionLabel = "Share", duration = SnackbarDuration.Long)
                             if (result == SnackbarResult.ActionPerformed) share(context, effect)
                         }
@@ -86,7 +93,7 @@ private fun App(vm: EditorViewModel) {
         }
     }
 
-    Surface(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().background(Ink.bg)) {
         Box(Modifier.safeDrawingPadding()) {
             when {
                 browsing -> WebImportScreen(
@@ -99,7 +106,17 @@ private fun App(vm: EditorViewModel) {
                 state.project == null -> HomeScreen(state, vm, onBrowse = { browsing = true })
                 else -> EditorScreen(state, vm, onBrowse = { browsing = true })
             }
-            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 64.dp))
+            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)) { data ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 24.dp).clip(RoundedCornerShape(24.dp)).background(Ink.raised).padding(start = 18.dp, end = 6.dp),
+                ) {
+                    Text(data.visuals.message, color = Ink.text, fontSize = 14.sp, modifier = Modifier.padding(vertical = 14.dp).weight(1f, fill = false))
+                    data.visuals.actionLabel?.let { label ->
+                        TextButton(onClick = data::performAction) { Text(label, color = Ink.accent, fontWeight = FontWeight.Bold) }
+                    } ?: Spacer(Modifier.width(12.dp))
+                }
+            }
             state.busy?.let { BusyOverlay(it) }
         }
     }
@@ -110,14 +127,18 @@ private fun BusyOverlay(label: String) {
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.6f))
+            .background(Color.Black.copy(alpha = 0.55f))
             // Swallow touches so nothing changes while the task runs.
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+            .blockTouches(),
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            CircularProgressIndicator()
-            Text(label, color = Color.White, style = MaterialTheme.typography.titleMedium)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+            modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Ink.raised).padding(horizontal = 36.dp, vertical = 28.dp),
+        ) {
+            CircularProgressIndicator(color = Ink.accent, trackColor = Ink.raised)
+            Text(label, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
         }
     }
 }

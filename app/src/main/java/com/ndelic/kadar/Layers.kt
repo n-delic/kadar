@@ -45,17 +45,32 @@ sealed interface Layer {
     val width: Float
     val height: Float
 
+    /** When the layer shows in a video, in output time (after trim and speed). [Long.MAX_VALUE] means "to the end". Photos ignore it. */
+    val startMs: Long
+    val endMs: Long
+
+    fun visibleAt(ms: Long) = ms >= startMs && ms < endMs
+    fun withTime(startMs: Long, endMs: Long): Layer
+
     /** Draws the content centered on the origin; [drawLayer] applies [t] around it. */
     fun drawContent(canvas: Canvas)
     fun withTransform(t: Transform): Layer
 }
 
 /** [file] is the image's name inside the project folder, so the project can be reopened. */
-data class ImageLayer(override val id: Long, override val t: Transform, val bitmap: Bitmap, val file: String) : Layer {
+data class ImageLayer(
+    override val id: Long,
+    override val t: Transform,
+    val bitmap: Bitmap,
+    val file: String,
+    override val startMs: Long = 0,
+    override val endMs: Long = Long.MAX_VALUE,
+) : Layer {
     override val width get() = bitmap.width.toFloat()
     override val height get() = bitmap.height.toFloat()
     override fun drawContent(canvas: Canvas) = canvas.drawBitmap(bitmap, -width / 2, -height / 2, bitmapPaint)
     override fun withTransform(t: Transform) = copy(t = t)
+    override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = endMs)
 }
 
 data class TextLayer(
@@ -67,6 +82,8 @@ data class TextLayer(
     val color: Int,
     /** Outline color, or null for no outline. */
     val outline: Int?,
+    override val startMs: Long = 0,
+    override val endMs: Long = Long.MAX_VALUE,
 ) : Layer {
     private val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).also {
         it.typeface = font.typeface
@@ -99,6 +116,7 @@ data class TextLayer(
     }
 
     override fun withTransform(t: Transform) = copy(t = t)
+    override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = endMs)
 }
 
 private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
@@ -125,6 +143,14 @@ fun renderLayers(width: Int, height: Int, background: Int, layers: List<Layer>, 
             layers.forEach { drawLayer(it) }
         }
     }
+
+/** Splits `0..durationMs` at every layer start and end, so the set of visible layers is constant inside each piece. */
+fun segmentBounds(ranges: List<Pair<Long, Long>>, durationMs: Long): List<Pair<Long, Long>> =
+    (ranges.flatMap { listOf(it.first, it.second) } + 0L + durationMs)
+        .map { it.coerceIn(0, durationMs) }
+        .distinct()
+        .sorted()
+        .zipWithNext()
 
 /** Bounding box `[left, top, right, bottom)` of the pixels that are not (almost) fully transparent, or null if none are. */
 fun opaqueBounds(pixels: IntArray, width: Int, height: Int): IntArray? {

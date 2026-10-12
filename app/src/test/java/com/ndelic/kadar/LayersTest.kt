@@ -35,4 +35,11 @@ class LayersTest {
         assertArrayEquals(intArrayOf(2, 1, 4, 3), opaqueBounds(px, 5, 4))
         assertNull(opaqueBounds(IntArray(4), 2, 2))
     }
+
+    @Test
+    fun segmentBoundsCutAtEveryLayerEdge() {
+        // A whole-video layer plus one from 1 s to 2 s, in a 3 s video; an end past the video is clamped.
+        val cuts = segmentBounds(listOf(0L to Long.MAX_VALUE, 1000L to 2000L, 2500L to 9000L), 3000)
+        assertEquals(listOf(0L to 1000L, 1000L to 2000L, 2000L to 2500L, 2500L to 3000L), cuts)
+    }
 }

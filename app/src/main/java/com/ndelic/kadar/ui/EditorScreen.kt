@@ -133,7 +133,10 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     val image = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::addImage) }
     val music = rememberLauncherForActivityResult(OpenDocument()) { it?.let(vm::setMusic) }
     val videoLayers = project.layers.filterIsInstance<VideoLayer>()
-    val player = if (video != null) rememberCompositionPlayer(multiInput = videoLayers.isNotEmpty()) else null
+    // Bumped to swap in a fresh preview player (see the video-layer drag effect below), resuming at [resumeAt].
+    var playerGeneration by remember { mutableIntStateOf(0) }
+    val resumeAt = remember { longArrayOf(0) }
+    val player = if (video != null) rememberCompositionPlayer(multiInput = videoLayers.isNotEmpty(), playerGeneration) else null
     var playing by remember { mutableStateOf(false) }
     var positionMs by remember { mutableLongStateOf(0L) }
     val overlayVideo = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let { uri -> vm.addVideo(uri, positionMs) } }
@@ -158,14 +161,23 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         val layers by rememberUpdatedState(project.layers)
         // Video layers' placement reaches the compositor live, so a drag doesn't rebuild the composition; anything else does.
         LaunchedEffect(player, video, videoLayers.map { it.withTransform(Transform(0f, 0f)) }) {
-            player.setComposition(video.composition(null, videos = videoLayers, placed = { v -> (layers.firstOrNull { it.id == v.id } ?: v).t }))
+            val start = resumeAt[0].also { resumeAt[0] = 0 }
+            player.setComposition(video.composition(null, videos = videoLayers, placed = { v -> (layers.firstOrNull { it.id == v.id } ?: v).t }), start)
             player.prepare()
             // A paused player keeps showing the old frame after a new composition; seek once it's loaded to repaint.
             delay(300)
-            if (!player.isPlaying) player.seekTo(player.currentPosition)
+            if (!player.isPlaying) player.seekTo(maxOf(start, player.currentPosition))
         }
-        // A paused player only composites again on a seek.
-        LaunchedEffect(videoLayers.map { it.t }) { if (!player.isPlaying) player.seekTo(player.currentPosition) }
+        // While playing, moved video layers follow live through `placed`. Paused, Media3's multi-input preview keeps its
+        // last composited frame through seeks, new compositions and short plays; only a fresh player paints the new
+        // placement. So once a drag rests while paused, swap in a new player at the same position.
+        LaunchedEffect(videoLayers.map { it.t }) {
+            delay(150)
+            if (!player.isPlaying && videoLayers.isNotEmpty()) {
+                resumeAt[0] = player.currentPosition
+                playerGeneration++
+            }
+        }
         LaunchedEffect(player, playing) { player.playWhenReady = playing }
         LaunchedEffect(player) {
             while (true) {
@@ -757,10 +769,10 @@ private fun VideoSurface(player: CompositionPlayer, canvasWidth: Int, canvasHeig
 private const val PREVIEW_LONG_SIDE = 1280f
 
 @Composable
-private fun rememberCompositionPlayer(multiInput: Boolean): CompositionPlayer {
+private fun rememberCompositionPlayer(multiInput: Boolean, generation: Int): CompositionPlayer {
     val context = LocalContext.current
     // Video layers need the compositor; projects without them keep the plain single-input preview.
-    val player = remember(multiInput) {
+    val player = remember(multiInput, generation) {
         CompositionPlayer.Builder(context)
             .apply { if (multiInput) setVideoGraphFactory(MultipleInputVideoGraph.Factory()) }
             .build()

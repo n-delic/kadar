@@ -12,10 +12,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
+import com.ndelic.kadar.R
 import com.ndelic.kadar.ui.common.Ink
 import com.ndelic.kadar.ui.common.KDialog
 import com.ndelic.kadar.ui.common.KTextField
@@ -25,11 +27,11 @@ import com.ndelic.kadar.ui.common.KTextField
 fun RenameDialog(current: String, onRename: (String) -> Unit, onDismiss: () -> Unit) {
     var value by remember { mutableStateOf(TextFieldValue(current, TextRange(0, current.length))) }
     val focus = remember { FocusRequester() }
-    KDialog("Rename project", "Save", onConfirm = { onRename(value.text) }, onDismiss = onDismiss) {
+    KDialog(stringResource(R.string.rename_title), stringResource(R.string.save), onConfirm = { onRename(value.text) }, onDismiss = onDismiss) {
         KTextField(
             value = value,
             onValueChange = { value = it },
-            placeholder = "Project name",
+            placeholder = stringResource(R.string.project_name),
             modifier = Modifier.fillMaxWidth().focusRequester(focus),
             background = Ink.bg,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),

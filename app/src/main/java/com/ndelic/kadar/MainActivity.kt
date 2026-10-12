@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,6 +52,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.ndelic.kadar.model.UiText
 import com.ndelic.kadar.ui.common.Ink
 import com.ndelic.kadar.ui.common.KadarTheme
 import com.ndelic.kadar.ui.common.blockTouches
@@ -95,6 +97,7 @@ private fun App(vm: EditorViewModel) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val resources = LocalResources.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var browsing by rememberSaveable { mutableStateOf(false) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
@@ -107,11 +110,11 @@ private fun App(vm: EditorViewModel) {
                 // Don't hold up the next effect while a snackbar is on screen.
                 launch {
                     when (effect) {
-                        is EditorEffect.Message -> snackbar.showSnackbar(effect.text)
+                        is EditorEffect.Message -> snackbar.showSnackbar(effect.text.asString(resources))
                         is EditorEffect.Saved -> if (effect.share) {
                             share(context, effect)
                         } else {
-                            val result = snackbar.showSnackbar("Saved to gallery", actionLabel = "Share", duration = SnackbarDuration.Long)
+                            val result = snackbar.showSnackbar(resources.getString(R.string.saved_to_gallery), actionLabel = resources.getString(R.string.share), duration = SnackbarDuration.Long)
                             if (result == SnackbarResult.ActionPerformed) share(context, effect)
                         }
                     }
@@ -155,7 +158,7 @@ private fun App(vm: EditorViewModel) {
 }
 
 @Composable
-private fun BusyOverlay(label: String) {
+private fun BusyOverlay(label: UiText) {
     Box(
         Modifier
             .fillMaxSize()
@@ -170,7 +173,7 @@ private fun BusyOverlay(label: String) {
             modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Ink.raised).padding(horizontal = 36.dp, vertical = 28.dp),
         ) {
             CircularProgressIndicator(color = Ink.accent, trackColor = Ink.raised)
-            Text(label, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            Text(label.asString(LocalResources.current), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
         }
     }
 }

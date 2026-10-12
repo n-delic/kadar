@@ -28,7 +28,7 @@ data class Project(
 
 data class SavedProject(val dir: File, val modified: Long, val thumb: Bitmap?, val isVideo: Boolean, val name: String? = null) {
     /** Folder names are creation timestamps (see [ProjectStore.create]). */
-    val label = name ?: defaultName(isVideo, dir.name.toLongOrNull() ?: modified)
+    fun label(words: LabelWords) = name ?: defaultName(isVideo, dir.name.toLongOrNull() ?: modified, words)
 }
 
 /**

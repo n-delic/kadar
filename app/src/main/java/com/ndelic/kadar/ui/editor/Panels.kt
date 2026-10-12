@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,7 +74,8 @@ private val EMOJIS = listOf(
     "😈", "😡", "🙏", "👍", "👎", "💯", "❤️", "✨", "🎉", "⚡", "❌", "✅", "⬆️", "➡️", "⭕",
 )
 
-private val ASPECTS = listOf("Original" to null, "1:1" to 1f, "4:5" to 0.8f, "9:16" to 9f / 16, "16:9" to 16f / 9)
+// A null label is the localized "Original".
+private val ASPECTS = listOf(null to null, "1:1" to 1f, "4:5" to 0.8f, "9:16" to 9f / 16, "16:9" to 16f / 9)
 
 private val SPEEDS = listOf(0.25f, 0.5f, 0.75f, 1f, 1.5f, 2f, 3f, 4f)
 
@@ -85,15 +87,15 @@ fun StickerPanel(stickers: List<Sticker>, vm: EditorViewModel) {
         LazyHorizontalGrid(GridCells.Fixed(2), Modifier.height(104.dp)) {
             items(EMOJIS) { e -> Text(e, fontSize = 30.sp, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { vm.addEmoji(e) }.padding(6.dp)) }
         }
-        PanelLabel("My stickers")
+        PanelLabel(stringResource(R.string.my_stickers))
         if (stickers.isEmpty()) {
-            Text("Remove the background of an image, then tap Save sticker to keep it here.", color = Ink.dim, fontSize = 13.sp)
+            Text(stringResource(R.string.my_stickers_empty), color = Ink.dim, fontSize = 13.sp)
         } else {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(stickers, key = { it.file.path }) { s ->
                     Image(
                         s.thumb.asImageBitmap(),
-                        contentDescription = "Sticker",
+                        contentDescription = stringResource(R.string.sticker),
                         modifier = Modifier.size(64.dp).clip(RoundedCornerShape(10.dp)).combinedClickable(onClick = { vm.addSticker(s) }, onLongClick = { deleting = s }),
                     )
                 }
@@ -102,9 +104,9 @@ fun StickerPanel(stickers: List<Sticker>, vm: EditorViewModel) {
     }
     deleting?.let { s ->
         KDialog(
-            title = "Delete sticker?",
-            text = "Projects that already use it keep their copy.",
-            confirm = "Delete",
+            title = stringResource(R.string.delete_sticker_title),
+            text = stringResource(R.string.delete_sticker_text),
+            confirm = stringResource(R.string.delete),
             onConfirm = {
                 vm.deleteSticker(s)
                 deleting = null
@@ -120,10 +122,10 @@ fun CanvasPanel(project: Project, defaultExport: ExportSize, vm: EditorViewModel
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             items(ASPECTS) { (label, ratio) ->
                 val active = if (ratio == null) project.height == project.originalHeight else abs(project.width / project.height.toFloat() - ratio) < 0.01f
-                AspectTile(label, ratio ?: (project.width / project.originalHeight.toFloat()), active) { vm.setAspect(ratio) }
+                AspectTile(label ?: stringResource(R.string.original), ratio ?: (project.width / project.originalHeight.toFloat()), active) { vm.setAspect(ratio) }
             }
         }
-        PanelLabel("Background")
+        PanelLabel(stringResource(R.string.background))
         ColorRow(project.background.takeIf { it != android.graphics.Color.TRANSPARENT }, allowNone = true) { vm.setBackground(it ?: android.graphics.Color.TRANSPARENT) }
         ExportSizeRow(project, defaultExport, vm)
     }
@@ -136,10 +138,10 @@ fun VideoCanvasPanel(project: Project, clip: VideoClip, defaultExport: ExportSiz
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             items(ASPECTS) { (label, ratio) ->
                 val active = clip.canvas?.let { ratio != null && abs(it - ratio) < 0.01f } ?: (ratio == null)
-                AspectTile(label, ratio ?: (clip.width / clip.height.toFloat()), active) { vm.setVideoCanvas(ratio) }
+                AspectTile(label ?: stringResource(R.string.original), ratio ?: (clip.width / clip.height.toFloat()), active) { vm.setVideoCanvas(ratio) }
             }
         }
-        if (clip.canvas != null) TextTabs(listOf(false, true), clip.blur, label = { if (it) "Blur" else "Black" }) { b -> vm.updateClip { copy(blur = b) } }
+        if (clip.canvas != null) TextTabs(listOf(false, true), clip.blur, label = { stringResource(if (it) R.string.canvas_blur else R.string.canvas_black) }) { b -> vm.updateClip { copy(blur = b) } }
         ExportSizeRow(project, defaultExport, vm)
     }
 }
@@ -149,17 +151,17 @@ fun VideoCanvasPanel(project: Project, clip: VideoClip, defaultExport: ExportSiz
 fun AdjustPanel(adjust: Adjust, onChange: (Adjust) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            PanelLabel("Adjust")
+            PanelLabel(stringResource(R.string.tool_adjust))
             Spacer(Modifier.weight(1f))
             // Resets the sliders only; the look has its own panel.
             val reset = Adjust(look = adjust.look, amount = adjust.amount)
             if (adjust != reset) {
-                Text("Reset", color = Ink.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onChange(reset) }.padding(6.dp))
+                Text(stringResource(R.string.reset), color = Ink.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onChange(reset) }.padding(6.dp))
             }
         }
-        LabeledSlider("Brightness", adjust.brightness) { onChange(adjust.copy(brightness = it)) }
-        LabeledSlider("Contrast", adjust.contrast) { onChange(adjust.copy(contrast = it)) }
-        LabeledSlider("Saturation", adjust.saturation) { onChange(adjust.copy(saturation = it)) }
+        LabeledSlider(stringResource(R.string.brightness), adjust.brightness) { onChange(adjust.copy(brightness = it)) }
+        LabeledSlider(stringResource(R.string.contrast), adjust.contrast) { onChange(adjust.copy(contrast = it)) }
+        LabeledSlider(stringResource(R.string.saturation), adjust.saturation) { onChange(adjust.copy(saturation = it)) }
     }
 }
 
@@ -174,9 +176,9 @@ private fun LabeledSlider(label: String, value: Float, onCommit: (Float) -> Unit
 @Composable
 fun TextStylePanel(layer: TextLayer, vm: EditorViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        TextTabs(TextAlign.entries, layer.align, label = { it.name }) { a -> vm.editText { copy(align = a) } }
-        KToggle("Shadow", null, layer.shadow) { on -> vm.editText { copy(shadow = on) } }
-        LabeledSlider("Spacing", layer.spacing * 2) { v -> vm.editText { copy(spacing = v / 2) } }
+        TextTabs(TextAlign.entries, layer.align, label = { stringResource(it.label) }) { a -> vm.editText { copy(align = a) } }
+        KToggle(stringResource(R.string.shadow), null, layer.shadow) { on -> vm.editText { copy(shadow = on) } }
+        LabeledSlider(stringResource(R.string.spacing), layer.spacing * 2) { v -> vm.editText { copy(spacing = v / 2) } }
     }
 }
 
@@ -184,8 +186,8 @@ fun TextStylePanel(layer: TextLayer, vm: EditorViewModel) {
 @Composable
 fun ExportSizeRow(project: Project, default: ExportSize, vm: EditorViewModel) {
     Column {
-        PanelLabel("Export size")
-        TextTabs(listOf<ExportSize?>(null) + ExportSize.entries, project.exportSize, label = { it?.label ?: "Default (${default.label})" }) { vm.setProjectExportSize(it) }
+        PanelLabel(stringResource(R.string.export_size))
+        TextTabs(listOf<ExportSize?>(null) + ExportSize.entries, project.exportSize, label = { it?.let { s -> stringResource(s.label) } ?: stringResource(R.string.export_size_default, stringResource(default.label)) }) { vm.setProjectExportSize(it) }
     }
 }
 
@@ -210,8 +212,8 @@ private fun AspectTile(label: String, ratio: Float, active: Boolean, onClick: ()
 fun SpeedPanel(clip: VideoClip, vm: EditorViewModel) {
     Column {
         TextTabs(SPEEDS, clip.speed, label = { "${it}x".replace(".0x", "x") }) { s -> vm.updateClip { copy(speed = s) } }
-        Text("Length after speed: ${formatMs(clip.outputDurationMs)}", color = Ink.dim, fontSize = 12.sp, modifier = Modifier.padding(start = 12.dp, top = 4.dp))
-        KToggle("Keep voice pitch", "Off gives the chipmunk / slow-mo voice", clip.keepPitch) { on -> vm.updateClip { copy(keepPitch = on) } }
+        Text(stringResource(R.string.speed_length, formatMs(clip.outputDurationMs)), color = Ink.dim, fontSize = 12.sp, modifier = Modifier.padding(start = 12.dp, top = 4.dp))
+        KToggle(stringResource(R.string.keep_pitch), stringResource(R.string.keep_pitch_hint), clip.keepPitch) { on -> vm.updateClip { copy(keepPitch = on) } }
     }
 }
 
@@ -246,10 +248,10 @@ fun LayersPanel(layers: List<Layer>, selectedId: Long?, vm: EditorViewModel) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                SmallIcon(if (l.hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility, if (l.hidden) "Show" else "Hide") { vm.setFlags(l.id, !l.hidden, l.locked) }
-                SmallIcon(if (l.locked) R.drawable.ic_lock else R.drawable.ic_lock_open, if (l.locked) "Unlock" else "Lock") { vm.setFlags(l.id, l.hidden, !l.locked) }
-                SmallIcon(R.drawable.ic_arrow_upward, "Move up") { vm.moveLayer(l.id, +1) }
-                SmallIcon(R.drawable.ic_arrow_downward, "Move down") { vm.moveLayer(l.id, -1) }
+                SmallIcon(if (l.hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility, stringResource(if (l.hidden) R.string.show else R.string.hide)) { vm.setFlags(l.id, !l.hidden, l.locked) }
+                SmallIcon(if (l.locked) R.drawable.ic_lock else R.drawable.ic_lock_open, stringResource(if (l.locked) R.string.unlock else R.string.lock)) { vm.setFlags(l.id, l.hidden, !l.locked) }
+                SmallIcon(R.drawable.ic_arrow_upward, stringResource(R.string.move_up)) { vm.moveLayer(l.id, +1) }
+                SmallIcon(R.drawable.ic_arrow_downward, stringResource(R.string.move_down)) { vm.moveLayer(l.id, -1) }
             }
         }
     }
@@ -257,11 +259,11 @@ fun LayersPanel(layers: List<Layer>, selectedId: Long?, vm: EditorViewModel) {
 
 /** What the Layers panel and the timeline tracks call a layer. */
 val Layer.label: String
-    get() = when (this) {
+    @Composable get() = when (this) {
         is TextLayer -> text.lines().first()
-        is ImageLayer -> "Image"
-        is VideoLayer -> "Video"
-        is DrawLayer -> "Drawing"
+        is ImageLayer -> stringResource(R.string.image)
+        is VideoLayer -> stringResource(R.string.video)
+        is DrawLayer -> stringResource(R.string.drawing)
     }
 
 @Composable
@@ -274,9 +276,9 @@ fun SmallIcon(icon: Int, description: String, onClick: () -> Unit) {
 @Composable
 fun AudioPanel(clip: VideoClip, vm: EditorViewModel, onAddMusic: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        PanelLabel("Video sound")
+        PanelLabel(stringResource(R.string.video_sound))
         KSlider(R.drawable.ic_volume_up, clip.volume, 0f..1f, ::percent) { v -> vm.updateClip { copy(volume = v) } }
-        PanelLabel("Music")
+        PanelLabel(stringResource(R.string.music))
         val music = clip.music
         if (music == null) {
             Row(
@@ -285,7 +287,7 @@ fun AudioPanel(clip: VideoClip, vm: EditorViewModel, onAddMusic: () -> Unit) {
             ) {
                 KIcon(R.drawable.ic_add, Modifier.size(22.dp), Ink.accent)
                 Spacer(Modifier.size(8.dp))
-                Text("Add music", color = Ink.accent, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.music_add), color = Ink.accent, fontWeight = FontWeight.SemiBold)
             }
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -293,7 +295,7 @@ fun AudioPanel(clip: VideoClip, vm: EditorViewModel, onAddMusic: () -> Unit) {
                 Spacer(Modifier.size(12.dp))
                 Text(music.name, color = Ink.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 Box(Modifier.clip(RoundedCornerShape(8.dp)).clickable { vm.updateClip { copy(music = null) } }.padding(8.dp)) {
-                    KIcon(R.drawable.ic_delete, Modifier.size(22.dp), description = "Remove music")
+                    KIcon(R.drawable.ic_delete, Modifier.size(22.dp), description = stringResource(R.string.music_remove))
                 }
             }
             KSlider(R.drawable.ic_volume_up, music.volume, 0f..1f, ::percent) { v -> vm.updateClip { copy(music = music.copy(volume = v)) } }

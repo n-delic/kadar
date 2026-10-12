@@ -1,5 +1,7 @@
 package com.ndelic.kadar.model
 
+import androidx.annotation.StringRes
+import com.ndelic.kadar.R
 import com.ndelic.kadar.ui.editor.label
 
 /** Rec. 709 luma weights: how much red, green and blue each add to perceived brightness. */
@@ -9,16 +11,16 @@ val LUMA = floatArrayOf(0.2126f, 0.7152f, 0.0722f)
  * Filters, each a 4x5 [android.graphics.ColorMatrix] (offsets in 0..255). Built in-house from the [Adjust] math,
  * channel gains and the luma weights; no third-party presets.
  */
-enum class Look(val label: String) {
-    None("None"),
-    Mono("Mono"),
-    Noir("Noir"),
-    Sepia("Sepia"),
-    Warm("Warm"),
-    Cool("Cool"),
-    Vivid("Vivid"),
-    Fade("Fade"),
-    TealOrange("Teal & Orange");
+enum class Look(@StringRes val label: Int) {
+    None(R.string.look_none),
+    Mono(R.string.look_mono),
+    Noir(R.string.look_noir),
+    Sepia(R.string.look_sepia),
+    Warm(R.string.look_warm),
+    Cool(R.string.look_cool),
+    Vivid(R.string.look_vivid),
+    Fade(R.string.look_fade),
+    TealOrange(R.string.look_teal_orange);
 
     fun matrix(): FloatArray = when (this) {
         None -> Adjust().colorMatrix()

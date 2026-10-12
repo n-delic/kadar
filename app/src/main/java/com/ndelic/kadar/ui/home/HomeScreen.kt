@@ -53,6 +53,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +67,7 @@ import com.ndelic.kadar.BuildConfig
 import com.ndelic.kadar.EditorUiState
 import com.ndelic.kadar.EditorViewModel
 import com.ndelic.kadar.R
+import com.ndelic.kadar.model.LabelWords
 import com.ndelic.kadar.model.Project
 import com.ndelic.kadar.model.ProjectSort
 import com.ndelic.kadar.model.SavedProject
@@ -90,7 +93,8 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, 
     // A few projects fit on screen; search only earns its space beyond that.
     val searchable = state.projects.size > 6
     val sort = state.settings.projectSort
-    val shown = remember(state.projects, searchable, query.text, sort) { state.projects.arrange(if (searchable) query.text else "", sort) }
+    val words = LabelWords(stringResource(R.string.photo), stringResource(R.string.video), stringResource(R.string.project_date_pattern))
+    val shown = remember(state.projects, searchable, query.text, sort, words) { state.projects.arrange(if (searchable) query.text else "", sort, words) }
     val selecting = selected.isNotEmpty()
     val picked = shown.filter { it.dir.path in selected }
     fun toggle(p: SavedProject) {
@@ -123,47 +127,47 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, 
                         Text("v${BuildConfig.VERSION_NAME}", color = Ink.dim, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, lineHeight = 10.sp)
                     }
                     Spacer(Modifier.weight(1f))
-                    CircleButton(R.drawable.ic_settings, "Settings", onClick = onSettings)
+                    CircleButton(R.drawable.ic_settings, stringResource(R.string.settings), onClick = onSettings)
                 }
-                Text("Photos and videos, edited on your phone. No account, no watermark.", color = Ink.dim, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
+                Text(stringResource(R.string.home_tagline), color = Ink.dim, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
                 Spacer(Modifier.height(24.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    StartCard(R.drawable.ic_image, "Photo", "Cut-outs, text, stickers", accent = true, Modifier.weight(1f)) {
+                    StartCard(R.drawable.ic_image, stringResource(R.string.photo), stringResource(R.string.home_photo_hint), accent = true, Modifier.weight(1f)) {
                         photo.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
                     }
-                    StartCard(R.drawable.ic_movie, "Video", "Trim, speed, music", accent = false, Modifier.weight(1f)) {
+                    StartCard(R.drawable.ic_movie, stringResource(R.string.video), stringResource(R.string.home_video_hint), accent = false, Modifier.weight(1f)) {
                         video.launch(PickVisualMediaRequest(PickVisualMedia.VideoOnly))
                     }
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    QuickAction(R.drawable.ic_crop_square, "Blank canvas", Modifier.weight(1f), vm::newBlank)
-                    QuickAction(R.drawable.ic_language, "Image from web", Modifier.weight(1f), onBrowse)
+                    QuickAction(R.drawable.ic_crop_square, stringResource(R.string.home_blank), Modifier.weight(1f), vm::newBlank)
+                    QuickAction(R.drawable.ic_language, stringResource(R.string.home_web), Modifier.weight(1f), onBrowse)
                 }
                 Spacer(Modifier.height(30.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Projects", color = Ink.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.projects), color = Ink.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     if (state.projects.isNotEmpty()) Text("  ${state.projects.size}", color = Ink.dim, fontSize = 15.sp)
                     Spacer(Modifier.weight(1f))
                     if (state.projects.size > 1) {
-                        TextTabs(ProjectSort.entries, sort, label = { it.label }) { s -> vm.updateSettings { copy(projectSort = s) } }
+                        TextTabs(ProjectSort.entries, sort, label = { stringResource(it.label) }) { s -> vm.updateSettings { copy(projectSort = s) } }
                     }
                 }
                 if (state.projects.isEmpty()) {
-                    Text("Nothing yet. Everything you make is saved here automatically.", color = Ink.dim, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp))
+                    Text(stringResource(R.string.projects_empty), color = Ink.dim, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp))
                 }
                 if (searchable) {
                     val focusManager = LocalFocusManager.current
                     KTextField(
                         value = query,
                         onValueChange = { query = it },
-                        placeholder = "Search projects",
+                        placeholder = stringResource(R.string.projects_search),
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         icon = R.drawable.ic_search,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
                     )
-                    if (shown.isEmpty()) Text("No project matches \"${query.text.trim()}\"", color = Ink.dim, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp))
+                    if (shown.isEmpty()) Text(stringResource(R.string.projects_no_match, query.text.trim()), color = Ink.dim, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp))
                 }
                 Spacer(Modifier.height(6.dp))
             }
@@ -196,7 +200,7 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, 
                     ) {
                         KIcon(if (p.isVideo) R.drawable.ic_movie else R.drawable.ic_image, Modifier.size(12.dp), Ink.onAccent)
                         Spacer(Modifier.width(4.dp))
-                        Text(if (p.isVideo) "VIDEO" else "PHOTO", color = Ink.onAccent, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.8.sp)
+                        Text(stringResource(if (p.isVideo) R.string.video else R.string.photo).uppercase(), color = Ink.onAccent, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.8.sp)
                     }
                     if (selecting) {
                         Box(
@@ -209,12 +213,12 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, 
                                 .border(1.5.dp, if (isPicked) Ink.accent else Color.White, CircleShape),
                             contentAlignment = Alignment.Center,
                         ) {
-                            if (isPicked) KIcon(R.drawable.ic_check, Modifier.size(15.dp), Ink.onAccent, "Selected")
+                            if (isPicked) KIcon(R.drawable.ic_check, Modifier.size(15.dp), Ink.onAccent, stringResource(R.string.project_selected))
                         }
                     }
                 }
                 Text(
-                    p.label,
+                    p.label(words),
                     color = Ink.text,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -250,32 +254,33 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, 
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.size(44.dp).clip(CircleShape).clickable { selected = emptyList() }, contentAlignment = Alignment.Center) {
-                KIcon(R.drawable.ic_close, Modifier.size(22.dp), description = "Cancel selection")
+                KIcon(R.drawable.ic_close, Modifier.size(22.dp), description = stringResource(R.string.selection_cancel))
             }
             // Just the count: with four actions, "N selected" wraps on a 360-400 dp wide phone.
+            val selectedCount = pluralStringResource(R.plurals.selected_count, picked.size, picked.size)
             Text(
                 "${picked.size}",
                 color = Ink.text,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f).padding(start = 4.dp).semantics { contentDescription = "${picked.size} selected" },
+                modifier = Modifier.weight(1f).padding(start = 4.dp).semantics { contentDescription = selectedCount },
             )
-            BarAction(R.drawable.ic_select_all, "All") { selected = shown.map { it.dir.path } }
-            if (picked.size == 1) BarAction(R.drawable.ic_edit, "Rename") { renaming = picked.single() }
-            BarAction(R.drawable.ic_content_copy, "Duplicate") {
+            BarAction(R.drawable.ic_select_all, stringResource(R.string.select_all)) { selected = shown.map { it.dir.path } }
+            if (picked.size == 1) BarAction(R.drawable.ic_edit, stringResource(R.string.rename)) { renaming = picked.single() }
+            BarAction(R.drawable.ic_content_copy, stringResource(R.string.duplicate)) {
                 vm.duplicateProjects(picked.map { it.dir })
                 selected = emptyList()
             }
-            BarAction(R.drawable.ic_delete, "Delete", tint = Color(0xFFFF5A6E)) { confirmDelete = true }
+            BarAction(R.drawable.ic_delete, stringResource(R.string.delete), tint = Color(0xFFFF5A6E)) { confirmDelete = true }
         }
     }
     }
 
     renaming?.let { p ->
         RenameDialog(
-            current = p.label,
+            current = p.label(words),
             onRename = { name ->
-                if (name.trim() != p.label) vm.renameProject(p.dir, name)
+                if (name.trim() != p.label(words)) vm.renameProject(p.dir, name)
                 selected = emptyList()
                 renaming = null
             },
@@ -286,9 +291,9 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, 
     if (confirmDelete) {
         val n = picked.size
         KDialog(
-            title = if (n == 1) "Delete project?" else "Delete $n projects?",
-            text = "Their images are deleted too. Things you saved to the gallery stay.",
-            confirm = "Delete",
+            title = pluralStringResource(R.plurals.delete_projects_title, n, n),
+            text = stringResource(R.string.delete_projects_text),
+            confirm = stringResource(R.string.delete),
             onConfirm = {
                 vm.deleteProjects(picked.map { it.dir })
                 selected = emptyList()

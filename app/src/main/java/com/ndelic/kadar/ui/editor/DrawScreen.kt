@@ -3,6 +3,7 @@ package com.ndelic.kadar.ui.editor
 import android.graphics.Bitmap
 import android.graphics.Paint
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.systemGestureExclusion
@@ -33,6 +34,7 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.withClip
 import com.ndelic.kadar.R
@@ -53,7 +55,7 @@ import com.ndelic.kadar.ui.common.fullWidthPanel
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-private enum class Pen { Marker, Highlighter }
+private enum class Pen(@StringRes val label: Int) { Marker(R.string.pen_marker), Highlighter(R.string.pen_highlighter) }
 
 /**
  * Freehand drawing over the canvas: one finger draws, two fingers zoom and pan. [layers] and [under] (the video frame
@@ -78,7 +80,7 @@ fun DrawScreen(project: Project, layers: List<Layer>, under: Bitmap?, onDone: (L
 
     Column(Modifier.fillMaxSize().background(Ink.bg).blockTouches()) {
         ToolTopBar(onCancel = onCancel, onDone = { onDone(strokes) }, doneEnabled = strokes.isNotEmpty()) {
-            CircleButton(R.drawable.ic_undo, "Undo stroke", enabled = strokes.isNotEmpty()) { strokes = strokes.dropLast(1) }
+            CircleButton(R.drawable.ic_undo, stringResource(R.string.undo_stroke), enabled = strokes.isNotEmpty()) { strokes = strokes.dropLast(1) }
         }
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
             val fit = min(constraints.maxWidth / w, constraints.maxHeight / h) * 0.92f
@@ -150,7 +152,7 @@ fun DrawScreen(project: Project, layers: List<Layer>, under: Bitmap?, onDone: (L
             }
         }
         Column(Modifier.fullWidthPanel(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            TextTabs(Pen.entries, pen, label = { it.name }) { pen = it }
+            TextTabs(Pen.entries, pen, label = { stringResource(it.label) }) { pen = it }
             ColorRow(color, allowNone = false) { c -> c?.let { color = it } }
             KSlider(R.drawable.ic_draw, sizeDp, 2f..40f, { "${it.roundToInt()}" }) { sizeDp = it }
         }

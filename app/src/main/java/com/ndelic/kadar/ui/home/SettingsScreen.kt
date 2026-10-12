@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -59,9 +60,9 @@ fun SettingsScreen(settings: AppSettings, onChange: (AppSettings) -> Unit, onClo
 
     Column(Modifier.fillMaxSize().background(Ink.bg)) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            CircleButton(R.drawable.ic_close, "Close") { if (license != null) license = null else onClose() }
+            CircleButton(R.drawable.ic_close, stringResource(R.string.close)) { if (license != null) license = null else onClose() }
             Spacer(Modifier.width(14.dp))
-            Text(license?.removeSuffix(".txt") ?: "Settings", color = Ink.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(license?.removeSuffix(".txt") ?: stringResource(R.string.settings), color = Ink.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
         val shown = license
         if (shown != null) {
@@ -76,36 +77,36 @@ fun SettingsScreen(settings: AppSettings, onChange: (AppSettings) -> Unit, onClo
             return@Column
         }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Section("Image search", "Used by the built-in browser for Image from web.")
+            Section(stringResource(R.string.settings_search), stringResource(R.string.settings_search_hint))
             Card {
                 SearchEngine.entries.forEach { e ->
                     Choice(e.label, selected = settings.search == e) { onChange(settings.copy(search = e)) }
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Section("Default export size", "By the short side; never upscales. Each project can override it in its Canvas panel.")
+            Section(stringResource(R.string.settings_export), stringResource(R.string.settings_export_hint))
             Card {
                 ExportSize.entries.forEach { s ->
-                    Choice(s.label, selected = settings.exportSize == s) { onChange(settings.copy(exportSize = s)) }
+                    Choice(stringResource(s.label), selected = settings.exportSize == s) { onChange(settings.copy(exportSize = s)) }
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Section("About", null)
+            Section(stringResource(R.string.settings_about), null)
             Card {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
-                    Text("Version", color = Ink.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                    Text(stringResource(R.string.settings_version), color = Ink.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
                     Text(listOf(BuildConfig.VERSION_NAME, BuildConfig.STAGE).filter { it.isNotEmpty() }.joinToString(" "), color = Ink.dim, fontSize = 15.sp)
                 }
-                Link("Source code", R.drawable.ic_open_in_new) { open(REPO) }
-                Link("License: GPL-3.0-or-later", R.drawable.ic_open_in_new) { open("$REPO/blob/main/LICENSE") }
+                Link(stringResource(R.string.settings_source), R.drawable.ic_open_in_new) { open(REPO) }
+                Link(stringResource(R.string.settings_license), R.drawable.ic_open_in_new) { open("$REPO/blob/main/LICENSE") }
             }
             Spacer(Modifier.height(12.dp))
-            Section("Open-source licenses", "Fonts and icons bundled in the app.")
+            Section(stringResource(R.string.settings_licenses), stringResource(R.string.settings_licenses_hint))
             Card {
                 licenses.forEach { name -> Link(name.removeSuffix(".txt"), R.drawable.ic_chevron_right) { license = name } }
             }
             Text(
-                "Kadar is free software with no ads, accounts or tracking.",
+                stringResource(R.string.settings_free),
                 color = Ink.dim,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(vertical = 20.dp),

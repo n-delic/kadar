@@ -7,6 +7,7 @@
     <application
         android:icon="@mipmap/ic_launcher"
         android:label="${appName}"
+        android:localeConfig="@xml/locales_config"
         android:theme="@style/Theme.Kadar">
         <activity
             android:name=".MainActivity"

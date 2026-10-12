@@ -106,6 +106,19 @@ To keep it this way:
 4. For UI, reuse the components in `ui/common/Theme.kt` and follow how the panels in `ui/editor/` are built.
 5. Run the tests and the build, then try the change on an emulator, including an export.
 
+### Adding text to the UI
+
+Kadar ships in English and Bosnian. Never write user-visible text inline:
+
+1. Add the string to `app/src/main/res/values/strings.xml` and the same name to `app/src/main/res/values-bs/strings.xml`. `./gradlew lintDebug` fails if one is missing.
+2. In a composable use `stringResource(R.string.name)`, with format arguments (`%1$s`, `%1$d`) instead of joining strings. Counts use `<plurals>` and `pluralStringResource`; Bosnian needs `one`, `few` and `other`, each with `%d` (21 is "one").
+3. Content descriptions for TalkBack are strings too.
+4. From the ViewModel or `media/`, pass a `UiText` (busy labels, `EditorEffect.Message`) or `throw UserError(R.string.name)`; the UI resolves it in the current language.
+5. Bosnian: Latin script, short and everyday ("Spremi u galeriju", "Podijeli", "Poništi"), informal "ti". Toolbar labels must fit about 11 characters.
+6. Names stored in projects or settings (fonts, enum names) are data: never translate or rename them.
+
+To try a language on a device: `adb shell cmd locale set-app-locales com.ndelic.kadar.debug --locales bs-BA` (Android 13+, or change the phone's language).
+
 ### Changing the project format
 
 Saved projects are the user's work, so format changes need care:

@@ -20,6 +20,9 @@ import com.google.android.gms.tasks.Task
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
+import com.ndelic.kadar.R
+import com.ndelic.kadar.model.UiText
+import com.ndelic.kadar.model.UserError
 import com.ndelic.kadar.model.opaqueBounds
 import com.ndelic.kadar.video.Music
 import java.io.IOException
@@ -46,12 +49,12 @@ fun downloadImage(url: String, maxSide: Int): Bitmap {
     val bytes = when {
         url.startsWith("data:") && url.substringBefore(',').endsWith(";base64") -> Base64.decode(url.substringAfter(','), Base64.DEFAULT)
         url.startsWith("https://") || url.startsWith("http://") -> fetch(url)
-        else -> error("This image can't be downloaded")
+        else -> throw UserError(R.string.error_cant_download)
     }
     return try {
         decode(ImageDecoder.createSource(ByteBuffer.wrap(bytes)), maxSide)
     } catch (e: IOException) {
-        throw IllegalStateException("That link isn't an image Kadar can open", e)
+        throw UserError(UiText.Res(R.string.error_not_image), e)
     }
 }
 
@@ -72,13 +75,13 @@ private fun fetch(start: String): ByteArray {
             CookieManager.getInstance().getCookie(url)?.let { connection.setRequestProperty("Cookie", it) }
             val code = connection.responseCode
             if (code in 300..399) {
-                val next = connection.getHeaderField("Location") ?: error("Download failed (HTTP $code)")
+                val next = connection.getHeaderField("Location") ?: throw UserError(R.string.error_download_http, code)
                 url = URL(URL(url), next).toString()
-                if (!url.startsWith("https://") && !url.startsWith("http://")) error("This image can't be downloaded")
+                if (!url.startsWith("https://") && !url.startsWith("http://")) throw UserError(R.string.error_cant_download)
                 return@repeat
             }
-            if (code !in 200..299) error("Download failed (HTTP $code)")
-            if (connection.contentLengthLong > MAX_DOWNLOAD) error("Image is too large")
+            if (code !in 200..299) throw UserError(R.string.error_download_http, code)
+            if (connection.contentLengthLong > MAX_DOWNLOAD) throw UserError(R.string.error_image_too_large)
             return connection.inputStream.use { input ->
                 val out = java.io.ByteArrayOutputStream()
                 val buffer = ByteArray(64 * 1024)
@@ -86,7 +89,7 @@ private fun fetch(start: String): ByteArray {
                     val n = input.read(buffer)
                     if (n < 0) break
                     out.write(buffer, 0, n)
-                    if (out.size() > MAX_DOWNLOAD) error("Image is too large")
+                    if (out.size() > MAX_DOWNLOAD) throw UserError(R.string.error_image_too_large)
                 }
                 out.toByteArray()
             }
@@ -94,7 +97,7 @@ private fun fetch(start: String): ByteArray {
             connection.disconnect()
         }
     }
-    error("Too many redirects")
+    throw UserError(R.string.error_cant_download)
 }
 
 /** Decodes into a software ARGB_8888 bitmap (drawable on a plain Canvas and readable by ML Kit), longest side at most [maxSide]. */
@@ -171,7 +174,7 @@ fun saveToGallery(context: Context, mime: String, write: (OutputStream) -> Unit)
     }
     val collection = if (video) MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
     else MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-    val uri = resolver.insert(collection, values) ?: error("Could not create a file in the gallery")
+    val uri = resolver.insert(collection, values) ?: throw UserError(R.string.error_gallery_file)
     try {
         resolver.openOutputStream(uri)!!.use(write)
         resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
@@ -193,10 +196,10 @@ suspend fun cutOutSubject(context: Context, bitmap: Bitmap): Bitmap {
             // The task above only means the download started; wait for it (a few MB) to finish.
             withTimeoutOrNull(120_000) {
                 while (!installer.areModulesAvailable(segmenter).await().areModulesAvailable()) delay(1000)
-            } ?: error("The background remover is still downloading. Check the internet and try again.")
+            } ?: throw UserError(R.string.error_bg_model)
         }
         return segmenter.process(InputImage.fromBitmap(bitmap, 0)).await().foregroundBitmap
-            ?: error("No subject found")
+            ?: throw UserError(R.string.error_no_subject)
     } finally {
         segmenter.close()
     }

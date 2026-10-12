@@ -1,6 +1,8 @@
 package com.ndelic.kadar.model
 
 import android.content.Context
+import androidx.annotation.StringRes
+import com.ndelic.kadar.R
 import com.ndelic.kadar.ui.editor.label
 import java.net.URLEncoder
 
@@ -14,10 +16,10 @@ enum class SearchEngine(val label: String, val home: String, private val query: 
 }
 
 /** Export size by the short side (1080p = 1080 px short side); [Original] keeps the canvas size. Never upscales. */
-enum class ExportSize(val label: String, val shortSide: Int?) {
-    Original("Original", null),
-    P1080("1080p", 1080),
-    P720("720p", 720),
+enum class ExportSize(@StringRes val label: Int, val shortSide: Int?) {
+    Original(R.string.original, null),
+    P1080(R.string.export_1080p, 1080),
+    P720(R.string.export_720p, 720),
 }
 
 data class AppSettings(

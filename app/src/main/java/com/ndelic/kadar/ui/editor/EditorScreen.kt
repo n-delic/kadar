@@ -87,6 +87,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -224,23 +225,23 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
 
     Column(Modifier.fillMaxSize().background(Ink.bg)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            CircleButton(R.drawable.ic_close, "Back to projects", onClick = vm::close)
+            CircleButton(R.drawable.ic_close, stringResource(R.string.back_to_projects), onClick = vm::close)
             Spacer(Modifier.weight(1f))
             Row(Modifier.clip(RoundedCornerShape(22.dp)).background(Ink.raised)) {
-                PillButton(R.drawable.ic_undo, "Undo", state.canUndo, vm::undo)
-                PillButton(R.drawable.ic_redo, "Redo", state.canRedo, vm::redo)
+                PillButton(R.drawable.ic_undo, stringResource(R.string.undo), state.canUndo, vm::undo)
+                PillButton(R.drawable.ic_redo, stringResource(R.string.redo), state.canRedo, vm::redo)
             }
             Spacer(Modifier.weight(1f))
             // Photos only: video shows the stack as timeline tracks.
             if (video == null) {
-                CircleButton(R.drawable.ic_layers, "Layers", enabled = project.layers.isNotEmpty(), active = panel == Panel.Layers) {
+                CircleButton(R.drawable.ic_layers, stringResource(R.string.layers), enabled = project.layers.isNotEmpty(), active = panel == Panel.Layers) {
                     panel = if (panel == Panel.Layers) null else Panel.Layers
                 }
                 Spacer(Modifier.width(10.dp))
             }
-            CircleButton(R.drawable.ic_download, "Save to gallery") { vm.export(share = false) }
+            CircleButton(R.drawable.ic_download, stringResource(R.string.save_to_gallery)) { vm.export(share = false) }
             Spacer(Modifier.width(10.dp))
-            CircleButton(R.drawable.ic_share, "Share") { vm.export(share = true) }
+            CircleButton(R.drawable.ic_share, stringResource(R.string.share)) { vm.export(share = true) }
         }
 
         Stage(project, selected, player, if (video != null) positionMs else null, vm, onEditText = { typing = it.text }, Modifier.weight(1f).fillMaxWidth())
@@ -254,7 +255,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp),
                 )
                 Box(Modifier.size(48.dp).clip(CircleShape).background(Ink.raised).clickableNoRipple { playing = !playing }, contentAlignment = Alignment.Center) {
-                    KIcon(if (playing) R.drawable.ic_pause else R.drawable.ic_play_arrow, Modifier.size(30.dp), description = if (playing) "Pause" else "Play")
+                    KIcon(if (playing) R.drawable.ic_pause else R.drawable.ic_play_arrow, Modifier.size(30.dp), description = stringResource(if (playing) R.string.pause else R.string.play))
                 }
             }
         }
@@ -315,72 +316,72 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                 }
                 when (tools) {
                     0 -> {
-                        IconTool(R.drawable.ic_title, "Text") { typing = "" }
-                        IconTool(R.drawable.ic_sentiment_satisfied, "Sticker", panel == Panel.Sticker) { toggle(Panel.Sticker) }
-                        IconTool(R.drawable.ic_draw, "Draw", onClick = ::draw)
-                        IconTool(R.drawable.ic_image, "Image") { image.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) }
-                        IconTool(R.drawable.ic_language, "Web", onClick = onBrowse)
+                        IconTool(R.drawable.ic_title, stringResource(R.string.tool_text)) { typing = "" }
+                        IconTool(R.drawable.ic_sentiment_satisfied, stringResource(R.string.sticker), panel == Panel.Sticker) { toggle(Panel.Sticker) }
+                        IconTool(R.drawable.ic_draw, stringResource(R.string.tool_draw), onClick = ::draw)
+                        IconTool(R.drawable.ic_image, stringResource(R.string.image)) { image.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) }
+                        IconTool(R.drawable.ic_language, stringResource(R.string.tool_web), onClick = onBrowse)
                         if (video != null) {
-                            IconTool(R.drawable.ic_movie, "Video") { overlayVideo.launch(PickVisualMediaRequest(PickVisualMedia.VideoOnly)) }
-                            IconTool(R.drawable.ic_content_cut, "Trim", trimming) { trimming = !trimming }
-                            IconTool(R.drawable.ic_speed, "Speed", panel == Panel.Speed) { toggle(Panel.Speed) }
-                            IconTool(R.drawable.ic_aspect_ratio, "Canvas", panel == Panel.VideoCanvas) { toggle(Panel.VideoCanvas) }
-                            IconTool(R.drawable.ic_tune, "Adjust", panel == Panel.Adjust) { toggle(Panel.Adjust) }
-                            IconTool(R.drawable.ic_filter_vintage, "Filters", panel == Panel.Filters) { toggle(Panel.Filters) }
-                            IconTool(R.drawable.ic_music_note, "Audio", panel == Panel.Audio) { toggle(Panel.Audio) }
+                            IconTool(R.drawable.ic_movie, stringResource(R.string.video)) { overlayVideo.launch(PickVisualMediaRequest(PickVisualMedia.VideoOnly)) }
+                            IconTool(R.drawable.ic_content_cut, stringResource(R.string.tool_trim), trimming) { trimming = !trimming }
+                            IconTool(R.drawable.ic_speed, stringResource(R.string.tool_speed), panel == Panel.Speed) { toggle(Panel.Speed) }
+                            IconTool(R.drawable.ic_aspect_ratio, stringResource(R.string.tool_canvas), panel == Panel.VideoCanvas) { toggle(Panel.VideoCanvas) }
+                            IconTool(R.drawable.ic_tune, stringResource(R.string.tool_adjust), panel == Panel.Adjust) { toggle(Panel.Adjust) }
+                            IconTool(R.drawable.ic_filter_vintage, stringResource(R.string.tool_filters), panel == Panel.Filters) { toggle(Panel.Filters) }
+                            IconTool(R.drawable.ic_music_note, stringResource(R.string.tool_audio), panel == Panel.Audio) { toggle(Panel.Audio) }
                         } else {
-                            IconTool(R.drawable.ic_aspect_ratio, "Canvas", panel == Panel.Canvas) { toggle(Panel.Canvas) }
+                            IconTool(R.drawable.ic_aspect_ratio, stringResource(R.string.tool_canvas), panel == Panel.Canvas) { toggle(Panel.Canvas) }
                         }
                     }
                     1 -> {
-                        IconTool(R.drawable.ic_check, "Done") { vm.select(null) }
+                        IconTool(R.drawable.ic_check, stringResource(R.string.done)) { vm.select(null) }
                         ToolDivider()
-                        IconTool(R.drawable.ic_edit, "Edit") { (state.selected as? TextLayer)?.let { typing = it.text } }
-                        IconTool(R.drawable.ic_match_case, "Font", panel == Panel.Font) { toggle(Panel.Font) }
-                        IconTool(R.drawable.ic_palette, "Color", panel == Panel.Color) { toggle(Panel.Color) }
-                        IconTool(R.drawable.ic_border_color, "Stroke", panel == Panel.Stroke) { toggle(Panel.Stroke) }
-                        IconTool(R.drawable.ic_rectangle, "Box", panel == Panel.Box) { toggle(Panel.Box) }
-                        IconTool(R.drawable.ic_text_fields, "Style", panel == Panel.Style) { toggle(Panel.Style) }
-                        if (video != null) IconTool(R.drawable.ic_animation, "Animate", panel == Panel.Animate) { toggle(Panel.Animate) }
-                        IconTool(R.drawable.ic_content_copy, "Duplicate", onClick = vm::duplicateSelected)
-                        IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
-                        IconTool(R.drawable.ic_flip_to_back, "Back", onClick = vm::sendToBack)
-                        IconTool(R.drawable.ic_delete, "Delete", onClick = vm::deleteSelected)
+                        IconTool(R.drawable.ic_edit, stringResource(R.string.edit)) { (state.selected as? TextLayer)?.let { typing = it.text } }
+                        IconTool(R.drawable.ic_match_case, stringResource(R.string.tool_font), panel == Panel.Font) { toggle(Panel.Font) }
+                        IconTool(R.drawable.ic_palette, stringResource(R.string.tool_color), panel == Panel.Color) { toggle(Panel.Color) }
+                        IconTool(R.drawable.ic_border_color, stringResource(R.string.tool_stroke), panel == Panel.Stroke) { toggle(Panel.Stroke) }
+                        IconTool(R.drawable.ic_rectangle, stringResource(R.string.tool_box), panel == Panel.Box) { toggle(Panel.Box) }
+                        IconTool(R.drawable.ic_text_fields, stringResource(R.string.tool_style), panel == Panel.Style) { toggle(Panel.Style) }
+                        if (video != null) IconTool(R.drawable.ic_animation, stringResource(R.string.tool_animate), panel == Panel.Animate) { toggle(Panel.Animate) }
+                        IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
+                        IconTool(R.drawable.ic_flip_to_front, stringResource(R.string.tool_front), onClick = vm::bringToFront)
+                        IconTool(R.drawable.ic_flip_to_back, stringResource(R.string.tool_back), onClick = vm::sendToBack)
+                        IconTool(R.drawable.ic_delete, stringResource(R.string.delete), onClick = vm::deleteSelected)
                     }
                     4 -> {
-                        IconTool(R.drawable.ic_check, "Done") { vm.select(null) }
+                        IconTool(R.drawable.ic_check, stringResource(R.string.done)) { vm.select(null) }
                         ToolDivider()
-                        IconTool(R.drawable.ic_draw, "Draw", onClick = ::draw)
-                        IconTool(R.drawable.ic_content_copy, "Duplicate", onClick = vm::duplicateSelected)
-                        IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
-                        IconTool(R.drawable.ic_flip_to_back, "Back", onClick = vm::sendToBack)
-                        IconTool(R.drawable.ic_delete, "Delete", onClick = vm::deleteSelected)
+                        IconTool(R.drawable.ic_draw, stringResource(R.string.tool_draw), onClick = ::draw)
+                        IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
+                        IconTool(R.drawable.ic_flip_to_front, stringResource(R.string.tool_front), onClick = vm::bringToFront)
+                        IconTool(R.drawable.ic_flip_to_back, stringResource(R.string.tool_back), onClick = vm::sendToBack)
+                        IconTool(R.drawable.ic_delete, stringResource(R.string.delete), onClick = vm::deleteSelected)
                     }
                     3 -> {
-                        IconTool(R.drawable.ic_check, "Done") { vm.select(null) }
+                        IconTool(R.drawable.ic_check, stringResource(R.string.done)) { vm.select(null) }
                         ToolDivider()
-                        IconTool(R.drawable.ic_tune, "Edit", panel == Panel.Overlay) { toggle(Panel.Overlay) }
-                        IconTool(R.drawable.ic_content_copy, "Duplicate", onClick = vm::duplicateSelected)
-                        IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
-                        IconTool(R.drawable.ic_flip_to_back, "Back", onClick = vm::sendToBack)
-                        IconTool(R.drawable.ic_delete, "Delete", onClick = vm::deleteSelected)
+                        IconTool(R.drawable.ic_tune, stringResource(R.string.edit), panel == Panel.Overlay) { toggle(Panel.Overlay) }
+                        IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
+                        IconTool(R.drawable.ic_flip_to_front, stringResource(R.string.tool_front), onClick = vm::bringToFront)
+                        IconTool(R.drawable.ic_flip_to_back, stringResource(R.string.tool_back), onClick = vm::sendToBack)
+                        IconTool(R.drawable.ic_delete, stringResource(R.string.delete), onClick = vm::deleteSelected)
                     }
                     else -> {
-                        IconTool(R.drawable.ic_check, "Done") { vm.select(null) }
+                        IconTool(R.drawable.ic_check, stringResource(R.string.done)) { vm.select(null) }
                         ToolDivider()
-                        IconTool(R.drawable.ic_background_replace, "Remove BG", onClick = vm::removeBackground)
-                        IconTool(R.drawable.ic_ink_eraser, "Eraser") {
+                        IconTool(R.drawable.ic_background_replace, stringResource(R.string.tool_remove_bg), onClick = vm::removeBackground)
+                        IconTool(R.drawable.ic_ink_eraser, stringResource(R.string.tool_eraser)) {
                             (state.selected as? ImageLayer)?.let { l -> scope.launch { erasing = l to vm.loadSource(l) } }
                         }
-                        IconTool(R.drawable.ic_crop, "Crop") { cropping = state.selected as? ImageLayer }
-                        IconTool(R.drawable.ic_tune, "Adjust", panel == Panel.Adjust) { toggle(Panel.Adjust) }
-                        IconTool(R.drawable.ic_filter_vintage, "Filters", panel == Panel.Filters) { toggle(Panel.Filters) }
-                        if (video != null) IconTool(R.drawable.ic_animation, "Animate", panel == Panel.Animate) { toggle(Panel.Animate) }
-                        IconTool(R.drawable.ic_library_add, "Save sticker", onClick = vm::saveSticker)
-                        IconTool(R.drawable.ic_content_copy, "Duplicate", onClick = vm::duplicateSelected)
-                        IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
-                        IconTool(R.drawable.ic_flip_to_back, "Back", onClick = vm::sendToBack)
-                        IconTool(R.drawable.ic_delete, "Delete", onClick = vm::deleteSelected)
+                        IconTool(R.drawable.ic_crop, stringResource(R.string.tool_crop)) { cropping = state.selected as? ImageLayer }
+                        IconTool(R.drawable.ic_tune, stringResource(R.string.tool_adjust), panel == Panel.Adjust) { toggle(Panel.Adjust) }
+                        IconTool(R.drawable.ic_filter_vintage, stringResource(R.string.tool_filters), panel == Panel.Filters) { toggle(Panel.Filters) }
+                        if (video != null) IconTool(R.drawable.ic_animation, stringResource(R.string.tool_animate), panel == Panel.Animate) { toggle(Panel.Animate) }
+                        IconTool(R.drawable.ic_library_add, stringResource(R.string.tool_save_sticker), onClick = vm::saveSticker)
+                        IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
+                        IconTool(R.drawable.ic_flip_to_front, stringResource(R.string.tool_front), onClick = vm::bringToFront)
+                        IconTool(R.drawable.ic_flip_to_back, stringResource(R.string.tool_back), onClick = vm::sendToBack)
+                        IconTool(R.drawable.ic_delete, stringResource(R.string.delete), onClick = vm::deleteSelected)
                     }
                 }
             }
@@ -703,7 +704,7 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
         }
         if (viewZoom > 1.01f) {
             Text(
-                "Fit",
+                stringResource(R.string.fit),
                 color = Ink.onAccent,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
@@ -870,9 +871,9 @@ private fun TextEntry(initial: String, font: Typeface, color: Int, onDone: (Stri
     BackHandler(onBack = onCancel)
     Column(Modifier.fillMaxSize().background(Ink.bg.copy(alpha = 0.94f)).blockTouches().imePadding()) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            CircleButton(R.drawable.ic_close, "Cancel", onClick = onCancel)
+            CircleButton(R.drawable.ic_close, stringResource(R.string.cancel), onClick = onCancel)
             Spacer(Modifier.weight(1f))
-            CircleButton(R.drawable.ic_check, "Done", enabled = value.text.isNotBlank()) { onDone(value.text, fill) }
+            CircleButton(R.drawable.ic_check, stringResource(R.string.done), enabled = value.text.isNotBlank()) { onDone(value.text, fill) }
         }
         Box(Modifier.weight(1f).fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
             BasicTextField(
@@ -883,7 +884,7 @@ private fun TextEntry(initial: String, font: Typeface, color: Int, onDone: (Stri
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
                 decorationBox = { field ->
                     Box(contentAlignment = Alignment.Center) {
-                        if (value.text.isEmpty()) Text("Enter your text", color = Ink.dim, fontSize = 36.sp, fontFamily = FontFamily(font), textAlign = TextAlign.Center)
+                        if (value.text.isEmpty()) Text(stringResource(R.string.text_hint), color = Ink.dim, fontSize = 36.sp, fontFamily = FontFamily(font), textAlign = TextAlign.Center)
                         field()
                     }
                 },

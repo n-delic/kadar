@@ -13,6 +13,8 @@ The owner's phone is a Galaxy S25. It also gets installed on older family phones
 - **Photo**: open a photo, blank canvas, or web image; add text (meme outline style), emoji, images and saved stickers as layers; move, pinch-resize, rotate; remove backgrounds on-device; change canvas aspect and background; export JPEG/PNG to `Pictures/Kadar`.
 - **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time; export H.264/AAC MP4 to `Movies/Kadar`.
 - **Undo / redo** for every edit (gestures and timeline drags count once per drag).
+- **Snapping** to the canvas center and 0°/90°, caption boxes behind text, a Layers panel, keep-pitch for speed changes.
+- **Share to Kadar**: `MainActivity` (singleTask) takes `ACTION_SEND` images and videos and calls `EditorViewModel.openShared`.
 - **Projects**: every edit autosaves into the app's private storage and shows up on the home screen; reopen or long-press to delete.
 - **Web images**: an in-app browser (Google Images by default). Long-press an image to download it into the project, never into the gallery.
 - **My stickers**: cut-outs saved for reuse across projects.
@@ -68,7 +70,7 @@ emulator -avd pixel_7_api35   # reference emulator (Google Play image, needed fo
 1. **One drawing path.** The stage, the photo export, the video overlay and the thumbnails all go through `drawLayer`/`renderLayers`. Never draw a layer type a second way, or exports stop matching the screen.
 2. **Canvas pixels are the unit.** Layer transforms are in full-resolution canvas pixels (photo size or video display size). The stage only scales for display; gestures divide by that scale.
 3. **Never lose a project.** Project writes go through `writeAtomic` (write then rename) under `saveLock`. A missing image drops only its layer, never the whole project. If you change the JSON format, bump `version` in `Project.toJson`, keep reading older files, and default new fields with `opt*`.
-4. **Images live in the project folder.** Every bitmap a layer uses is written once with `ProjectStore.writeImage` and referenced by file name. Videos and music are referenced by content URI with a persisted read grant (`keepAccess`); don't copy them (they're large).
+4. **Images live in the project folder.** Every bitmap a layer uses is written once with `ProjectStore.writeImage` and referenced by file name; `ProjectStore.cleanUp` removes unreferenced ones on close. Videos and music are referenced by content URI with a persisted read grant (`keepAccess`); only when that fails (a one-time share grant) is the video copied into the project as `video.mp4`.
 5. **Nothing goes to the gallery except an export.** Web downloads, cut-outs and stickers stay in app storage. Exports go to `Pictures/Kadar` or `Movies/Kadar` through `saveToGallery` (no storage permission needed).
 6. **Offline first.** No analytics, no accounts, no cloud APIs. The browser is the only feature that needs internet; don't add features that silently require it.
 7. **Treat web input as untrusted.** `downloadImage` accepts only `http(s)` and base64 `data:` URLs, caps the size, and must fail with a message, not a crash.

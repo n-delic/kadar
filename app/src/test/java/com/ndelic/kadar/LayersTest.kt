@@ -42,4 +42,15 @@ class LayersTest {
         val cuts = segmentBounds(listOf(0L to Long.MAX_VALUE, 1000L to 2000L, 2500L to 9000L), 3000)
         assertEquals(listOf(0L to 1000L, 1000L to 2000L, 2000L to 2500L, 2500L to 3000L), cuts)
     }
+
+    @Test
+    fun snappedPullsOntoCenterAndRightAngles() {
+        val t = Transform(503f, 300f, rotation = 92.5f).snapped(cx = 500f, cy = 500f, distance = 5f)
+        assertEquals(500f, t.x, 0.001f)
+        assertEquals(300f, t.y, 0.001f) // too far from the center line to snap
+        assertEquals(90f, t.rotation, 0.001f)
+        // Keeps the winding: -358° is 2° off 0°, so it snaps to -360°, not to 0°.
+        assertEquals(-360f, Transform(0f, 0f, rotation = -358f).snapped(1000f, 1000f, 5f).rotation, 0.001f)
+        assertEquals(45f, Transform(0f, 0f, rotation = 45f).snapped(1000f, 1000f, 5f).rotation, 0.001f)
+    }
 }

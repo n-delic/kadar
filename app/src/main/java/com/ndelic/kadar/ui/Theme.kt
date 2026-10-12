@@ -212,6 +212,26 @@ fun KSlider(@DrawableRes icon: Int?, value: Float, range: ClosedFloatingPointRan
     }
 }
 
+/** A setting row with a small pill switch on the right. */
+@Composable
+fun KToggle(title: String, subtitle: String?, on: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { onChange(!on) }.padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Ink.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            subtitle?.let { Text(it, color = Ink.dim, fontSize = 12.sp) }
+        }
+        Box(
+            Modifier.size(width = 44.dp, height = 26.dp).clip(CircleShape).background(if (on) Ink.accent else Ink.line).padding(3.dp),
+            contentAlignment = if (on) Alignment.CenterEnd else Alignment.CenterStart,
+        ) {
+            Box(Modifier.size(20.dp).clip(CircleShape).background(Ink.text))
+        }
+    }
+}
+
 @Composable
 fun PanelLabel(text: String) {
     Text(text.uppercase(), color = Ink.dim, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.sp)

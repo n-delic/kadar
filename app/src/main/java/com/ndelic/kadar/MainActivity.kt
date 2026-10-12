@@ -3,7 +3,10 @@ package com.ndelic.kadar
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.net.Uri
 import androidx.activity.ComponentActivity
+import androidx.activity.viewModels
+import androidx.core.content.IntentCompat
 import androidx.activity.compose.setContent
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
@@ -36,7 +39,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
@@ -54,15 +56,30 @@ import com.ndelic.kadar.ui.WebImportScreen
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    private val vm: EditorViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Only the first launch: after rotation the same share intent would open a second copy.
+        if (savedInstanceState == null) openShared(intent)
         // Light status and navigation icons: the app is always dark, whatever the system theme.
         enableEdgeToEdge(SystemBarStyle.dark(android.graphics.Color.TRANSPARENT), SystemBarStyle.dark(android.graphics.Color.TRANSPARENT))
         setContent {
             KadarTheme {
-                App(viewModel())
+                App(vm)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openShared(intent)
+    }
+
+    private fun openShared(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SEND) return
+        val uri = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java) ?: return
+        vm.openShared(uri, intent.type ?: contentResolver.getType(uri) ?: "image/*")
     }
 }
 

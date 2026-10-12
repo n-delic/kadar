@@ -1,4 +1,4 @@
-@file:OptIn(UnstableApi::class)
+@file:OptIn(UnstableApi::class, ExperimentalApi::class)
 
 package com.ndelic.kadar
 
@@ -11,7 +11,9 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.audio.DefaultGainProvider
 import androidx.media3.common.audio.GainProcessor
+import androidx.media3.common.audio.SonicAudioProcessor
 import androidx.media3.common.audio.SpeedProvider
+import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.OverlayEffect
@@ -40,6 +42,8 @@ data class VideoClip(
     val speed: Float = 1f,
     /** Volume of the video's own sound; 0 drops it. */
     val volume: Float = 1f,
+    /** Speeding up raises the pitch (chipmunk voice) unless this corrects it back. */
+    val keepPitch: Boolean = true,
     val music: Music? = null,
 ) {
     val outputDurationMs get() = ((endMs - startMs) / speed).toLong()
@@ -55,7 +59,7 @@ fun VideoClip.composition(overlay: TextureOverlay?): Composition {
         .setDurationUs(durationMs * 1000)
         .setRemoveAudio(volume == 0f)
         .setSpeed(ConstantSpeed(speed))
-        .setEffects(Effects(listOf(gain(volume)), emptyList()))
+        .setEffects(Effects(listOfNotNull(gain(volume), pitchFix(speed).takeIf { keepPitch && speed != 1f }), emptyList()))
         .build()
     val sequences = mutableListOf(EditedMediaItemSequence.Builder(video).build())
     music?.let { m ->
@@ -129,6 +133,9 @@ private fun clipped(uri: Uri, startMs: Long, endMs: Long) = MediaItem.Builder()
     .build()
 
 private fun gain(volume: Float) = GainProcessor(DefaultGainProvider.Builder(volume).build())
+
+/** The speed change scales every frequency by [speed]; shifting pitch by 1/[speed] cancels it without touching the length. */
+private fun pitchFix(speed: Float) = SonicAudioProcessor().apply { setPitch(1 / speed) }
 
 private class ConstantSpeed(private val speed: Float) : SpeedProvider {
     override fun getSpeed(timeUs: Long) = speed

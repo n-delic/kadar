@@ -47,6 +47,14 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
         return name
     }
 
+    /** Deletes images no layer uses any more (after undo history is gone, so nothing can bring them back). */
+    fun cleanUp(dir: File, project: Project) {
+        val used = project.layers.filterIsInstance<ImageLayer>().map { it.file }.toSet() + THUMB
+        dir.listFiles().orEmpty()
+            .filter { (it.name.endsWith(".png") || it.name.endsWith(".jpg")) && it.name !in used }
+            .forEach { it.delete() }
+    }
+
     fun save(dir: File, project: Project, thumb: Bitmap) {
         writeAtomic(File(dir, THUMB)) { thumb.compress(Bitmap.CompressFormat.JPEG, 85, it) }
         writeAtomic(File(dir, PROJECT)) { it.write(project.toJson().toString().toByteArray()) }
@@ -85,6 +93,7 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
                 size = j.getDouble("size").toFloat(),
                 color = j.getInt("color"),
                 outline = if (j.has("outline")) j.getInt("outline") else null,
+                box = if (j.has("box")) j.getInt("box") else null,
                 startMs = start,
                 endMs = end,
             )
@@ -99,6 +108,7 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
         endMs = j.getLong("endMs"),
         speed = j.getDouble("speed").toFloat(),
         volume = j.getDouble("volume").toFloat(),
+        keepPitch = j.optBoolean("keepPitch", true),
         music = j.optJSONObject("music")?.let {
             Music(Uri.parse(it.getString("uri")), it.getString("name"), it.getLong("durationMs"), it.getLong("startMs"), it.getDouble("volume").toFloat())
         },
@@ -140,6 +150,7 @@ private fun Layer.toJson() = JSONObject().apply {
             put("size", layer.size.toDouble())
             put("color", layer.color)
             layer.outline?.let { put("outline", it) }
+            layer.box?.let { put("box", it) }
         }
     }
 }
@@ -151,6 +162,7 @@ private fun VideoClip.toJson() = JSONObject().apply {
     put("endMs", endMs)
     put("speed", speed.toDouble())
     put("volume", volume.toDouble())
+    put("keepPitch", keepPitch)
     music?.let { m ->
         put("music", JSONObject().apply {
             put("uri", m.uri.toString())

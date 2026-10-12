@@ -1,4 +1,4 @@
-@file:OptIn(UnstableApi::class)
+@file:OptIn(UnstableApi::class, ExperimentalApi::class)
 
 package com.ndelic.kadar.ui
 
@@ -83,7 +83,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -99,6 +102,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
+import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.CompositionPlayer
 import com.ndelic.kadar.EditorUiState
@@ -108,6 +112,7 @@ import com.ndelic.kadar.Layer
 import com.ndelic.kadar.Project
 import com.ndelic.kadar.R
 import com.ndelic.kadar.TextLayer
+import com.ndelic.kadar.Transform
 import com.ndelic.kadar.VideoClip
 import com.ndelic.kadar.composition
 import com.ndelic.kadar.drawLayer
@@ -116,7 +121,7 @@ import kotlin.math.atan2
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-enum class Panel { Sticker, Canvas, Speed, Audio, Font, Color, Stroke }
+enum class Panel { Sticker, Canvas, Speed, Audio, Font, Color, Stroke, Box, Layers }
 
 @Composable
 fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
@@ -134,7 +139,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     var trimming by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(state.selectedId) {
-        panel = null
+        // Selecting from the Layers list keeps the list open; anything else starts from the layer's tools.
+        if (panel != Panel.Layers) panel = null
         if (state.selectedId != null) trimming = false
     }
     BackHandler {
@@ -202,6 +208,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     Panel.Font -> (selected as? TextLayer)?.let { FontPanel(it, vm) }
                     Panel.Color -> (selected as? TextLayer)?.let { t -> ColorRow(t.color, allowNone = false) { c -> c?.let { vm.editText { copy(color = it) } } } }
                     Panel.Stroke -> (selected as? TextLayer)?.let { t -> ColorRow(t.outline, allowNone = true) { vm.editText { copy(outline = it) } } }
+                    Panel.Box -> (selected as? TextLayer)?.let { t -> ColorRow(t.box, allowNone = true) { vm.editText { copy(box = it) } } }
+                    Panel.Layers -> LayersPanel(project.layers, state.selectedId, vm)
                 }
             }
         }
@@ -225,6 +233,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_sentiment_satisfied, "Sticker", panel == Panel.Sticker) { toggle(Panel.Sticker) }
                         IconTool(R.drawable.ic_image, "Image") { image.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) }
                         IconTool(R.drawable.ic_language, "Web", onClick = onBrowse)
+                        if (project.layers.isNotEmpty()) IconTool(R.drawable.ic_layers, "Layers", panel == Panel.Layers) { toggle(Panel.Layers) }
                         if (video != null) {
                             IconTool(R.drawable.ic_content_cut, "Trim", trimming) { trimming = !trimming }
                             IconTool(R.drawable.ic_speed, "Speed", panel == Panel.Speed) { toggle(Panel.Speed) }
@@ -240,6 +249,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_match_case, "Font", panel == Panel.Font) { toggle(Panel.Font) }
                         IconTool(R.drawable.ic_palette, "Color", panel == Panel.Color) { toggle(Panel.Color) }
                         IconTool(R.drawable.ic_border_color, "Stroke", panel == Panel.Stroke) { toggle(Panel.Stroke) }
+                        IconTool(R.drawable.ic_rectangle, "Box", panel == Panel.Box) { toggle(Panel.Box) }
                         IconTool(R.drawable.ic_flip_to_front, "Front", onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, "Back", onClick = vm::sendToBack)
                         IconTool(R.drawable.ic_delete, "Delete", onClick = vm::deleteSelected)
@@ -315,6 +325,33 @@ private fun ToolDivider() {
 
 private enum class Handle { Delete, Scale }
 
+/** Which snaps are active during a drag: drives the guide lines and a tick of haptic feedback when one engages. */
+private class Snaps(private val haptics: HapticFeedback) {
+    var x by mutableStateOf(false)
+    var y by mutableStateOf(false)
+    private var angle = false
+
+    fun apply(t: Transform, cx: Float, cy: Float, distance: Float): Transform {
+        val s = t.snapped(cx, cy, distance)
+        val nx = s.x == cx && distance > 0
+        val ny = s.y == cy && distance > 0
+        val na = s.rotation != t.rotation
+        if ((nx && !x) || (ny && !y) || (na && !angle)) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        x = nx
+        y = ny
+        angle = na
+        return s
+    }
+
+    fun clear() {
+        x = false
+        y = false
+        angle = false
+    }
+}
+
+private val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFF3D7F.toInt() }
+
 /**
  * The canvas: video preview underneath, layers drawn on top at screen scale.
  * Drag, pinch and twist move the selected layer; the corner handles delete it or scale and rotate it with one finger;
@@ -333,6 +370,11 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
         val current by rememberUpdatedState(selected)
         val editText by rememberUpdatedState(onEditText)
         val lastTap = remember { longArrayOf(-1, 0) } // layer id, time
+        val haptics = LocalHapticFeedback.current
+        val snaps = remember { Snaps(haptics) }
+        val cx = project.width / 2f
+        val cy = project.height / 2f
+        val snapDistance = with(density) { 10.dp.toPx() }
         val transparent = project.background == android.graphics.Color.TRANSPARENT
         Box(Modifier.size(size)) {
             Box(Modifier.fillMaxSize().clipToBounds().background(if (transparent) Color(0xFF3A3A3A) else Color(project.background))) {
@@ -364,10 +406,14 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                                     var first = true
                                     while (true) {
                                         val change = awaitPointerEvent().changes.first()
-                                        if (!change.pressed) break
+                                        if (!change.pressed) {
+                                            snaps.clear()
+                                            break
+                                        }
                                         val v = change.position - center
                                         val turn = Math.toDegrees((atan2(v.y, v.x) - atan2(v0.y, v0.x)).toDouble()).toFloat()
-                                        vm.setSelectedTransform(sel.t.copy(scale = sel.t.scale * v.getDistance() / v0.getDistance(), rotation = sel.t.rotation + turn), first)
+                                        val next = sel.t.copy(scale = sel.t.scale * v.getDistance() / v0.getDistance(), rotation = sel.t.rotation + turn)
+                                        vm.setSelectedTransform(snaps.apply(next, cx, cy, distance = 0f), first)
                                         first = false
                                         change.consume()
                                     }
@@ -377,6 +423,8 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                             val p = down.position / scale
                             val hit = layers.lastOrNull { it.t.contains(it.width, it.height, p.x, p.y) }
                             if (hit != null) vm.select(hit.id)
+                            // Track the unsnapped placement, so a layer can be pulled back out of a snap.
+                            var raw = (hit ?: sel)?.t
                             var moved = false
                             while (true) {
                                 val event = awaitPointerEvent()
@@ -385,11 +433,16 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                                 val zoom = event.calculateZoom()
                                 val rotation = event.calculateRotation()
                                 if (pan != Offset.Zero || zoom != 1f || rotation != 0f) {
-                                    vm.transformSelected(pan.x / scale, pan.y / scale, zoom, rotation, first = !moved)
+                                    raw?.let { r ->
+                                        val next = r.copy(x = r.x + pan.x / scale, y = r.y + pan.y / scale, scale = r.scale * zoom, rotation = r.rotation + rotation)
+                                        raw = next
+                                        vm.setSelectedTransform(snaps.apply(next, cx, cy, snapDistance / scale), first = !moved)
+                                    }
                                     moved = true
                                     event.changes.forEach { it.consume() }
                                 }
                             }
+                            snaps.clear()
                             if (!moved) {
                                 // A tap on empty canvas deselects; a second quick tap on text opens the editor.
                                 if (hit == null) vm.select(null)
@@ -407,6 +460,8 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                         c.scale(scale, scale)
                         shown.forEach { c.drawLayer(it) }
                         selected?.let { c.drawSelection(it, scale) }
+                        if (snaps.x) c.drawLine(cx, 0f, cx, project.height.toFloat(), guidePaint.also { it.strokeWidth = 2 / scale })
+                        if (snaps.y) c.drawLine(0f, cy, project.width.toFloat(), cy, guidePaint.also { it.strokeWidth = 2 / scale })
                         c.restore()
                     }
                 }

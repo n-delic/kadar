@@ -26,6 +26,17 @@ data class Transform(val x: Float, val y: Float, val scale: Float = 1f, val rota
         return abs(lx) <= width / 2 && abs(ly) <= height / 2
     }
 
+    /** Pulls the center onto the canvas center lines ([cx], [cy]) and the angle onto a multiple of 90° when they're close. */
+    fun snapped(cx: Float, cy: Float, distance: Float, degrees: Float = 4f): Transform {
+        val r = (rotation % 360 + 360) % 360
+        val off = r - (r / 90f).roundToInt() * 90f
+        return copy(
+            x = if (abs(x - cx) < distance) cx else x,
+            y = if (abs(y - cy) < distance) cy else y,
+            rotation = if (abs(off) < degrees) rotation - off else rotation,
+        )
+    }
+
     /** Moves the center by ([dx], [dy]) measured in the layer's own unscaled, unrotated pixels. */
     fun shiftedLocal(dx: Float, dy: Float): Transform {
         val r = Math.toRadians(rotation.toDouble())
@@ -82,6 +93,8 @@ data class TextLayer(
     val color: Int,
     /** Outline color, or null for no outline. */
     val outline: Int?,
+    /** Rounded box behind the text (caption style), or null for none. */
+    val box: Int? = null,
     override val startMs: Long = 0,
     override val endMs: Long = Long.MAX_VALUE,
 ) : Layer {
@@ -97,11 +110,17 @@ data class TextLayer(
             .build()
     }
     private val stroke get() = if (outline == null) 0f else size * 0.16f
+    private val boxPadX get() = if (box == null) 0f else size * 0.3f
+    private val boxPadY get() = if (box == null) 0f else size * 0.12f
 
-    override val width get() = layout.width + stroke
-    override val height get() = layout.height + stroke
+    override val width get() = layout.width + stroke + 2 * boxPadX
+    override val height get() = layout.height + stroke + 2 * boxPadY
 
     override fun drawContent(canvas: Canvas) {
+        if (box != null) {
+            boxPaint.color = box
+            canvas.drawRoundRect(-width / 2, -height / 2, width / 2, height / 2, size * 0.25f, size * 0.25f, boxPaint)
+        }
         canvas.translate(-layout.width / 2f, -layout.height / 2f)
         if (outline != null) {
             paint.style = Paint.Style.STROKE
@@ -120,6 +139,7 @@ data class TextLayer(
 }
 
 private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+private val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
 fun Canvas.drawLayer(layer: Layer) {
     save()

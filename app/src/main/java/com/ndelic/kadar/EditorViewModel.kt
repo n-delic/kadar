@@ -1,3 +1,5 @@
+@file:OptIn(UnstableApi::class)
+
 package com.ndelic.kadar
 
 import android.app.Application
@@ -7,8 +9,10 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
 import android.net.Uri
+import androidx.annotation.OptIn
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.media3.common.util.UnstableApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -84,7 +88,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         refreshProjects()
         loadStickers()
         viewModelScope.launch {
-            @OptIn(FlowPreview::class)
+            @kotlin.OptIn(FlowPreview::class)
             uiState.map { it.projectDir to it.project }.distinctUntilChanged().debounce(800).collect { (dir, project) ->
                 if (dir != null && project != null && project != lastSaved) save(dir, project)
             }
@@ -106,11 +110,33 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun newBlank() = open(store.create(), Project(1080, 1080))
 
-    fun newVideo(uri: Uri) = work("Opening video") {
-        keepAccess(uri)
+    fun newVideo(uri: Uri) = work("Opening video") { newVideoNow(uri) }
+
+    private suspend fun newVideoNow(shared: Uri) {
+        val dir = store.create()
+        // A video shared from another app comes with a one-time grant; keep a copy so the project still opens later.
+        val uri = if (keepAccess(shared)) shared else withContext(Dispatchers.IO) {
+            val copy = File(dir, "video.mp4")
+            app.contentResolver.openInputStream(shared)!!.use { input -> copy.outputStream().use { input.copyTo(it) } }
+            Uri.fromFile(copy)
+        }
         val (info, frame) = withContext(Dispatchers.IO) { mediaInfo(app, uri) to videoFrame(app, uri, 0) }
-        if (info.width == 0 || info.durationMs == 0L) error("Can't read this video")
-        open(store.create(), Project(info.width, info.height, background = Color.BLACK, video = VideoClip(uri, info.durationMs)), frame)
+        if (info.width == 0 || info.durationMs == 0L) {
+            dir.deleteRecursively()
+            error("Can't read this video")
+        }
+        open(dir, Project(info.width, info.height, background = Color.BLACK, video = VideoClip(uri, info.durationMs)), frame)
+    }
+
+    /** "Share to Kadar" from the gallery or another app: saves whatever is open, then starts a project from it. */
+    fun openShared(uri: Uri, mime: String) = work("Opening") {
+        val s = _uiState.value
+        if (s.projectDir != null && s.project != null && s.project != lastSaved) save(s.projectDir, s.project)
+        try {
+            if (mime.startsWith("video/")) newVideoNow(uri) else newPhoto(withContext(Dispatchers.IO) { loadBitmap(app, uri, MAX_PHOTO) })
+        } catch (e: SecurityException) {
+            throw IllegalStateException("The other app didn't let Kadar open that file", e)
+        }
     }
 
     fun openProject(dir: File) = work("Opening") {
@@ -132,7 +158,10 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val s = _uiState.value
         if (s.busy != null) return
         viewModelScope.launch {
-            if (s.projectDir != null && s.project != null && s.project != lastSaved) save(s.projectDir, s.project)
+            if (s.projectDir != null && s.project != null) {
+                if (s.project != lastSaved) save(s.projectDir, s.project)
+                withContext(Dispatchers.IO) { store.cleanUp(s.projectDir, s.project) }
+            }
             _uiState.update { it.copy(projectDir = null, project = null, selectedId = null) }
             refreshProjects()
         }
@@ -190,7 +219,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     /** Photo picker and document URIs expire when the app closes unless we keep the grant; saved projects need them later. */
     private fun keepAccess(uri: Uri) = runCatching {
         app.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
+    }.isSuccess
 
     // Layers
 
@@ -243,6 +272,14 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     fun bringToFront() {
         val layer = _uiState.value.selected ?: return
         updateProject { p -> p.copy(layers = p.layers.filter { it.id != layer.id } + layer) }
+    }
+
+    /** Moves the layer [by] places up (+) or down (-) the stack. */
+    fun moveLayer(id: Long, by: Int) = updateProject { p ->
+        val from = p.layers.indexOfFirst { it.id == id }
+        if (from < 0) return@updateProject p
+        val to = (from + by).coerceIn(0, p.layers.lastIndex)
+        p.copy(layers = p.layers.toMutableList().apply { add(to, removeAt(from)) })
     }
 
     fun sendToBack() {

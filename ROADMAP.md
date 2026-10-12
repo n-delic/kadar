@@ -22,16 +22,21 @@
 - Layer order: Front and Back
 - Share button exports and opens the share sheet directly
 
+## v0.3: done
+
+- Snap to the canvas center lines and to 0°/90°, with guide lines and a haptic tick
+- Caption box behind text (any color)
+- Keep voice pitch when changing speed (on by default; off for the chipmunk / slow-mo voice)
+- Layers panel: the whole stack, tap to select, arrows to reorder (photos and video tracks)
+- "Share to Kadar" from the gallery or any app; shared videos are copied into the project when the grant can't be kept
+- Unused images are deleted from a project folder when it's closed
+
 ## Next
 
-- [ ] Keep pitch when changing video speed (today 2x also raises the pitch)
 - [ ] Manual eraser / restore brush to fix background-removal edges
 - [ ] Crop a single image layer
-- [ ] Text background box (caption style), shadow, letter spacing, alignment
-- [ ] Layer list for photos (reorder by drag, hide, lock); drag tracks up/down to reorder in video
-- [ ] Snap to center and to 0°/90° while moving and rotating
-- [ ] "Share to Kadar" from the gallery and other apps (open a photo or video directly)
-- [ ] Clean up unused images inside a project folder
+- [ ] Text shadow, letter spacing, alignment
+- [ ] Hide and lock layers; drag tracks up/down to reorder
 
 ## Later / maybe
 

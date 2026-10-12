@@ -93,7 +93,7 @@ data class ImageLayer(
     override val hidden: Boolean = false,
     override val locked: Boolean = false,
 ) : Layer {
-    private val paint = if (adjust.isNone) bitmapPaint else Paint(bitmapPaint).apply { colorFilter = ColorMatrixColorFilter(adjust.colorMatrix()) }
+    private val paint = if (adjust.isNone) bitmapPaint else Paint(bitmapPaint).apply { colorFilter = ColorMatrixColorFilter(adjust.filterMatrix()) }
     override val width get() = bitmap.width.toFloat()
     override val height get() = bitmap.height.toFloat()
     override fun drawContent(canvas: Canvas) = canvas.drawBitmap(bitmap, -width / 2, -height / 2, paint)
@@ -102,19 +102,27 @@ data class ImageLayer(
     override fun withFlags(hidden: Boolean, locked: Boolean) = copy(hidden = hidden, locked = locked)
 }
 
-/** Brightness, contrast and saturation, each -1..1 with 0 meaning unchanged. Used by image layers and the video. */
-data class Adjust(val brightness: Float = 0f, val contrast: Float = 0f, val saturation: Float = 0f) {
-    val isNone get() = brightness == 0f && contrast == 0f && saturation == 0f
+/**
+ * Brightness, contrast and saturation, each -1..1 with 0 meaning unchanged, plus a [Look] blended in by [amount] (0..1).
+ * Used by image layers and the video.
+ */
+data class Adjust(
+    val brightness: Float = 0f,
+    val contrast: Float = 0f,
+    val saturation: Float = 0f,
+    val look: Look = Look.None,
+    val amount: Float = 1f,
+) {
+    val isNone get() = brightness == 0f && contrast == 0f && saturation == 0f && (look == Look.None || amount == 0f)
 
     /** 4x5 color matrix for [android.graphics.ColorMatrix]: saturate, then contrast around mid-gray, then brighten. */
     fun colorMatrix(): FloatArray {
         val s = 1 + saturation
         val k = 1 + contrast
         val offset = 128 * (1 - k) + 128 * brightness
-        val luma = floatArrayOf(0.2126f, 0.7152f, 0.0722f)
         val m = FloatArray(20)
         for (row in 0..2) {
-            for (col in 0..2) m[row * 5 + col] = k * (luma[col] * (1 - s) + if (row == col) s else 0f)
+            for (col in 0..2) m[row * 5 + col] = k * (LUMA[col] * (1 - s) + if (row == col) s else 0f)
             m[row * 5 + 4] = offset
         }
         m[18] = 1f

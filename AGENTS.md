@@ -14,6 +14,7 @@ The owner's phone is a Galaxy S25; it also runs on older phones, hence `minSdk 2
 - **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time; export H.264/AAC MP4 to `Movies/Kadar`.
 - **Undo / redo** for every edit (gestures and timeline drags count once per drag).
 - **Snapping** to the canvas center and 0°/90°, caption boxes behind text, a Layers panel (photos only, top-bar button; video shows layers as timeline tracks), keep-pitch for speed changes.
+- **Filters** (`Looks.kt`, `ui/FiltersPanel.kt`): in-house looks as 4x5 color matrices, blended by a strength and stored on `Adjust` (`look`, `amount`). `Adjust.filterMatrix()` (look, then the sliders) is the one matrix for the image layer paint and, through `glRgbMatrix`, the video's Media3 `RgbMatrix`, so photos and video match.
 - **Eraser / restore brush and crop** for image layers (`ui/ImageTools.kt`). `ImageLayer.source` + `sourceX/Y` remember the untouched original and where the layer's bitmap sits in it; keep them right in any new operation that resizes or crops a bitmap.
 - **Settings** (`Settings.kt`, `ui/SettingsScreen.kt`): image search engine, default export size (per-project override in the Canvas panels), About with the bundled license texts (`third_party/` is packaged as app assets).
 - **Share to Kadar**: `MainActivity` (singleTask) takes `ACTION_SEND` images and videos and calls `EditorViewModel.openShared`.
@@ -40,6 +41,7 @@ Versions live in `gradle/libs.versions.toml`.
 ```
 app/src/main/java/com/ndelic/kadar/
   Layers.kt           Transform (placement + hit test), Layer / ImageLayer / TextLayer, drawLayer, renderLayers, opaqueBounds
+  Looks.kt            Filters: Look matrices, Adjust.filterMatrix() (look + sliders), glRgbMatrix() for Media3
   Projects.kt         Project model, ProjectStore (one folder per project: project.json, thumb.jpg, images), JSON mapping
   Media.kt            Bitmap decode/download, video info and frames, gallery export (MediaStore), ML Kit cut-out
   VideoEdit.kt        VideoClip / Music, VideoClip.composition(), exportVideo() via Transformer
@@ -49,13 +51,15 @@ app/src/main/java/com/ndelic/kadar/
   ui/HomeScreen.kt    Create tiles (video / photo / blank / web), project grid
   ui/EditorScreen.kt  Top bar (close, undo/redo, save, share), Stage (canvas, handles, video preview), tool row,
                       NLE Timeline (layer tracks + clip), TrimStrip, full-screen TextEntry
-  ui/Panels.kt        Tool panels: stickers, canvas, speed, audio, font
+  ui/Panels.kt        Tool panels: stickers, canvas, speed, audio, font, adjust
+  ui/FiltersPanel.kt  Look tiles previewed on the image or a video frame, plus the strength slider
   ui/WebImportScreen.kt  WebView browser with long-press-to-import
   ui/ImageTools.kt    EraseScreen (erase/restore brush) and CropScreen for image layers
 app/src/main/res/font/anton.ttf          Meme font (SIL OFL, license in third_party/)
 app/src/main/res/font/jakarta.ttf        UI font, Plus Jakarta Sans variable (SIL OFL)
 scripts/add-icons.sh                     Fetches Material Symbols as vector drawables
 app/src/test/.../LayersTest.kt           JVM tests for transform math, transparent-border trimming, timeline segments
+app/src/test/.../LooksTest.kt            JVM tests for look/adjust matrix composition and the Media3 matrix conversion
 ```
 
 ## Commands

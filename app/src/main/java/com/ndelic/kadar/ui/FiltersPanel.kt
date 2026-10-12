@@ -1,0 +1,70 @@
+package com.ndelic.kadar.ui
+
+import android.graphics.Bitmap
+import android.graphics.ColorMatrixColorFilter
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asComposeColorFilter
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.ndelic.kadar.Adjust
+import com.ndelic.kadar.Look
+import com.ndelic.kadar.filterMatrix
+import com.ndelic.kadar.scaleDown
+
+/** One tile per [Look], previewed on [source] (the image layer or a video frame) with the current sliders, plus its strength. */
+@Composable
+fun FiltersPanel(source: Bitmap?, adjust: Adjust, onChange: (Adjust) -> Unit) {
+    val thumb = remember(source) { source?.let { scaleDown(it, 160).asImageBitmap() } }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(Look.entries) { look ->
+                val active = look == adjust.look
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { if (!active) onChange(adjust.copy(look = look, amount = 1f)) }.padding(4.dp),
+                ) {
+                    Box(
+                        Modifier
+                            .size(64.dp)
+                            .border(2.dp, if (active) Ink.accent else Color.Transparent, RoundedCornerShape(10.dp))
+                            .padding(4.dp)
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(Ink.raised),
+                    ) {
+                        if (thumb != null) {
+                            // The platform filter an image layer's paint uses, so the tile shows what the stage will.
+                            val filter = remember(adjust, look) { ColorMatrixColorFilter(adjust.copy(look = look, amount = 1f).filterMatrix()).asComposeColorFilter() }
+                            Image(thumb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, colorFilter = filter)
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(look.label, color = if (active) Ink.accent else Ink.dim, fontSize = 11.sp, maxLines = 1)
+                }
+            }
+        }
+        if (adjust.look != Look.None) KSlider(null, adjust.amount, 0f..1f, ::percent) { onChange(adjust.copy(amount = it)) }
+    }
+}

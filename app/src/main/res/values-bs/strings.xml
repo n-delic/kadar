@@ -36,6 +36,7 @@
     <string name="projects">Projekti</string>
     <string name="projects_empty">Još ništa. Sve što napraviš automatski se sprema ovdje.</string>
     <string name="projects_search">Traži projekte</string>
+    <string name="just_now">Upravo sada</string>
     <string name="projects_no_match">Nijedan projekat ne sadrži \"%1$s\"</string>
     <string name="sort_recent">Nedavno</string>
     <string name="sort_name">Naziv</string>

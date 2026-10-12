@@ -227,7 +227,9 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, 
                     modifier = Modifier.padding(top = 5.dp, start = 2.dp, end = 2.dp),
                 )
                 Text(
-                    DateUtils.getRelativeTimeSpanString(p.modified).toString(),
+                    // The platform says "0 minutes ago" for the first minute.
+                    if (System.currentTimeMillis() - p.modified < DateUtils.MINUTE_IN_MILLIS) stringResource(R.string.just_now)
+                    else DateUtils.getRelativeTimeSpanString(p.modified).toString(),
                     color = Ink.dim,
                     fontSize = 11.sp,
                     maxLines = 1,

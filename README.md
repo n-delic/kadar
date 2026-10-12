@@ -8,12 +8,12 @@
 <p align="center">
   <img src="docs/screenshots/home.jpg" width="230" alt="Kadar home screen">
   <img src="docs/screenshots/photo-editor.jpg" width="230" alt="Photo editor with a cut-out and a meme caption">
-  <img src="docs/screenshots/video-editor.jpg" width="230" alt="Video editor with two timed captions on the timeline">
+  <img src="docs/screenshots/video-editor.jpg" width="230" alt="Video editor with a blurred 9:16 canvas and two timed captions on the timeline">
 </p>
 
 <p align="center">
   <b>A free, open-source photo and video editor for Android.</b><br>
-  Cut-outs, captions, stickers, trim, speed, music and a real layer timeline. No account, no subscription, no watermark, no ads.
+  Cut-outs, captions, stickers, filters, video over video, voiceover, music and a real layer timeline. No account, no subscription, no watermark, no ads.
 </p>
 
 <p align="center">
@@ -42,7 +42,10 @@ phone.
 - **Eraser and restore brush.** Clean up the edges by hand; restore paints the original image back in
   place. Two fingers zoom and pan while you work.
 - **Crop** any image layer, freely or at 1:1, 4:5, 9:16 or 16:9.
-- **Adjust** brightness, contrast and saturation per image.
+- **Filters and adjust.** Eight looks (Mono, Noir, Sepia, Warm, Cool, Vivid, Fade, Teal & Orange) with a
+  strength slider, plus brightness, contrast and saturation, per image.
+- **Draw.** Circle things, draw arrows or scribble with a marker or a see-through highlighter. Each
+  drawing is a layer you can move, resize and draw more onto.
 - **Text.** A classic meme font, eight more free caption fonts (tall, condensed, heavy, comic, marker,
   casual, retro script, horror) and the system fonts, fill and outline colors, a caption box behind the
   text, shadow, letter spacing and alignment. Double-tap text to edit it.
@@ -53,14 +56,21 @@ phone.
 
 ### Video
 
-- **A timeline with layer tracks.** Every caption and sticker gets its own track above the clip. Drag
-  its ends to choose when it appears and disappears, or drag the middle to move it.
+- **A timeline with layer tracks.** Every caption, sticker, drawing and clip on top gets its own track
+  above the main clip. Drag its ends to choose when it appears and disappears, drag the middle to move it,
+  long-press to reorder, and hide or lock it from the left. Pinch to zoom in on long videos.
+- **Video over video.** Put more clips on top, picture-in-picture style: move, resize, rotate, fade them,
+  start them from the middle, with their own volume.
+- **Animations.** Captions and stickers can fade, pop or slide in and out.
 - **Trim** the clip with handles on a strip of frames.
 - **Speed** from 0.25x to 4x, with the voice pitch kept natural (or not, for the chipmunk effect).
-- **Music.** Add a song, set its volume and where it starts; it loops or is cut to fit. The video's own
-  sound has its own volume.
-- **Canvas.** Turn a landscape clip into 9:16 for reels and stories, or 1:1 and 4:5 for feeds.
-- **Adjust** brightness, contrast and saturation.
+- **Music.** Add a song, set its volume and where it starts, fade it in and out; it loops or is cut to
+  fit. The video's own sound has its own volume.
+- **Voiceover.** Record your voice from the playhead while the video plays, as many takes as you like,
+  each with its own volume.
+- **Canvas.** Turn a landscape clip into 9:16 for reels and stories, or 1:1 and 4:5 for feeds, with black
+  bars or a blurred copy of the video behind it.
+- **Filters and adjust** for the whole video, the same looks as for photos.
 - **What you see is what you export.** The preview runs the same edit the exporter does.
 
 ### Everywhere
@@ -71,9 +81,11 @@ phone.
   the project. It never lands in your gallery.
 - **Share to Kadar** from the gallery or any app to start a project.
 - **Export** to `Pictures/Kadar` and `Movies/Kadar` (JPEG, PNG, H.264 MP4), or straight to the share sheet.
+  Video exports show their progress and can be cancelled; pick Standard or High quality in Settings.
+- **English and Bosnian**, following the phone's language.
 
 <p align="center">
-  <img src="docs/screenshots/text-tools.jpg" width="230" alt="Text tools with the font picker open">
+  <img src="docs/screenshots/text-tools.jpg" width="230" alt="Font picker on a photo caption">
   <img src="docs/screenshots/eraser.jpg" width="230" alt="Eraser brush on a cut-out">
 </p>
 
@@ -85,6 +97,8 @@ Kadar has no accounts, analytics, ads or tracking, and it never uploads your pho
 - The **only** feature that uses the internet is the image browser, and only while you use it.
 - Background removal uses Google ML Kit on the device. The first time, Google Play services downloads
   the model (a few MB); after that it works offline. Your images are not sent anywhere.
+- The microphone is used only while you record a voiceover, and Android asks first. Recordings stay
+  inside the project.
 - Projects live in the app's private storage. Uninstalling the app deletes them; your exports in the
   gallery stay.
 

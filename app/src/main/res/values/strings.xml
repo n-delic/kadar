@@ -37,6 +37,7 @@
     <string name="projects">Projects</string>
     <string name="projects_empty">Nothing yet. Everything you make is saved here automatically.</string>
     <string name="projects_search">Search projects</string>
+    <string name="just_now">Just now</string>
     <string name="projects_no_match">No project matches \"%1$s\"</string>
     <string name="sort_recent">Recent</string>
     <string name="sort_name">Name</string>

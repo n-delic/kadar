@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.net.Uri
 import com.ndelic.kadar.video.Music
 import com.ndelic.kadar.video.VideoClip
+import com.ndelic.kadar.video.VoiceClip
 import java.io.File
 import java.io.OutputStream
 import kotlin.math.roundToInt
@@ -78,11 +79,15 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
         return name
     }
 
-    /** Deletes images no layer uses any more (after undo history is gone, so nothing can bring them back). */
+    /** A new, not yet existing file in the project folder for a voice recording (AAC in MP4, so `.m4a`). */
+    fun newVoiceFile(dir: File) = File(dir, "${System.nanoTime()}$VOICE_EXTENSION")
+
+    /** Deletes images and voice recordings nothing uses any more (after undo history is gone, so nothing can bring them back). */
     fun cleanUp(dir: File, project: Project) {
-        val used = project.layers.filterIsInstance<ImageLayer>().flatMap { listOfNotNull(it.file, it.source) }.toSet() + THUMB
+        val used = project.layers.filterIsInstance<ImageLayer>().flatMap { listOfNotNull(it.file, it.source) }.toSet() +
+            project.video?.voices.orEmpty().map { it.file.name } + THUMB
         dir.listFiles().orEmpty()
-            .filter { (it.name.endsWith(".png") || it.name.endsWith(".jpg")) && it.name !in used }
+            .filter { (it.name.endsWith(".png") || it.name.endsWith(".jpg") || it.name.endsWith(VOICE_EXTENSION)) && it.name !in used }
             .forEach { it.delete() }
     }
 
@@ -101,7 +106,7 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
             background = j.getInt("background"),
             layers = layers,
             // Projects from before the video canvas existed: the canvas was the video's own size.
-            video = j.optJSONObject("video")?.let { clipFromJson(it, j.getInt("width"), j.getInt("height")) },
+            video = j.optJSONObject("video")?.let { clipFromJson(dir, it, j.getInt("width"), j.getInt("height")) },
             exportSize = j.optString("exportSize").ifEmpty { null }?.let { enumOr<ExportSize>(it, ExportSize.Original) },
             name = j.optString("name").ifEmpty { null },
         )
@@ -190,7 +195,7 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
         }
     }
 
-    private fun clipFromJson(j: JSONObject, projectWidth: Int, projectHeight: Int) = VideoClip(
+    private fun clipFromJson(dir: File, j: JSONObject, projectWidth: Int, projectHeight: Int) = VideoClip(
         uri = Uri.parse(j.getString("uri")),
         durationMs = j.getLong("durationMs"),
         startMs = j.getLong("startMs"),
@@ -205,13 +210,25 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
         blur = j.optBoolean("blur"),
         adjust = adjustFromJson(j),
         music = j.optJSONObject("music")?.let {
-            Music(Uri.parse(it.getString("uri")), it.getString("name"), it.getLong("durationMs"), it.getLong("startMs"), it.getDouble("volume").toFloat())
+            Music(
+                Uri.parse(it.getString("uri")), it.getString("name"), it.getLong("durationMs"), it.getLong("startMs"), it.getDouble("volume").toFloat(),
+                fadeIn = it.optBoolean("fadeIn"),
+                fadeOut = it.optBoolean("fadeOut"),
+            )
         },
+        // A missing recording drops only that voice.
+        voices = j.optJSONArray("voices")?.let { a ->
+            (0 until a.length()).mapNotNull { i ->
+                val v = a.getJSONObject(i)
+                File(dir, v.getString("file")).takeIf { it.exists() }?.let { VoiceClip(it, v.getLong("startMs"), v.getLong("durationMs"), v.optDouble("volume", 1.0).toFloat()) }
+            }
+        }.orEmpty(),
     )
 
     private companion object {
         const val PROJECT = "project.json"
         const val THUMB = "thumb.jpg"
+        const val VOICE_EXTENSION = ".m4a"
     }
 }
 
@@ -307,8 +324,19 @@ private fun VideoClip.toJson() = JSONObject().apply {
             put("durationMs", m.durationMs)
             put("startMs", m.startMs)
             put("volume", m.volume.toDouble())
+            put("fadeIn", m.fadeIn)
+            put("fadeOut", m.fadeOut)
         })
     }
+    if (voices.isNotEmpty()) put("voices", JSONArray(voices.map { v ->
+        JSONObject().apply {
+            // Only the name: the folder moves with the project (duplicates load it from their own copy).
+            put("file", v.file.name)
+            put("startMs", v.startMs)
+            put("durationMs", v.durationMs)
+            put("volume", v.volume.toDouble())
+        }
+    }))
 }
 
 private fun adjustFromJson(j: JSONObject) = Adjust(

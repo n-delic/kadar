@@ -88,6 +88,17 @@ emulator -avd pixel_7_api35   # reference emulator (Google Play image, needed fo
 15. **Known patents to stay clear of** (checked 2026-10-12, assignee search, not a legal opinion): US11989808B2 covers recording a creator's edit steps as a "replay" others apply to their own photo; read its claims before building anything like edit-sharing templates. USD1056949S1 is a design patent on a staggered two-column card feed with a five-tab bottom bar and a central round "+"; don't build the home screen that way.
 16. **Smallest change that fully works.** No new dependencies, layers or abstractions without a clear need. UI text is English and inline for now (no translation yet).
 
+## Keep the codebase clean
+
+Several agents work on this repo in parallel, so structure matters as much as features.
+
+1. **Reuse before you write.** Search for an existing helper first: shared UI pieces live in `ui/Theme.kt` (`IconTool`, `CircleButton`, `KSlider`, `ColorRow`, `TextTabs`, `KToggle`, `KDialog`, `PanelLabel`), drawing in `Layers.kt`, media I/O in `Media.kt`, video in `VideoEdit.kt`, persistence in `Projects.kt`. Extend one of those instead of writing a second copy. If you need something twice, extract it once to the right file.
+2. **One responsibility per file.** A new screen or self-contained component gets its own file in `ui/` (like `ui/ImageTools.kt`, `ui/Intro.kt`, `ui/SettingsScreen.kt`). `ui/EditorScreen.kt` is already ~1000 lines: put new editor parts (panels, timeline pieces, overlays) in their own files instead of growing it; move code out only when you are already changing it.
+3. **Pure logic outside composables and the ViewModel.** Math, geometry, parsing, matrix and time calculations go in plain Kotlin functions (`Layers.kt`, `VideoEdit.kt` or a new focused file) with a JVM test in `app/src/test`. Composables render and forward events; the ViewModel orchestrates and owns state.
+4. **Model types live with their data.** Layer types and their drawing in `Layers.kt`; `Project` and its JSON in `Projects.kt`; video settings in `VideoEdit.kt`; app settings in `Settings.kt`. A new field touches its type, its JSON read/write (with an `opt*` default) and nothing else by surprise.
+5. **Name things after what they are**, match the existing naming and formatting, no dead code, no commented-out code, no `TODO` without context. Comments explain *why*, never *what*.
+6. **Small, focused diffs.** Don't reformat or reorganize code you aren't changing; it makes parallel work impossible to merge. Refactors are their own commits.
+
 ## Verifying a change
 
 1. `./gradlew testDebugUnitTest assembleDebug` passes.

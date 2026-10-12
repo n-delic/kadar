@@ -54,6 +54,7 @@
 - Draw: circle things, draw arrows and scribble with a marker or a see-through highlighter, any color and size, with undo inside the draw screen. Each drawing is a layer you can move, resize, rotate, time on the video timeline, duplicate or draw more onto
 - Project names: unnamed projects show their type and day ("Photo · Oct 12"); select one project on the home screen and tap Rename. Sort the grid by Recent, Name or Type (videos first), remembered between launches, and search by name once there are more than 6 projects
 - In/out animations for text and stickers in videos: None, Fade, Pop or Slide up, for the entrance and the exit separately (Animate tool); the preview plays them and the export matches
+- Eight more caption fonts, all free (OFL) and bundled, so they work offline: Tall (Bebas Neue), Narrow (Oswald), Heavy (Archivo Black), Comic (Bangers), Marker (Caveat Brush), Casual (Comic Neue), Retro (Pacifico) and Horror (Creepster). The font row scrolls and marks the chosen one in lime
 
 ## Next
 
@@ -67,7 +68,7 @@
 
 - [ ] Several video clips in a row, with transitions
 - [ ] Zoomable timeline for long videos
-- [ ] More free fonts (Google Fonts, OFL) and a CC0 sticker pack
+- [ ] A CC0 sticker pack
 - [ ] Templates, once it's clear which layouts get used most
 - [ ] Bosnian translation
 

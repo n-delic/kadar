@@ -29,6 +29,10 @@ This product bundles or links third-party material under its own licenses. The p
 Anton font (app/src/main/res/font/anton.ttf) - SIL Open Font License 1.1. See third_party/Anton-OFL.txt.
 Plus Jakarta Sans font (app/src/main/res/font/jakarta.ttf) - SIL Open Font License 1.1.
   See third_party/PlusJakartaSans-OFL.txt.
+Caption fonts from Google Fonts (app/src/main/res/font/): Bebas Neue (bebas_neue.ttf), Oswald
+  (oswald_bold.ttf), Archivo Black (archivo_black.ttf), Bangers (bangers.ttf), Caveat Brush
+  (caveat_brush.ttf), Comic Neue (comic_neue_bold.ttf), Pacifico (pacifico.ttf) and Creepster
+  (creepster.ttf) - SIL Open Font License 1.1. See third_party/<Name>-OFL.txt.
 Material Symbols icons (app/src/main/res/drawable/ic_*.xml, except ic_launcher_*) - Apache License 2.0.
   See third_party/MaterialSymbols-LICENSE.txt.
 AndroidX, Jetpack Compose and Media3 libraries - Apache License 2.0.

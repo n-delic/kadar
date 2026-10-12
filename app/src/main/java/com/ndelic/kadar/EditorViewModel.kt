@@ -96,8 +96,17 @@ sealed interface EditorEffect {
 
 class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
+    // Projects store a font by name: add new ones, never rename or remove these.
     val fonts = listOf(
         Font("Meme", app.resources.getFont(R.font.anton)),
+        Font("Tall", app.resources.getFont(R.font.bebas_neue)),
+        Font("Narrow", app.resources.getFont(R.font.oswald_bold)),
+        Font("Heavy", app.resources.getFont(R.font.archivo_black)),
+        Font("Comic", app.resources.getFont(R.font.bangers)),
+        Font("Marker", app.resources.getFont(R.font.caveat_brush)),
+        Font("Casual", app.resources.getFont(R.font.comic_neue_bold)),
+        Font("Retro", app.resources.getFont(R.font.pacifico)),
+        Font("Horror", app.resources.getFont(R.font.creepster)),
         Font("Sans", Typeface.DEFAULT_BOLD),
         Font("Serif", Typeface.create(Typeface.SERIF, Typeface.BOLD)),
         Font("Mono", Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)),

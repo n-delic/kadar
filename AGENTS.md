@@ -77,7 +77,8 @@ app/src/main/java/com/ndelic/kadar/
   ui/web/
     WebImportScreen.kt     WebView image browser with long-press-to-import
 app/src/test/java/com/ndelic/kadar/   Same packages as main: model/, video/, ui/editor/ (JVM tests for the pure logic)
-app/src/main/res/font/                anton.ttf (meme font), jakarta.ttf (UI font), both SIL OFL
+app/src/main/res/font/                anton.ttf (meme font), jakarta.ttf (UI font), eight caption fonts from Google Fonts
+                                      (EditorViewModel.fonts), all SIL OFL
 app/src/main/res/drawable/ic_*.xml    Material Symbols (scripts/add-icons.sh) plus ic_mark / ic_launcher_* (own work)
 scripts/                              add-icons.sh, make-logo.py
 docs/                                 screenshots/ and brand/ for the README

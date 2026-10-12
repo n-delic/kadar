@@ -43,7 +43,8 @@ phone.
   place. Two fingers zoom and pan while you work.
 - **Crop** any image layer, freely or at 1:1, 4:5, 9:16 or 16:9.
 - **Adjust** brightness, contrast and saturation per image.
-- **Text.** A classic meme font plus system fonts, fill and outline colors, a caption box behind the
+- **Text.** A classic meme font, eight more free caption fonts (tall, condensed, heavy, comic, marker,
+  casual, retro script, horror) and the system fonts, fill and outline colors, a caption box behind the
   text, shadow, letter spacing and alignment. Double-tap text to edit it.
 - **Snapping.** Layers snap to the center of the canvas and to 0° and 90°, with guide lines.
 - **Canvas.** Original size or 1:1, 4:5, 9:16, 16:9, on white, black or a transparent background
@@ -158,8 +159,10 @@ bundled asset is openly licensed and listed in [ATTRIBUTION.md](ATTRIBUTION.md).
 
 Built with [AndroidX Media3](https://github.com/androidx/media),
 [Jetpack Compose](https://developer.android.com/compose) and
-[ML Kit](https://developers.google.com/ml-kit). Fonts: [Anton](https://github.com/googlefonts/AntonFont)
-and [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans) (OFL). Icons:
+[ML Kit](https://developers.google.com/ml-kit). Fonts: [Anton](https://github.com/googlefonts/AntonFont),
+[Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans) and Bebas Neue, Oswald, Archivo Black,
+Bangers, Caveat Brush, Comic Neue, Pacifico and Creepster from [Google Fonts](https://github.com/google/fonts)
+(all OFL). Icons:
 [Material Symbols](https://github.com/google/material-design-icons) (Apache 2.0). The corgi in the
 screenshots is a CC0 photo from Wikimedia Commons.
 

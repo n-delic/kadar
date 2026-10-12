@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -312,16 +313,25 @@ fun VideoVolumePanel(layer: VideoLayer, vm: EditorViewModel) {
 
 @Composable
 fun FontPanel(layer: TextLayer, vm: EditorViewModel) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         items(vm.fonts) { f ->
             val active = layer.font.name == f.name
-            Text(
-                f.name,
-                fontFamily = FontFamily(f.typeface),
-                fontSize = 22.sp,
-                color = if (active) Ink.text else Ink.dim,
-                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { vm.editText { copy(font = f) } }.padding(horizontal = 6.dp, vertical = 8.dp),
-            )
+            val shape = RoundedCornerShape(10.dp)
+            Box(
+                Modifier.heightIn(min = 44.dp).widthIn(max = 120.dp).clip(shape)
+                    .border(1.5.dp, if (active) Ink.accent else Color.Transparent, shape)
+                    .clickable { vm.editText { copy(font = f) } }.padding(horizontal = 10.dp, vertical = 4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    f.name,
+                    fontFamily = FontFamily(f.typeface),
+                    fontSize = 22.sp,
+                    color = if (active) Ink.accent else Ink.dim,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

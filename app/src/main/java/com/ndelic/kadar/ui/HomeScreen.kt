@@ -43,6 +43,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ndelic.kadar.BuildConfig
 import com.ndelic.kadar.EditorUiState
 import com.ndelic.kadar.EditorViewModel
 import com.ndelic.kadar.R
@@ -68,6 +69,14 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) 
                     Box(Modifier.size(12.dp).clip(CircleShape).background(Ink.accent))
                     Spacer(Modifier.width(10.dp))
                     Text("Kadar", color = Ink.text, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        listOf("v${BuildConfig.VERSION_NAME}", BuildConfig.STAGE).filter { it.isNotEmpty() }.joinToString(" "),
+                        color = Ink.dim,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Ink.raised).padding(horizontal = 8.dp, vertical = 3.dp),
+                    )
                 }
                 Text("Photos and videos, edited on your phone. No account, no watermark.", color = Ink.dim, fontSize = 14.sp, modifier = Modifier.padding(top = 6.dp))
                 Spacer(Modifier.height(24.dp))

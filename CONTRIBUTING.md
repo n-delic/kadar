@@ -38,7 +38,7 @@ Debug builds install as a separate app, **Kadar Dev** (`com.ndelic.kadar.debug`)
 
 To publish a release:
 
-1. Bump `versionCode` and `versionName` in `app/build.gradle.kts` and add the release to `ROADMAP.md`.
+1. Bump `versionCode` and `versionName` in `app/build.gradle.kts` (and `STAGE` when leaving alpha or beta; it shows on the home screen) and add the release to `ROADMAP.md`.
 2. Commit, then tag with the same version: `git tag v0.5.0 && git push && git push --tags`.
 3. `.github/workflows/release.yml` checks the tag matches `versionName`, builds a signed, R8-shrunk APK and publishes it with a SHA-256 file as a GitHub release.
 

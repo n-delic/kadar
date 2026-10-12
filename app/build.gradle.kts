@@ -21,6 +21,8 @@ android {
         targetSdk = 35
         versionCode = 5
         versionName = "0.5.0"
+        // Shown next to the version on the home screen: alpha, beta, or "" once stable.
+        buildConfigField("String", "STAGE", "\"alpha\"")
     }
 
     signingConfigs {
@@ -53,6 +55,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

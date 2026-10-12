@@ -11,7 +11,7 @@ The owner's phone is a Galaxy S25; it also runs on older phones, hence `minSdk 2
 ## What it does today
 
 - **Photo**: open a photo, blank canvas, or web image; add text (meme outline style), emoji, images and saved stickers as layers; move, pinch-resize, rotate; remove backgrounds on-device; change canvas aspect and background; export JPEG/PNG to `Pictures/Kadar`.
-- **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time; export H.264/AAC MP4 to `Movies/Kadar`.
+- **Video (NLE)**: one clip with trim, speed (0.25x to 4x), video volume, a music track (volume, start offset, loops to fit). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time. Video layers (picture-in-picture) put more clips on top, placed like stickers, with their own track and volume; export H.264/AAC MP4 to `Movies/Kadar`.
 - **Undo / redo** for every edit (gestures and timeline drags count once per drag).
 - **Snapping** to the canvas center and 0°/90°, caption boxes behind text, a Layers panel (photos only, top-bar button; video shows layers as timeline tracks), keep-pitch for speed changes.
 - **Eraser / restore brush and crop** for image layers (`ui/ImageTools.kt`). `ImageLayer.source` + `sourceX/Y` remember the untouched original and where the layer's bitmap sits in it; keep them right in any new operation that resizes or crops a bitmap.
@@ -39,10 +39,11 @@ Versions live in `gradle/libs.versions.toml`.
 
 ```
 app/src/main/java/com/ndelic/kadar/
-  Layers.kt           Transform (placement + hit test), Layer / ImageLayer / TextLayer, drawLayer, renderLayers, opaqueBounds
+  Layers.kt           Transform (placement + hit test), Layer / ImageLayer / TextLayer / VideoLayer, drawLayer, renderLayers, opaqueBounds
   Projects.kt         Project model, ProjectStore (one folder per project: project.json, thumb.jpg, images), JSON mapping
   Media.kt            Bitmap decode/download, video info and frames, gallery export (MediaStore), ML Kit cut-out
-  VideoEdit.kt        VideoClip / Music, VideoClip.composition(), exportVideo() via Transformer
+  VideoEdit.kt        VideoClip / Music, VideoClip.composition() (video layers as compositor sequences), exportVideo() via Transformer
+  VideoOverlay.kt     Pure math for video layers: canvas Transform to compositor coordinates, when a layer plays
   EditorViewModel.kt  Single ViewModel: projects, layers, stickers, canvas, video settings, export, autosave
   MainActivity.kt     Theme, screen switching, snackbars (effects), busy overlay, share sheet
   ui/Theme.kt         Ink palette, fonts, shared components (IconTool, CircleButton, KSlider, ColorRow, TextTabs, KDialog)
@@ -56,6 +57,7 @@ app/src/main/res/font/anton.ttf          Meme font (SIL OFL, license in third_pa
 app/src/main/res/font/jakarta.ttf        UI font, Plus Jakarta Sans variable (SIL OFL)
 scripts/add-icons.sh                     Fetches Material Symbols as vector drawables
 app/src/test/.../LayersTest.kt           JVM tests for transform math, transparent-border trimming, timeline segments
+app/src/test/.../VideoOverlayTest.kt     JVM tests for the video-layer placement and timing
 ```
 
 ## Commands
@@ -71,14 +73,14 @@ emulator -avd pixel_7_api35   # reference emulator (Google Play image, needed fo
 
 ## Rules that matter
 
-1. **One drawing path.** The stage, the photo export, the video overlay and the thumbnails all go through `drawLayer`/`renderLayers`. Never draw a layer type a second way, or exports stop matching the screen.
+1. **One drawing path.** The stage, the photo export, the video overlay and the thumbnails all go through `drawLayer`/`renderLayers`. Never draw a layer type a second way, or exports stop matching the screen. The one exception is `VideoLayer`: its pixels come only from the Media3 compositor (preview and export), so its `drawContent` draws nothing and the stage shows just its selection box.
 2. **Canvas pixels are the unit.** Layer transforms are in full-resolution canvas pixels (photo size or video display size). The stage only scales for display; gestures divide by that scale.
 3. **Never lose a project.** Project writes go through `writeAtomic` (write then rename) under `saveLock`. A missing image drops only its layer, never the whole project. If you change the JSON format, bump `version` in `Project.toJson`, keep reading older files, and default new fields with `opt*`.
 4. **Images live in the project folder.** Every bitmap a layer uses is written once with `ProjectStore.writeImage` and referenced by file name; `ProjectStore.cleanUp` removes unreferenced ones on close. Videos and music are referenced by content URI with a persisted read grant (`keepAccess`); only when that fails (a one-time share grant) is the video copied into the project as `video.mp4`.
 5. **Nothing goes to the gallery except an export.** Web downloads, cut-outs and stickers stay in app storage. Exports go to `Pictures/Kadar` or `Movies/Kadar` through `saveToGallery` (no storage permission needed).
 6. **Offline first.** No analytics, no accounts, no cloud APIs. The browser is the only feature that needs internet; don't add features that silently require it.
 7. **Treat web input as untrusted.** `downloadImage` accepts only `http(s)` and base64 `data:` URLs, caps the size, and must fail with a message, not a crash.
-8. **The preview is the export.** Video settings change `VideoClip`; `VideoClip.composition()` builds both the `CompositionPlayer` preview and the Transformer export. Add new video features there, not in only one of them.
+8. **The preview is the export.** Video settings change `VideoClip`; `VideoClip.composition()` builds both the `CompositionPlayer` preview and the Transformer export. Add new video features there, not in only one of them. Video layers are sequences before the clip (the compositor draws sequence 0 on top and takes its frame times), padded with gaps to the clip's length; gap frames are hidden by alpha. They always sit under text and stickers (the bitmap overlay comes after compositing). The preview needs `MultipleInputVideoGraph`, so the player is rebuilt when a project gets its first video layer.
 9. **Layer times are output time** (after trim and speed), the same clock as `CompositionPlayer.currentPosition`. `endMs = Long.MAX_VALUE` means "to the end". The stage shows only layers visible at the playhead (plus the selected one); the export uses `timedOverlay`, which sits on the composition (not the clip) so it sees output timestamps.
 10. **Every edit is undoable.** Change the project only through `updateProject`/`updateLayer`; continuous gestures pass `record = first` so one drag is one undo step.
 11. **Long tasks go through `EditorViewModel.work`.** It shows the busy overlay, runs one task at a time, and turns exceptions into a snackbar. Transformer must be called on the main thread.

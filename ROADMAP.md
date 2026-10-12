@@ -48,10 +48,14 @@
 - GPL-3.0-or-later, NOTICE and ATTRIBUTION.md
 - Fix: the keyboard no longer shrinks the editor while typing text
 
+## Done for the next release
+
+- Video over video: add more clips as layers on top of the main one, picture-in-picture style. Move, pinch-resize and rotate them on the stage, set when they show on their own timeline track, give them their own volume (muted by default), and export them with the main clip
+
 ## Next
 
 - [ ] Text shadow, letter spacing, alignment
-- [ ] Video over video: add a second clip (or several) as a layer on top of the main one, picture-in-picture style. Move, resize, rotate and crop it on the stage like an image, give it its own track with start/end on the timeline, its own trim, volume and opacity, and export it with the main clip (Media3 multi-sequence composition with a video compositor)
+- [ ] Video layers: their own trim, crop and opacity, and a way to put them above text and stickers
 - [ ] Timeline tracks do everything the photo Layers panel does: drag up/down to reorder, plus hide and lock right on the track (the Layers button is photo-only now)
 - [ ] Blurred-background video canvas (Media3's blur-with-frame effect squeezed the frame on the emulator; needs another approach)
 

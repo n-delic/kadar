@@ -126,6 +126,20 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
                 startMs = start,
                 endMs = end,
             )
+            // Versions before video layers skip this type (the `else` below) rather than fail the whole project.
+            "video" -> VideoLayer(
+                id = id,
+                t = t,
+                uri = Uri.parse(j.getString("uri")),
+                durationMs = j.getLong("durationMs"),
+                videoWidth = j.getInt("videoWidth"),
+                videoHeight = j.getInt("videoHeight"),
+                volume = j.optDouble("volume", 0.0).toFloat(),
+                hidden = j.optBoolean("hidden"),
+                locked = j.optBoolean("locked"),
+                startMs = start,
+                endMs = end,
+            )
             else -> null
         }
     }
@@ -196,6 +210,14 @@ private fun Layer.toJson() = JSONObject().apply {
             put("shadow", layer.shadow)
             put("spacing", layer.spacing.toDouble())
             put("align", layer.align.name)
+        }
+        is VideoLayer -> {
+            put("type", "video")
+            put("uri", layer.uri.toString())
+            put("durationMs", layer.durationMs)
+            put("videoWidth", layer.videoWidth)
+            put("videoHeight", layer.videoHeight)
+            put("volume", layer.volume.toDouble())
         }
     }
 }

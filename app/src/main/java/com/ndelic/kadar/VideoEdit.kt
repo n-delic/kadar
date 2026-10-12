@@ -9,11 +9,14 @@ import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.OverlaySettings
+import androidx.media3.common.VideoCompositorSettings
 import androidx.media3.common.audio.DefaultGainProvider
 import androidx.media3.common.audio.GainProcessor
 import androidx.media3.common.audio.SonicAudioProcessor
 import androidx.media3.common.audio.SpeedProvider
 import androidx.media3.common.util.ExperimentalApi
+import androidx.media3.common.util.Size
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.Effect
 import androidx.media3.effect.BitmapOverlay
@@ -21,6 +24,7 @@ import androidx.media3.effect.Brightness
 import androidx.media3.effect.Contrast
 import androidx.media3.effect.HslAdjustment
 import androidx.media3.effect.Presentation
+import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.TextureOverlay
 import androidx.media3.transformer.Composition
@@ -78,8 +82,15 @@ fun canvasSize(w: Int, h: Int, ratio: Float?): Pair<Int, Int> {
 /**
  * The edit as a Media3 composition: used for both the live preview and the export. [overlay] draws the text/sticker
  * layers; it sits on the composition, not the clip, so it gets output timestamps (after trim and speed) like the layers.
+ * [videos] are picture-in-picture layers, each a sequence of its own; the compositor asks where they sit ([placed]) for
+ * every frame, so the preview can follow a drag without rebuilding the composition.
  */
-fun VideoClip.composition(overlay: TextureOverlay?, shortSide: Int? = null): Composition {
+fun VideoClip.composition(
+    overlay: TextureOverlay?,
+    shortSide: Int? = null,
+    videos: List<VideoLayer> = emptyList(),
+    placed: (VideoLayer) -> Transform = { it.t },
+): Composition {
     // CompositionPlayer needs each item's full (unclipped) duration up front.
     val video = EditedMediaItem.Builder(clipped(uri, startMs, endMs))
         .setDurationUs(durationMs * 1000)
@@ -87,7 +98,11 @@ fun VideoClip.composition(overlay: TextureOverlay?, shortSide: Int? = null): Com
         .setSpeed(ConstantSpeed(speed))
         .setEffects(Effects(listOfNotNull(gain(volume), pitchFix(speed).takeIf { keepPitch && speed != 1f }), videoEffects()))
         .build()
-    val sequences = mutableListOf(EditedMediaItemSequence.Builder(video).build())
+    // The compositor draws sequence 0 on top and takes its frame times, so overlays come first (topmost layer first),
+    // each padded with gaps to the clip's full length, and the clip last.
+    val overlays = videos.asReversed().filter { !it.hidden }.mapNotNull { v -> overlaySpan(v.startMs, v.endMs, v.durationMs, outputDurationMs)?.let { v to it } }
+    val sequences = overlays.map { (v, span) -> v.sequence(span, outputDurationMs) }.toMutableList()
+    sequences += EditedMediaItemSequence.Builder(video).build()
     music?.let { m ->
         val track = EditedMediaItem.Builder(clipped(m.uri, m.startMs, C.TIME_END_OF_SOURCE))
             .setDurationUs(m.durationMs * 1000)
@@ -110,8 +125,44 @@ fun VideoClip.composition(overlay: TextureOverlay?, shortSide: Int? = null): Com
         )
         // HDR phone footage turns washed out on most apps once posted; memes go out as plain SDR.
         .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
+        .apply { if (overlays.isNotEmpty()) setVideoCompositorSettings(overlaySettings(overlays, placed)) }
         .build()
 }
+
+/** One overlay's sequence: a gap until it starts, its clip from the beginning, then a gap to [totalMs]. */
+private fun VideoLayer.sequence(span: Pair<Long, Long>, totalMs: Long): EditedMediaItemSequence {
+    val (start, end) = span
+    val clip = EditedMediaItem.Builder(clipped(uri, 0, end - start))
+        .setDurationUs(durationMs * 1000)
+        .setRemoveAudio(volume == 0f)
+        // Presented at the layer's own size, so the compositor's scale is the layer's scale.
+        .setEffects(Effects(listOf(gain(volume)), listOf(Presentation.createForWidthAndHeight(videoWidth, videoHeight, Presentation.LAYOUT_STRETCH_TO_FIT))))
+        .build()
+    val tracks = if (volume == 0f) setOf(C.TRACK_TYPE_VIDEO) else setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO)
+    return EditedMediaItemSequence.Builder(tracks)
+        .apply { if (start > 0) addGap(start * 1000) }
+        .addItem(clip)
+        .apply { if (totalMs > end) addGap((totalMs - end) * 1000) }
+        .build()
+}
+
+/** Places overlay `i` (sequence `i`) by its layer; the clip after them keeps the default full-frame settings. */
+private fun VideoClip.overlaySettings(overlays: List<Pair<VideoLayer, Pair<Long, Long>>>, placed: (VideoLayer) -> Transform) =
+    object : VideoCompositorSettings {
+        override fun getOutputSize(inputSizes: List<Size>) = Size(outputSize.first, outputSize.second)
+
+        override fun getOverlaySettings(inputId: Int, presentationTimeUs: Long): OverlaySettings {
+            val (layer, span) = overlays.getOrNull(inputId) ?: return StaticOverlaySettings.Builder().build()
+            val p = overlayPlacement(placed(layer), outputSize.first, outputSize.second)
+            return StaticOverlaySettings.Builder()
+                .setBackgroundFrameAnchor(p.x, p.y)
+                .setScale(p.scale, p.scale)
+                .setRotationDegrees(p.rotation)
+                // Gaps are filled with small black frames; only the clip's own frames may show.
+                .setAlphaScale(if (presentationTimeUs in span.first * 1000 until span.second * 1000) 1f else 0f)
+                .build()
+        }
+    }
 
 /**
  * Layers that come and go: one full-frame bitmap per stretch of time where the visible set doesn't change.

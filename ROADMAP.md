@@ -81,6 +81,7 @@
 
 - Speech bubbles: the text Bubble tool puts the caption in a speech bubble, a thought cloud or a shout burst (or the old box), white with a black outline to start, any fill and outline color. The text wraps inside, and the tail points wherever you drag its handle on the canvas
 - Shapes: rectangle, rounded rectangle, ellipse, arrow, star and line from the new Shape tool, with fill and outline color (or none), outline width, stretch and opacity; moved, resized, rotated, duplicated, animated and timed on the video timeline like any layer
+- Several clips in a row: add videos and photos (3 s stills) with the + after the clip strip, tap a clip to pick it, long-press to reorder, split at the playhead, duplicate, delete; trim, speed, volume, filter and adjust per clip
 
 ## Next
 
@@ -88,7 +89,7 @@ Feature parity with the big phone editors, built from how their features behave,
 
 ### Video
 
-- [ ] Several clips in a row: add videos and photos (as stills) to one timeline, long-press to reorder, split at the playhead, duplicate, delete, replace; trim, speed, volume, filter and adjust per clip
+- [ ] Replace a clip with another video or photo, keeping its place and settings
 - [ ] Transitions between clips: fade, fade through black/white, wipes, slides, push, zoom, blur; a duration; apply to all
 - [ ] Clip tools: freeze frame, reverse, rotate and flip, crop the main clip, capture the frame as a photo, a blank color clip
 - [ ] Canvas: more ratios (3:4, 4:3, 2:3, 3:2, 2:1, 1:2, 2.35:1); zoom and move the clip inside the canvas; background color, blur strength or an image

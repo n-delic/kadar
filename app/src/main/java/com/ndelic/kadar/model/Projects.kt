@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.net.Uri
 import com.ndelic.kadar.video.Music
+import com.ndelic.kadar.video.Segment
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.VoiceClip
 import java.io.File
@@ -85,7 +86,8 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
     /** Deletes images and voice recordings nothing uses any more (after undo history is gone, so nothing can bring them back). */
     fun cleanUp(dir: File, project: Project) {
         val used = project.layers.filterIsInstance<ImageLayer>().flatMap { listOfNotNull(it.file, it.source) }.toSet() +
-            project.video?.voices.orEmpty().map { it.file.name } + THUMB
+            project.video?.voices.orEmpty().map { it.file.name } +
+            project.video?.segments.orEmpty().filter { it.isImage }.map { File(it.uri.path!!).name } + THUMB
         dir.listFiles().orEmpty()
             .filter { (it.name.endsWith(".png") || it.name.endsWith(".jpg") || it.name.endsWith(VOICE_EXTENSION)) && it.name !in used }
             .forEach { it.delete() }
@@ -218,19 +220,14 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
     }
 
     private fun clipFromJson(dir: File, j: JSONObject, projectWidth: Int, projectHeight: Int) = VideoClip(
-        uri = Uri.parse(j.getString("uri")),
-        durationMs = j.getLong("durationMs"),
-        startMs = j.getLong("startMs"),
-        endMs = j.getLong("endMs"),
-        speed = j.getDouble("speed").toFloat(),
-        volume = j.getDouble("volume").toFloat(),
-        keepPitch = j.optBoolean("keepPitch", true),
+        // Version 1 had one clip, its fields on the video itself.
+        segments = j.optJSONArray("clips")?.let { a -> (0 until a.length()).map { segmentFromJson(dir, a.getJSONObject(it), projectWidth, projectHeight) } }
+            ?: listOf(segmentFromJson(dir, j, projectWidth, projectHeight)),
         frameRate = j.optDouble("frameRate", 0.0).toFloat(),
         width = j.optInt("videoWidth", projectWidth),
         height = j.optInt("videoHeight", projectHeight),
         canvas = if (j.has("canvas")) j.getDouble("canvas").toFloat() else null,
         blur = j.optBoolean("blur"),
-        adjust = adjustFromJson(j),
         music = j.optJSONObject("music")?.let {
             Music(
                 Uri.parse(it.getString("uri")), it.getString("name"), it.getLong("durationMs"), it.getLong("startMs"), it.getDouble("volume").toFloat(),
@@ -247,6 +244,21 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
         }.orEmpty(),
     )
 
+    private fun segmentFromJson(dir: File, j: JSONObject, projectWidth: Int, projectHeight: Int) = Segment(
+        // A photo is stored by name: the folder moves with the project (duplicates load it from their own copy).
+        uri = if (j.has("file")) Uri.fromFile(File(dir, j.getString("file"))) else Uri.parse(j.getString("uri")),
+        durationMs = j.getLong("durationMs"),
+        width = j.optInt("videoWidth", projectWidth),
+        height = j.optInt("videoHeight", projectHeight),
+        startMs = j.getLong("startMs"),
+        endMs = j.getLong("endMs"),
+        speed = j.getDouble("speed").toFloat(),
+        volume = j.getDouble("volume").toFloat(),
+        keepPitch = j.optBoolean("keepPitch", true),
+        adjust = adjustFromJson(j),
+        isImage = j.has("file"),
+    )
+
     private companion object {
         const val PROJECT = "project.json"
         const val THUMB = "thumb.jpg"
@@ -255,7 +267,8 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
 }
 
 private fun Project.toJson() = JSONObject().apply {
-    put("version", 1)
+    // 2: the video's clips are a list ("clips"); version 1 had the one clip's fields on the video.
+    put("version", 2)
     put("width", width)
     put("height", height)
     put("originalHeight", originalHeight)
@@ -342,20 +355,26 @@ private fun Layer.toJson() = JSONObject().apply {
     }
 }
 
-private fun VideoClip.toJson() = JSONObject().apply {
-    put("uri", uri.toString())
+private fun Segment.toJson() = JSONObject().apply {
+    if (isImage) put("file", File(uri.path!!).name) else put("uri", uri.toString())
     put("durationMs", durationMs)
+    put("videoWidth", width)
+    put("videoHeight", height)
     put("startMs", startMs)
     put("endMs", endMs)
     put("speed", speed.toDouble())
     put("volume", volume.toDouble())
     put("keepPitch", keepPitch)
+    putAdjust(adjust)
+}
+
+private fun VideoClip.toJson() = JSONObject().apply {
+    put("clips", JSONArray(segments.map { it.toJson() }))
     put("frameRate", frameRate.toDouble())
     put("videoWidth", width)
     put("videoHeight", height)
     canvas?.let { put("canvas", it.toDouble()) }
     put("blur", blur)
-    putAdjust(adjust)
     music?.let { m ->
         put("music", JSONObject().apply {
             put("uri", m.uri.toString())

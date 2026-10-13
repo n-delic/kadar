@@ -72,30 +72,51 @@ data class Music(
 /** A voiceover recorded in the editor: an audio [file] in the project folder, playing from [startMs] of the output. */
 data class VoiceClip(val file: File, val startMs: Long, val durationMs: Long, val volume: Float = 1f)
 
-data class VideoClip(
+/**
+ * One clip of the main track: [startMs]..[endMs] of its source (source time) played at [speed]. A photo ([isImage],
+ * a file in the project folder) is a still whose trimmed length is how long it shows, up to [durationMs].
+ */
+data class Segment(
     val uri: Uri,
     val durationMs: Long,
+    /** The source's display size (rotation applied). */
+    val width: Int,
+    val height: Int,
     val startMs: Long = 0,
     val endMs: Long = durationMs,
     val speed: Float = 1f,
-    /** Volume of the video's own sound; 0 drops it. */
+    /** Volume of the clip's own sound; 0 drops it. */
     val volume: Float = 1f,
     /** Speeding up raises the pitch (chipmunk voice) unless this corrects it back. */
     val keepPitch: Boolean = true,
+    val adjust: Adjust = Adjust(),
+    val isImage: Boolean = false,
+) {
+    val outputDurationMs get() = outputMs(startMs, endMs, speed)
+}
+
+data class VideoClip(
+    /** The main track, played end to end; never empty. */
+    val segments: List<Segment>,
     val music: Music? = null,
-    /** The video's own display size (rotation applied). */
+    /** The first clip's display size, set when the project is made; every clip is fitted into it. */
     val width: Int = 0,
     val height: Int = 0,
     /** Output aspect ratio (width / height), or null to keep the video's own; the rest is black, or [blur]. */
     val canvas: Float? = null,
     /** Fills the canvas around the video with a blurred, zoomed copy of it instead of black. */
     val blur: Boolean = false,
-    val adjust: Adjust = Adjust(),
-    /** The video's average frames per second, 0 when unknown. */
+    /** The first clip's average frames per second, 0 when unknown. */
     val frameRate: Float = 0f,
     val voices: List<VoiceClip> = emptyList(),
 ) {
-    val outputDurationMs get() = ((endMs - startMs) / speed).toLong()
+    val outputDurationMs get() = segments.sumOf { it.outputDurationMs }
+
+    /** Index of the clip playing at output time [positionMs], and how far into it (output time). */
+    fun segmentAt(positionMs: Long) = clipAt(segments.map { it.outputDurationMs }, positionMs)
+
+    /** Where clip [index] starts, in output time. */
+    fun segmentStart(index: Int) = segments.take(index).sumOf { it.outputDurationMs }
 
     /** Output frame size; also the project canvas, so layers line up with the exported frame. */
     val outputSize get() = canvasSize(width, height, canvas)
@@ -134,17 +155,10 @@ private const val BLUR_LONG_SIDE = 320
  * own. Call it on the main thread, like [timedOverlay].
  */
 fun VideoClip.composition(layers: List<Layer> = emptyList(), shortSide: Int? = null): Composition {
-    // CompositionPlayer needs each item's full (unclipped) duration up front.
-    val video = EditedMediaItem.Builder(clipped(uri, startMs, endMs))
-        .setDurationUs(durationMs * 1000)
-        .setRemoveAudio(volume == 0f)
-        .setSpeed(ConstantSpeed(speed))
-        .setEffects(Effects(listOfNotNull(gain(volume), pitchFix(speed).takeIf { keepPitch && speed != 1f }), videoEffects()))
-        .build()
     // Media3's compositor takes every output frame time from sequence 0 and draws it on top, then the others in order.
     // So sequence 0 is an invisible frame clock at the clip's rate, then the overlays (topmost layer first), each padded
-    // with gaps to the clip's full length and followed by the layers drawn right under it, then the clip, and under it
-    // the blurred background. The clip's letterbox bars are transparent (Media3 clears to transparent black), so the
+    // with gaps to the output's full length and followed by the layers drawn right under it, then the clips, and under
+    // them the blurred background. The letterbox bars are transparent (Media3 clears to transparent black), so the
     // background shows through them.
     val (w, h) = outputSize
     fun VideoLayer.span() = overlaySpan(startMs, endMs, playableMs, outputDurationMs)
@@ -166,8 +180,8 @@ fun VideoClip.composition(layers: List<Layer> = emptyList(), shortSide: Int? = n
         }
     }
     val overlay = groups.last().takeIf { it.isNotEmpty() }?.let { timedOverlay(w, h, it, outputDurationMs) }
-    sequences += EditedMediaItemSequence.Builder(video).build()
-    if (blurred) sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItem(blurredBackground()).build()
+    sequences += mainSequence()
+    if (blurred) sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItems(segments.map { blurredBackground(it) }).build()
     music?.let { sequences += it.sequences(outputDurationMs) }
     // Audio only, after every video sequence, so the compositor's input numbers above stay as they are.
     sequences += voices.mapNotNull { it.sequence(outputDurationMs) }
@@ -204,24 +218,50 @@ private fun VideoClip.blankStill(effects: List<Effect> = emptyList()): EditedMed
     return EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItem(item).build()
 }
 
-/** The clip again, muted, with the same trim and speed so it stays in sync, cropped to fill the canvas, blurred and darkened. */
-private fun VideoClip.blurredBackground(): EditedMediaItem {
+/**
+ * The clips end to end. With sound in any of them every clip gets an audio track (silence for photos and silent
+ * clips), so the sequence's audio runs through without a break.
+ */
+private fun VideoClip.mainSequence(): EditedMediaItemSequence {
+    val sound = segments.any { !it.isImage && it.volume > 0f }
+    val tracks = if (sound) setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO) else setOf(C.TRACK_TYPE_VIDEO)
+    val items = segments.map { s ->
+        val audio = if (sound && !s.isImage) listOfNotNull(gain(s.volume), pitchFix(s.speed).takeIf { s.keepPitch && s.speed != 1f }) else emptyList()
+        segmentItem(s, Effects(audio, videoEffects(s)), removeAudio = !sound)
+    }
+    return EditedMediaItemSequence.Builder(tracks).addItems(items).build()
+}
+
+/** Clip [s] as a sequence item: its trimmed source at its speed, or a photo shown for its length at the clip's frame rate. */
+private fun VideoClip.segmentItem(s: Segment, effects: Effects, removeAudio: Boolean): EditedMediaItem {
+    if (s.isImage) {
+        val ms = s.outputDurationMs
+        val mime = if (s.uri.path.orEmpty().endsWith(".png")) MimeTypes.IMAGE_PNG else MimeTypes.IMAGE_JPEG
+        val still = MediaItem.Builder().setUri(s.uri).setMimeType(mime).setImageDurationMs(ms).build()
+        return EditedMediaItem.Builder(still).setDurationUs(ms * 1000).setFrameRate(outputFrameRate(frameRate)).setEffects(effects).build()
+    }
+    // CompositionPlayer needs each item's full (unclipped) duration up front.
+    return EditedMediaItem.Builder(clipped(s.uri, s.startMs, s.endMs))
+        .setDurationUs(s.durationMs * 1000)
+        .setRemoveAudio(removeAudio)
+        .setSpeed(ConstantSpeed(s.speed))
+        .setEffects(effects)
+        .build()
+}
+
+/** Clip [s] again, muted, with the same trim and speed so it stays in sync, cropped to fill the canvas, blurred and darkened. */
+private fun VideoClip.blurredBackground(s: Segment): EditedMediaItem {
     val (w, h) = outputSize
     val (bw, bh) = blurSize(w, h)
     val effects = listOfNotNull(
-        adjustEffect(),
+        adjustEffect(s.adjust),
         Presentation.createForWidthAndHeight(bw, bh, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP),
         GaussianBlur(BLUR_SIGMA),
         // Darker, so captions over the background stay readable.
         Brightness(-0.15f),
         Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_STRETCH_TO_FIT),
     )
-    return EditedMediaItem.Builder(clipped(uri, startMs, endMs))
-        .setDurationUs(durationMs * 1000)
-        .setRemoveAudio(true)
-        .setSpeed(ConstantSpeed(speed))
-        .setEffects(Effects(emptyList(), effects))
-        .build()
+    return segmentItem(s, Effects(emptyList(), effects), removeAudio = true)
 }
 
 /** In pixels of [blurSize]'s frame: about 5% of the canvas's long side. */
@@ -420,16 +460,17 @@ fun highBitrate(width: Int, height: Int, shortSide: Int?, frameRate: Float): Int
 private const val HIGH_BITS_PER_PIXEL = 0.28f
 private const val MAX_BITRATE = 50_000_000f
 
-private fun VideoClip.videoEffects(): List<Effect> = buildList {
-    adjustEffect()?.let(::add)
-    if (canvas != null) {
+private fun VideoClip.videoEffects(s: Segment): List<Effect> = buildList {
+    adjustEffect(s.adjust)?.let(::add)
+    // Clips of another size or orientation than the first are fitted into its frame.
+    if (canvas != null || s.width != width || s.height != height) {
         val (w, h) = outputSize
         add(Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_SCALE_TO_FIT))
     }
 }
 
 /** The same matrix as an image layer's paint, so a look or adjustment matches between photo and video. */
-private fun VideoClip.adjustEffect() = if (adjust.isNone) null else glRgbMatrix(adjust.filterMatrix()).let { m -> RgbMatrix { _, _ -> m } }
+private fun adjustEffect(adjust: Adjust) = if (adjust.isNone) null else glRgbMatrix(adjust.filterMatrix()).let { m -> RgbMatrix { _, _ -> m } }
 
 private fun clipped(uri: Uri, startMs: Long, endMs: Long) = MediaItem.Builder()
     .setUri(uri)

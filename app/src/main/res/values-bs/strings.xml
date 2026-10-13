@@ -96,6 +96,7 @@
     <string name="tool_web">Web</string>
     <string name="tool_trim">Skrati</string>
     <string name="tool_speed">Brzina</string>
+    <string name="tool_split">Razdvoji</string>
     <string name="tool_canvas">Platno</string>
     <string name="tool_adjust">Podesi</string>
     <string name="tool_filters">Filteri</string>
@@ -210,6 +211,9 @@
     <string name="busy_adding_sticker">Dodajem stiker</string>
     <string name="busy_adding_image">Dodajem sliku</string>
     <string name="busy_adding_video">Dodajem video</string>
+    <string name="busy_adding_clip">Dodajem klip</string>
+    <string name="split_too_close">Pomjeri oznaku dalje od krajeva klipa da ga razdvojiš</string>
+    <string name="add_clip">Dodaj video ili sliku na kraj</string>
     <string name="busy_adding_music">Dodajem muziku</string>
     <string name="busy_removing_bg">Uklanjam pozadinu</string>
     <string name="busy_saving">Spremam</string>

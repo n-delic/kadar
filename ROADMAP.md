@@ -77,7 +77,7 @@
 - Fix: see-through parts of text, stickers and drawings (soft edges, shadows, fades, the highlighter) exported darker than the preview showed them
 - Fixes: paused video layers and the blurred canvas show their frame right away (they could stay black until you scrubbed), the Audio panel no longer squeezes the preview to a thumbnail, voiceovers are listed by start time, a new project says "Just now"
 
-## Done for the next release
+## v0.6.0: done
 
 - Speech bubbles: the text Bubble tool puts the caption in a speech bubble, a thought cloud or a shout burst (or the old box), white with a black outline to start, any fill and outline color. The text wraps inside, and the tail points wherever you drag its handle on the canvas
 - Shapes: rectangle, rounded rectangle, ellipse, arrow, star and line from the new Shape tool, with fill and outline color (or none), outline width, stretch and opacity; moved, resized, rotated, duplicated, animated and timed on the video timeline like any layer

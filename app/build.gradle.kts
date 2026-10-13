@@ -19,8 +19,8 @@ android {
         // Android 10+: MediaStore RELATIVE_PATH and IS_PENDING need it.
         minSdk = 29
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.5.2"
+        versionCode = 8
+        versionName = "0.6.0"
         // Shown next to the version on the home screen: alpha, beta, or "" once stable.
         buildConfigField("String", "STAGE", "\"alpha\"")
     }

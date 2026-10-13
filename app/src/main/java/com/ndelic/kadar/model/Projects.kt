@@ -5,7 +5,10 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.net.Uri
 import com.ndelic.kadar.video.Music
+import com.ndelic.kadar.video.DEFAULT_TRANSITION_MS
 import com.ndelic.kadar.video.Segment
+import com.ndelic.kadar.video.Transition
+import com.ndelic.kadar.video.TransitionKind
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.VoiceClip
 import java.io.File
@@ -257,6 +260,10 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
         keepPitch = j.optBoolean("keepPitch", true),
         adjust = adjustFromJson(j),
         isImage = j.has("file"),
+        transition = Transition(
+            TransitionKind.entries.firstOrNull { it.name == j.optString("transition") } ?: TransitionKind.None,
+            j.optLong("transitionMs", DEFAULT_TRANSITION_MS),
+        ),
     )
 
     private companion object {
@@ -366,6 +373,10 @@ private fun Segment.toJson() = JSONObject().apply {
     put("volume", volume.toDouble())
     put("keepPitch", keepPitch)
     putAdjust(adjust)
+    if (transition.kind != TransitionKind.None) {
+        put("transition", transition.kind.name)
+        put("transitionMs", transition.durationMs)
+    }
 }
 
 private fun VideoClip.toJson() = JSONObject().apply {

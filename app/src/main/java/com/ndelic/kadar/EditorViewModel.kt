@@ -53,6 +53,7 @@ import com.ndelic.kadar.ui.editor.Timeline
 import com.ndelic.kadar.ui.editor.label
 import com.ndelic.kadar.video.Music
 import com.ndelic.kadar.video.Segment
+import com.ndelic.kadar.video.Transition
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.VoiceClip
 import com.ndelic.kadar.video.composition
@@ -616,9 +617,14 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             _effects.trySend(EditorEffect.Message(UiText.Res(R.string.split_too_close)))
             return
         }
-        updateClip { copy(segments = segments.take(i) + s.copy(endMs = at) + s.copy(startMs = at) + segments.drop(i + 1)) }
+        // A cut, not a transition, joins the two halves.
+        updateClip { copy(segments = segments.take(i) + s.copy(endMs = at) + s.copy(startMs = at, transition = Transition()) + segments.drop(i + 1)) }
         selectClip(i + 1)
     }
+
+    /** Sets the transition into clip [index] from the one before it, or with [all] into every clip after the first. */
+    fun setTransition(index: Int, transition: Transition, all: Boolean = false) =
+        updateClip { copy(segments = segments.mapIndexed { i, s -> if (i > 0 && (all || i == index)) s.copy(transition = transition) else s }) }
 
     fun duplicateClip(index: Int) {
         updateClip { copy(segments = segments.take(index + 1) + segments[index] + segments.drop(index + 1)) }

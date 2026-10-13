@@ -4,6 +4,7 @@ import com.ndelic.kadar.model.CropRect
 import com.ndelic.kadar.model.Transform
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 /**
  * A video layer's placement in Media3's compositor: its center in normalized device coordinates of the output frame
@@ -39,6 +40,12 @@ fun overlayAlpha(opacity: Float, span: Pair<Long, Long>, timeUs: Long) = if (tim
  * 60 so phones can encode it. 30 when the rate is unknown.
  */
 fun outputFrameRate(clipFrameRate: Float) = if (clipFrameRate > 0) clipFrameRate.roundToInt().coerceIn(1, 60) else 30
+
+/**
+ * The output frame (at [fps], from 0) that a compositor input's frame at [timeUs] is drawn into: Media3's compositor
+ * pairs every output frame with the nearest frame of each other input.
+ */
+fun outputFrameUs(timeUs: Long, fps: Int) = (timeUs * fps / 1_000_000.0).roundToLong() * 1_000_000 / fps
 
 /**
  * How layers stack around video layers: [layers] (bottom first) cut at every one [isVideo] picks, giving the other

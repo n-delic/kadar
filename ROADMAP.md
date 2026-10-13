@@ -79,13 +79,41 @@
 
 ## Next
 
+Feature parity with the big phone editors, built from how their features behave, never from their code, assets or look (AGENTS.md rules 14 and 15). Offline only: no cloud AI.
+
+### Video
+
+- [ ] Several clips in a row: add videos and photos (as stills) to one timeline, long-press to reorder, split at the playhead, duplicate, delete, replace; trim, speed, volume, filter and adjust per clip
+- [ ] Transitions between clips: fade, fade through black/white, wipes, slides, push, zoom, blur; a duration; apply to all
+- [ ] Clip tools: freeze frame, reverse, rotate and flip, crop the main clip, capture the frame as a photo, a blank color clip
+- [ ] Canvas: more ratios (3:4, 4:3, 2:3, 3:2, 2:1, 1:2, 2.35:1); zoom and move the clip inside the canvas; background color, blur strength or an image
+- [ ] Speed up to 10x and speed ramps (presets that slow down or speed up within a clip)
+- [ ] Timed video effects on their own track: slow zoom, jump zoom, shake, glitch, blur, flash, fade to black, film grain
+- [ ] Audio: a bundled CC0 sound-effect pack (meme sounds), several music tracks, extract the sound of a video, voice effects (higher, deeper, robot), text-to-speech with the phone's offline voices
+- [ ] Clip in/out animations (zoom, slide, spin) and keyframes for layers and clips (position, scale, rotation, opacity over time)
 - [ ] Overlay clips with long frame gaps (screen recordings that only emit frames when the screen changes) make Media3's compositor draw a stretched copy of the overlay over the main clip during the gap. Constant-frame-rate clips (phone camera) are fine. Fix idea: re-time such overlays to a constant rate before compositing
+
+### Photo
+
+- [ ] Speech bubbles: text inside a round, cloud or shout bubble with a tail you can point
+- [ ] Shapes: rectangle, rounded rectangle, circle, arrow, star, line, with fill, outline and opacity
+- [ ] Effects: blur, pixelate, glitch, posterize, pop art, vignette, sharpen, noise, duotone, with strength
+- [ ] Layer tools: flip, opacity, blend modes, shape crop (circle, heart, star), outline and shadow around cut-outs
+- [ ] Canvas tools: free crop and rotate of the whole picture, resize, perspective, border and frame, fit with a blurred or colored background
+- [ ] Clone and stretch/warp brushes, curves, tilt-shift, motion trail
+- [ ] Collage: a grid of photos (2 to 9 cells) with spacing, rounded corners and a background
+- [ ] A CC0 sticker pack
+
+### Text (photo and video)
+
+- [ ] Glow, opacity, line spacing and a wrap width (drag the box sides)
+- [ ] Loop animations (wiggle, pulse, bounce) and per-letter animations (typewriter, letters pop in)
+- [ ] Our own style presets (outline meme, caption box, neon, shadow title)
+- [ ] Import a font file
 
 ## Later / maybe
 
-- [ ] Several video clips in a row, with transitions
-- [ ] A CC0 sticker pack
-- [ ] Templates, once it's clear which layouts get used most
+- [ ] Templates, once it's clear which layouts get used most (check patent US11989808B2 first, AGENTS.md rule 15)
 
 ## Not planned
 

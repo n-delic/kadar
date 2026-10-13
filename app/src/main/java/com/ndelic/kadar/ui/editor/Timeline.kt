@@ -53,9 +53,11 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -65,7 +67,11 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -89,6 +95,7 @@ import com.ndelic.kadar.ui.common.KIcon
 import com.ndelic.kadar.ui.common.PanelLabel
 import com.ndelic.kadar.video.MIN_CLIP_MS
 import com.ndelic.kadar.video.Segment
+import com.ndelic.kadar.video.TransitionKind
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.outputMs
 import kotlin.math.abs
@@ -201,6 +208,8 @@ fun Timeline(
     onClipTap: (Int) -> Unit,
     onClipMove: (Int, Int) -> Unit,
     onAddClip: () -> Unit,
+    transitionAt: Int?,
+    onTransition: (Int) -> Unit,
 ) {
     val total = clip.outputDurationMs.coerceAtLeast(1)
     val startDp = if (layers.isEmpty()) TIMELINE_PAD else TRACK_START
@@ -261,7 +270,7 @@ fun Timeline(
                         )
                     }
                 }
-                ClipRow(clip, frames, pickedClip, total, view, startDp, onSeek, onClipTap, onClipMove, onAddClip)
+                ClipRow(clip, frames, pickedClip, total, view, startDp, onSeek, onClipTap, onClipMove, onAddClip, transitionAt, onTransition)
             }
             Canvas(Modifier.matchParentSize()) {
                 val x = start + view.x(positionMs, width)
@@ -489,8 +498,12 @@ private fun ClipRow(
     onTap: (Int) -> Unit,
     onMove: (Int, Int) -> Unit,
     onAdd: () -> Unit,
+    transitionAt: Int?,
+    onTransition: (Int) -> Unit,
 ) {
     val images = remember(frames) { frames.mapValues { (_, f) -> f.map { it.asImageBitmap() } } }
+    val transitionIcon = painterResource(R.drawable.ic_transition_fade)
+    val transitionLabels = (1 until clip.segments.size).map { stringResource(R.string.transition, it + 1) }
     val current by rememberUpdatedState(clip)
     val haptics = LocalHapticFeedback.current
     // The clip being moved and how far it's been dragged (px). Reset by the new order, so the drop doesn't flicker.
@@ -502,12 +515,16 @@ private fun ClipRow(
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(6.dp))
                 .background(Ink.raised)
+                .semantics { customActions = transitionLabels.mapIndexed { i, label -> CustomAccessibilityAction(label) { onTransition(i + 1); true } } }
                 .pointerInput(total, view) {
                     awaitEachGesture {
                         val c = current
                         fun timeAt(x: Float) = view.time(x, size.width.toFloat(), total)
                         val down = awaitFirstDown()
                         val index = c.segmentAt(timeAt(down.position.x)).first
+                        // A tap on a cut's button opens its transition.
+                        val cuts = c.played.runningFold(0L) { t, s -> t + s.outputDurationMs }
+                        val cut = (1 until c.segments.size).firstOrNull { abs(view.x(cuts[it], size.width.toFloat()) - down.position.x) < CUT_BUTTON.toPx() / 2 }
                         // Like a track: moving first scrubs, holding still lifts the clip to move it, letting go taps it.
                         var moved: PointerInputChange? = null
                         var tapped = false
@@ -527,7 +544,7 @@ private fun ClipRow(
                             }
                         } == null
                         if (tapped) {
-                            onTap(index)
+                            if (cut != null) onTransition(cut) else onTap(index)
                             return@awaitEachGesture
                         }
                         if (held) {
@@ -556,9 +573,11 @@ private fun ClipRow(
                     }
                 },
         ) {
-            val starts = clip.segments.runningFold(0L) { t, s -> t + s.outputDurationMs }
+            // As the main track plays them: the head an overlapping transition plays over the clip before is left out.
+            val played = clip.played
+            val starts = played.runningFold(0L) { t, s -> t + s.outputDurationMs }
             fun drawClip(i: Int, dx: Float) {
-                val s = clip.segments[i]
+                val s = played[i]
                 val x0 = view.x(starts[i], size.width) + dx
                 val x1 = view.x(starts[i + 1], size.width) + dx
                 if (x1 < 0 || x0 > size.width) return
@@ -588,6 +607,17 @@ private fun ClipRow(
             clip.segments.indices.forEach { if (it != lifted?.first) drawClip(it, 0f) }
             // On top of the others, so it shows where it's being dragged.
             lifted?.let { (i, dx) -> if (i in clip.segments.indices) drawClip(i, dx) }
+            // A button on every cut for its transition, lime when it has one or is open.
+            if (lifted == null) (1 until clip.segments.size).forEach { i ->
+                val on = i == transitionAt || clip.segments[i].transition.kind != TransitionKind.None
+                val box = CUT_BUTTON.toPx() * 0.7f
+                val topLeft = Offset(view.x(starts[i], size.width) - box / 2, (size.height - box) / 2)
+                drawRoundRect(if (on) Ink.accent else Ink.bg, topLeft, Size(box, box), CornerRadius(6.dp.toPx()))
+                val iconSize = box * 0.7f
+                translate(topLeft.x + (box - iconSize) / 2, topLeft.y + (box - iconSize) / 2) {
+                    with(transitionIcon) { draw(Size(iconSize, iconSize), colorFilter = ColorFilter.tint(if (on) Ink.onAccent else Ink.text)) }
+                }
+            }
         }
         Box(Modifier.width(TIMELINE_PAD).fillMaxHeight().clickable(onClick = onAdd), contentAlignment = Alignment.Center) {
             KIcon(R.drawable.ic_add, Modifier.size(22.dp), Ink.accent, stringResource(R.string.add_clip))
@@ -596,6 +626,8 @@ private fun ClipRow(
 }
 
 private val TIMELINE_PAD = 28.dp
+/** Touch width of a cut's transition button; it draws at 70% of that. */
+private val CUT_BUTTON = 34.dp
 private val TRACK_HEIGHT = 40.dp
 private val RULER_HEIGHT = 18.dp
 /** Hide and lock toggles, 40dp each. */

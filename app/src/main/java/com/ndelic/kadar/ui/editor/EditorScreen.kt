@@ -139,13 +139,14 @@ import com.ndelic.kadar.ui.common.blockTouches
 import com.ndelic.kadar.ui.common.fullWidthPanel
 import com.ndelic.kadar.video.composition
 import com.ndelic.kadar.video.drawnGroups
+import com.ndelic.kadar.video.outgoingOffset
 import kotlin.math.atan2
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Presets, Font, Color, Stroke, Glow, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Shape, ShapeFill, ShapeOutline }
+enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Presets, Font, Color, Stroke, Glow, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Shape, ShapeFill, ShapeOutline, Transition }
 
 @Composable
 fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
@@ -167,6 +168,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     val newClip = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::addClip) }
     // The clip being trimmed, by index.
     var trimming by rememberSaveable { mutableStateOf<Int?>(null) }
+    // The clip whose transition in the Transition panel shows, by index.
+    var transitionAt by rememberSaveable { mutableStateOf<Int?>(null) }
     // The clip the clip tools act on: the one picked on the strip, else the one under the playhead.
     val picked = state.selectedClip?.takeIf { video != null && it in video.segments.indices }
     val clipIndex = picked ?: video?.segmentAt(positionMs)?.first ?: 0
@@ -204,7 +207,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         LaunchedEffect(player, video) {
             // After an edit (a split, a trim) the playhead stays where it was.
             val start = resumeAt[0].also { resumeAt[0] = 0 }.takeIf { it > 0 } ?: positionMs.coerceAtMost(video.outputDurationMs)
-            player.setComposition(video.copy(blur = false).composition(), start)
+            player.setComposition(video.copy(blur = false).composition(incoming = false), start)
             player.prepare()
             // A paused player keeps showing the old frame after a new composition; seek once it's loaded to repaint.
             delay(300)
@@ -311,6 +314,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     Panel.Style -> (selected as? TextLayer)?.let { TextStylePanel(it, vm) }
                     Panel.Overlay -> (selected as? VideoLayer)?.let { VideoLayerPanel(it, vm) }
                     Panel.Animate -> selected?.let { AnimationPanel(it, vm) }
+                    Panel.Transition -> video?.let { v -> transitionAt?.takeIf { it in 1 until v.segments.size }?.let { TransitionPanel(v, it, vm) } }
                     Panel.Adjust -> when (val l = selected) {
                         is ImageLayer -> AdjustPanel(l.adjust) { a -> vm.editImage { copy(adjust = a) } }
                         null -> video?.let { v -> AdjustPanel(v.segments[clipIndex].adjust) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } }
@@ -491,6 +495,12 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     onClipTap = { i -> if (i == picked) trimming = i else vm.selectClip(i) },
                     onClipMove = vm::moveClip,
                     onAddClip = { newClip.launch(PickVisualMediaRequest(PickVisualMedia.ImageAndVideo)) },
+                    transitionAt = transitionAt.takeIf { panel == Panel.Transition },
+                    onTransition = { i ->
+                        val open = panel == Panel.Transition && transitionAt == i
+                        transitionAt = i
+                        panel = if (open) null else Panel.Transition
+                    },
                 )
             }
         }
@@ -624,7 +634,9 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
         val videoEnd = project.video?.outputDurationMs
         val animated = player != null && videoEnd != null && project.layers.any { it.animIn != Anim.None || it.animOut != Anim.None || it.animLoop != Loop.None }
         val clock = remember { mutableLongStateOf(0L) }
-        if (animated && player != null) {
+        // So do the overlapping transitions the stage draws over the main preview.
+        val overlapping = project.video?.transitionSpans.orEmpty().filter { it.kind.overlaps }
+        if ((animated || overlapping.isNotEmpty()) && player != null) {
             LaunchedEffect(player) {
                 while (true) {
                     clock.longValue = player.currentPosition
@@ -706,7 +718,21 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
             Box(Modifier.fillMaxSize().clipToBounds().background(if (transparent) Color(0xFF3A3A3A) else Color(project.background))) {
                 if (transparent) Checkerboard()
                 project.video?.takeIf { it.blurred }?.let { BlurBackgroundPreview(it, stills, project.width, project.height, scale, player) }
-                player?.let { p -> VideoSurface(p, project.width, project.height, Modifier.fillMaxSize()) }
+                player?.let { p ->
+                    VideoSurface(
+                        p,
+                        project.width,
+                        project.height,
+                        Modifier.fillMaxSize().graphicsLayer {
+                            // Pushed out by the incoming clip, like the export's outgoingSettings.
+                            val push = overlapping.firstOrNull { it.kind.pushes && clock.longValue in it } ?: return@graphicsLayer
+                            val (x, y) = push.kind.outgoingOffset(push.progress(clock.longValue))
+                            translationX = x * this.size.width
+                            translationY = y * this.size.height
+                        },
+                    )
+                }
+                project.video?.takeIf { overlapping.isNotEmpty() }?.let { IncomingClipPreview(it, stills, project.width, project.height, scale, player, clock) }
                 // Over the main video and under the top canvas (handles and the layers above every video layer), bottom
                 // layer first, each over the layers drawn under it, like the export.
                 if (videoEnd != null) {

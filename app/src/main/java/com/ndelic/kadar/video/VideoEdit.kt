@@ -92,6 +92,8 @@ data class Segment(
     val keepPitch: Boolean = true,
     val adjust: Adjust = Adjust(),
     val isImage: Boolean = false,
+    /** The transition into this clip from the one before it; the first clip's is unused. */
+    val transition: Transition = Transition(),
 ) {
     val outputDurationMs get() = outputMs(startMs, endMs, speed)
 }
@@ -111,13 +113,29 @@ data class VideoClip(
     val frameRate: Float = 0f,
     val voices: List<VoiceClip> = emptyList(),
 ) {
-    val outputDurationMs get() = segments.sumOf { it.outputDurationMs }
+    /** How much of each clip's start an overlapping transition plays over the clip before it (output time). */
+    val headsMs get() = headsMs(segments.map { it.outputDurationMs }, segments.map { it.transition })
 
-    /** Index of the clip playing at output time [positionMs], and how far into it (output time). */
-    fun segmentAt(positionMs: Long) = clipAt(segments.map { it.outputDurationMs }, positionMs)
+    /** The clips as the main track plays them: each without its head, which plays on top of the clip before. */
+    val played get() = segments.zip(headsMs) { s, head -> s.copy(startMs = s.startMs + (head * s.speed).toLong()) }
 
-    /** Where clip [index] starts, in output time. */
-    fun segmentStart(index: Int) = segments.take(index).sumOf { it.outputDurationMs }
+    /** Where each transition plays, in output time. */
+    val transitionSpans get() = transitionSpans(segments.map { it.outputDurationMs }, segments.map { it.transition })
+
+    /** The clips end to end, shortened by every overlapping transition. */
+    val outputDurationMs get() = played.sumOf { it.outputDurationMs }
+
+    /**
+     * Index of the clip the main track plays at output time [positionMs], and how far into it (output time, counted
+     * from its very start, so its head comes first): during an overlapping transition, still the clip before.
+     */
+    fun segmentAt(positionMs: Long): Pair<Int, Long> {
+        val (i, into) = clipAt(played.map { it.outputDurationMs }, positionMs)
+        return i to into + headsMs[i]
+    }
+
+    /** Where clip [index] starts, in output time: its head plays over the end of the clip before it. */
+    fun segmentStart(index: Int) = played.take(index).sumOf { it.outputDurationMs } - headsMs[index]
 
     /** Output frame size; also the project canvas, so layers line up with the exported frame. */
     val outputSize get() = canvasSize(width, height, canvas)
@@ -153,36 +171,47 @@ private const val BLUR_LONG_SIDE = 320
  * draws them itself) stack in their order: video layers are picture-in-picture sequences of their own; the other
  * layers above the topmost video layer are one [timedOverlay] on the composition, not the clip, so it gets output
  * timestamps (after trim and speed) like the layers, and those under a video layer are drawn into a sequence of their
- * own. Call it on the main thread, like [timedOverlay].
+ * own. [incoming] adds the heads of overlapping transitions as a sequence over the clips (the preview leaves it out and
+ * draws them itself, with IncomingClipPreview). Call it on the main thread, like [timedOverlay].
  */
-fun VideoClip.composition(layers: List<Layer> = emptyList(), shortSide: Int? = null): Composition {
+fun VideoClip.composition(layers: List<Layer> = emptyList(), shortSide: Int? = null, incoming: Boolean = true): Composition {
     // Media3's compositor takes every output frame time from sequence 0 and draws it on top, then the others in order.
     // So sequence 0 is an invisible frame clock at the clip's rate, then the overlays (topmost layer first), each padded
-    // with gaps to the output's full length and followed by the layers drawn right under it, then the clips, and under
-    // them the blurred background. The letterbox bars are transparent (Media3 clears to transparent black), so the
-    // background shows through them.
+    // with gaps to the output's full length and followed by the layers drawn right under it, then the heads of
+    // overlapping transitions, then the clips, and under them the blurred background. The letterbox bars are
+    // transparent (Media3 clears to transparent black), so the background shows through them.
     val (w, h) = outputSize
     fun VideoLayer.span() = overlaySpan(startMs, endMs, playableMs, outputDurationMs)
     val shown = layers.filter { !it.hidden && (it !is VideoLayer || it.span() != null) }
     val groups = drawnGroups(shown) { it is VideoLayer }
     val videos = shown.filterIsInstance<VideoLayer>()
-    // Compositor inputs after sequence 0, topmost first: a video layer and its span, or null for drawn layers (full frame).
-    val inputs = mutableListOf<Pair<VideoLayer, Pair<Long, Long>>?>()
+    val spans = transitionSpans
+    val overlapping = spans.filter { it.kind.overlaps }.takeIf { incoming && it.isNotEmpty() }
+    // Compositor inputs after sequence 0, topmost first: how each is placed at an output time (us).
+    val inputs = mutableListOf<(Long) -> OverlaySettings>()
     val sequences = mutableListOf<EditedMediaItemSequence>()
-    if (videos.isNotEmpty()) sequences += blankStill()
+    if (videos.isNotEmpty() || overlapping != null) sequences += blankStill()
     videos.indices.reversed().forEach { i ->
         val span = videos[i].span()!!
-        inputs += videos[i] to span
+        inputs += layerSettings(videos[i], span)
         sequences += videos[i].sequence(span, outputDurationMs)
         if (groups[i].isNotEmpty()) {
-            inputs += null
+            inputs += { FULL_FRAME }
             val drawn = OverlayEffect(listOf(timedOverlay(w, h, groups[i], outputDurationMs)))
             sequences += blankStill(listOf(Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_STRETCH_TO_FIT), drawn, Unpremultiply))
         }
     }
     val overlay = groups.last().takeIf { it.isNotEmpty() }?.let { timedOverlay(w, h, it, outputDurationMs) }
-    sequences += mainSequence()
-    if (blurred) sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItems(segments.map { blurredBackground(it) }).build()
+    val played = this.played
+    overlapping?.let { o ->
+        val tails = headTailsMs(o)
+        val fps = outputFrameRate(frameRate)
+        inputs += incomingSettings(o, tails, fps)
+        sequences += incomingSequence(o, tails, played, fps)
+        inputs += outgoingSettings(o, fps)
+    }
+    sequences += mainSequence(played, spans)
+    if (blurred) sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItems(played.map { blurredBackground(it) }).build()
     music?.let { sequences += it.sequences(outputDurationMs) }
     // Audio only, after every video sequence, so the compositor's input numbers above stay as they are.
     sequences += voices.mapNotNull { it.sequence(outputDurationMs) }
@@ -199,7 +228,7 @@ fun VideoClip.composition(layers: List<Layer> = emptyList(), shortSide: Int? = n
         )
         // HDR phone footage turns washed out on most apps once posted; memes go out as plain SDR.
         .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
-        .apply { if (videos.isNotEmpty()) setVideoCompositorSettings(overlaySettings(inputs)) }
+        .apply { if (videos.isNotEmpty() || overlapping != null) setVideoCompositorSettings(overlaySettings(inputs)) }
         .build()
 }
 
@@ -220,18 +249,48 @@ private fun VideoClip.blankStill(effects: List<Effect> = emptyList()): EditedMed
 }
 
 /**
- * The clips end to end. With sound in any of them every clip gets an audio track (silence for photos and silent
- * clips), so the sequence's audio runs through without a break.
+ * The [played] clips end to end, with the centered transitions among [spans] as effects on the clips either side of
+ * each cut. With sound in any clip every clip gets an audio track (silence for photos and silent clips), so the
+ * sequence's audio runs through without a break.
  */
-private fun VideoClip.mainSequence(): EditedMediaItemSequence {
-    val sound = segments.any { !it.isImage && it.volume > 0f }
-    val tracks = if (sound) setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO) else setOf(C.TRACK_TYPE_VIDEO)
-    val items = segments.map { s ->
-        val audio = if (sound && !s.isImage) listOfNotNull(gain(s.volume), pitchFix(s.speed).takeIf { s.keepPitch && s.speed != 1f }) else emptyList()
-        segmentItem(s, Effects(audio, videoEffects(s)), removeAudio = !sound)
+private fun VideoClip.mainSequence(played: List<Segment>, spans: List<TransitionSpan>): EditedMediaItemSequence {
+    val sound = hasSound(played)
+    val dips = spans.filter { !it.kind.overlaps }
+    val items = played.mapIndexed { i, s ->
+        val effects = dipEffects(dips.filter { it.clip == i || it.clip == i + 1 }, s.width, s.height)
+        segmentItem(s, Effects(audioEffects(s, sound), videoEffects(s, effects)), removeAudio = !sound)
     }
-    return EditedMediaItemSequence.Builder(tracks).addItems(items).build()
+    return EditedMediaItemSequence.Builder(tracks(sound)).addItems(items).build()
 }
+
+/**
+ * The heads of the clips coming in through the overlapping transitions [spans], each at its transition's time with
+ * gaps between and to the end, over the main track: faded, moved or wiped in by [incomingSettings] and [WipeMask].
+ * Each plays on for its [tails] past the cut, the same picture as the main track there, muted.
+ */
+private fun VideoClip.incomingSequence(spans: List<TransitionSpan>, tails: List<Long>, played: List<Segment>, fps: Int): EditedMediaItemSequence {
+    val heads = spans.mapIndexed { k, span -> segments[span.clip].let { it.copy(endMs = played[span.clip].startMs + (tails[k] * it.speed).toLong()) } }
+    val sound = hasSound(heads)
+    val builder = EditedMediaItemSequence.Builder(tracks(sound))
+    var at = 0L
+    spans.forEachIndexed { k, span ->
+        val s = heads[k]
+        if (span.startMs > at) builder.addGap((span.startMs - at) * 1000)
+        at = maxOf(at, span.startMs) + s.outputDurationMs
+        val wipe = listOfNotNull(WipeMask(span, fps).takeIf { span.kind.wipes })
+        builder.addItem(segmentItem(s, Effects(audioEffects(s, sound, mutedFromUs = (span.endMs - span.startMs) * 1000), videoEffects(s) + wipe), removeAudio = !sound))
+    }
+    if (outputDurationMs > at) builder.addGap((outputDurationMs - at) * 1000)
+    return builder.build()
+}
+
+private fun hasSound(clips: List<Segment>) = clips.any { !it.isImage && it.volume > 0f }
+
+private fun tracks(sound: Boolean) = if (sound) setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO) else setOf(C.TRACK_TYPE_VIDEO)
+
+/** Clip [s]'s volume and pitch fix; silent from [mutedFromUs] into it, if given. */
+private fun audioEffects(s: Segment, sound: Boolean, mutedFromUs: Long? = null) =
+    if (sound && !s.isImage) listOfNotNull(gain(s.volume, mutedFromUs), pitchFix(s.speed).takeIf { s.keepPitch && s.speed != 1f }) else emptyList()
 
 /** Clip [s] as a sequence item: its trimmed source at its speed, or a photo shown for its length at the clip's frame rate. */
 private fun VideoClip.segmentItem(s: Segment, effects: Effects, removeAudio: Boolean): EditedMediaItem {
@@ -332,26 +391,70 @@ private fun VideoLayer.sequence(span: Pair<Long, Long>, totalMs: Long): EditedMe
 }
 
 /**
- * Hides the frame clock (sequence 0) and places input `i` (sequence `i + 1`) by its video layer; drawn layers (null)
- * and the clip after them keep the default full-frame settings.
+ * Hides the frame clock (sequence 0) and places input `i` (sequence `i + 1`) by [inputs]; the ones after them (the
+ * clips without transitions on top, the blurred background) keep the default full-frame settings.
  */
-private fun VideoClip.overlaySettings(inputs: List<Pair<VideoLayer, Pair<Long, Long>>?>) =
+private fun VideoClip.overlaySettings(inputs: List<(Long) -> OverlaySettings>) =
     object : VideoCompositorSettings {
         override fun getOutputSize(inputSizes: List<Size>) = Size(outputSize.first, outputSize.second)
 
-        override fun getOverlaySettings(inputId: Int, presentationTimeUs: Long): OverlaySettings {
-            if (inputId == 0) return StaticOverlaySettings.Builder().setAlphaScale(0f).build()
-            val (layer, span) = inputs.getOrNull(inputId - 1) ?: return StaticOverlaySettings.Builder().build()
-            val p = overlayPlacement(layer.t, outputSize.first, outputSize.second)
-            return StaticOverlaySettings.Builder()
-                .setBackgroundFrameAnchor(p.x, p.y)
-                .setScale(p.scale, p.scale)
-                .setRotationDegrees(p.rotation)
-                // Gaps are filled with small black frames; only the clip's own frames may show.
-                .setAlphaScale(overlayAlpha(layer.opacity, span, presentationTimeUs))
-                .build()
-        }
+        override fun getOverlaySettings(inputId: Int, presentationTimeUs: Long) =
+            if (inputId == 0) HIDDEN else inputs.getOrNull(inputId - 1)?.invoke(presentationTimeUs) ?: FULL_FRAME
     }
+
+/** Video layer [layer] placed by its transform while it plays its [span]. */
+private fun VideoClip.layerSettings(layer: VideoLayer, span: Pair<Long, Long>): (Long) -> OverlaySettings {
+    val p = overlayPlacement(layer.t, outputSize.first, outputSize.second)
+    return { us ->
+        StaticOverlaySettings.Builder()
+            .setBackgroundFrameAnchor(p.x, p.y)
+            .setScale(p.scale, p.scale)
+            .setRotationDegrees(p.rotation)
+            // Gaps are filled with small black frames; only the clip's own frames may show.
+            .setAlphaScale(overlayAlpha(layer.opacity, span, us))
+            .build()
+    }
+}
+
+/**
+ * The incoming heads of [spans]: only during their transitions and [tails] (the gaps hold black frames), faded or
+ * moved in. Each input's frame is placed for the output frame it lands in (at [fps]), so heads and the main track
+ * move in step.
+ */
+private fun incomingSettings(spans: List<TransitionSpan>, tails: List<Long>, fps: Int): (Long) -> OverlaySettings = { us ->
+    val ms = outputFrameUs(us, fps) / 1000
+    val k = spans.indices.firstOrNull { ms >= spans[it].startMs && ms < spans[it].endMs + tails[it] }
+    if (k == null) {
+        HIDDEN
+    } else {
+        val span = spans[k]
+        val p = span.progress(ms)
+        shifted(span.kind.incomingOffset(p)).setAlphaScale(span.kind.incomingAlpha(p)).build()
+    }
+}
+
+/** The main track, pushed out during a push among [spans] (placed for its output frame, like [incomingSettings]). */
+private fun outgoingSettings(spans: List<TransitionSpan>, fps: Int): (Long) -> OverlaySettings = { us ->
+    val ms = outputFrameUs(us, fps) / 1000
+    val span = spans.firstOrNull { it.kind.pushes && ms in it }
+    if (span == null) {
+        FULL_FRAME
+    } else {
+        shifted(span.kind.outgoingOffset(span.progress(ms))).build()
+    }
+}
+
+/**
+ * A canvas-sized input moved by [offset] (canvas fractions, y down). Anchors only go from -1 to 1 (normalized device
+ * coordinates, y up), so a whole canvas away is the overlay's far edge on the background's near one: half each way.
+ */
+private fun shifted(offset: Pair<Float, Float>) = StaticOverlaySettings.Builder()
+    .setBackgroundFrameAnchor(offset.first, -offset.second)
+    .setOverlayFrameAnchor(-offset.first, offset.second)
+
+// Lazy: building one needs Android classes, which the JVM tests of this file's pure functions don't have.
+private val HIDDEN by lazy { StaticOverlaySettings.Builder().setAlphaScale(0f).build() }
+private val FULL_FRAME by lazy { StaticOverlaySettings.Builder().build() }
 
 /**
  * Layers that come and go: one full-frame bitmap per stretch of time where the visible set doesn't change, rendered up
@@ -462,8 +565,10 @@ fun highBitrate(width: Int, height: Int, shortSide: Int?, frameRate: Float): Int
 private const val HIGH_BITS_PER_PIXEL = 0.28f
 private const val MAX_BITRATE = 50_000_000f
 
-private fun VideoClip.videoEffects(s: Segment): List<Effect> = buildList {
+/** Clip [s]'s look, then [transition] effects, then its fit into the canvas. */
+private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyList()): List<Effect> = buildList {
     adjustEffect(s.adjust)?.let(::add)
+    addAll(transition)
     // Clips of another size or orientation than the first are fitted into its frame.
     if (canvas != null || s.width != width || s.height != height) {
         val (w, h) = outputSize
@@ -479,7 +584,9 @@ private fun clipped(uri: Uri, startMs: Long, endMs: Long) = MediaItem.Builder()
     .setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setStartPositionMs(startMs).setEndPositionMs(endMs).build())
     .build()
 
-private fun gain(volume: Float) = GainProcessor(DefaultGainProvider.Builder(volume).build())
+private fun gain(volume: Float, mutedFromUs: Long? = null) =
+    // A minute is past the end of anything muted this way (a head's tail).
+    GainProcessor(DefaultGainProvider.Builder(volume).apply { mutedFromUs?.let { addFadeAt(it, 60_000_000) { _, _ -> 0f } } }.build())
 
 /** The speed change scales every frequency by [speed]; shifting pitch by 1/[speed] cancels it without touching the length. */
 private fun pitchFix(speed: Float) = SonicAudioProcessor().apply { setPitch(1 / speed) }

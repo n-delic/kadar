@@ -88,6 +88,10 @@
 - Add font: import a .ttf or .otf file from the Font panel; it stays in the app (offline) for every project. A project whose imported font is gone uses the default font
 - Fix: dragging a selection handle near the screen edge no longer triggers the system back gesture
 
+## v0.6.1: done
+
+- Transitions between clips: tap the button on a cut in the clip strip for None, Dissolve, Black, White, Zoom, Blur, Wipe, Slide or Push (left or up), a length from 0.2 to 1.5 s, and Apply to all. Dissolve, wipes, slides and pushes overlap the two clips, so the video gets shorter by their length; the others pass through black, white, a zoom or a blur at the cut
+
 ## Next
 
 Feature parity with the big phone editors, built from how their features behave, never from their code, assets or look (AGENTS.md rules 14 and 15). Offline only: no cloud AI.
@@ -95,7 +99,6 @@ Feature parity with the big phone editors, built from how their features behave,
 ### Video
 
 - [ ] Replace a clip with another video or photo, keeping its place and settings
-- [ ] Transitions between clips: fade, fade through black/white, wipes, slides, push, zoom, blur; a duration; apply to all
 - [ ] Clip tools: freeze frame, reverse, rotate and flip, crop the main clip, capture the frame as a photo, a blank color clip
 - [ ] Canvas: more ratios (3:4, 4:3, 2:3, 3:2, 2:1, 1:2, 2.35:1); zoom and move the clip inside the canvas; background color, blur strength or an image
 - [ ] Speed up to 10x and speed ramps (presets that slow down or speed up within a clip)

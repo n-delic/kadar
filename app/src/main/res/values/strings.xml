@@ -96,6 +96,7 @@
     <string name="tool_web">Web</string>
     <string name="tool_trim">Trim</string>
     <string name="tool_speed">Speed</string>
+    <string name="tool_split">Split</string>
     <string name="tool_canvas">Canvas</string>
     <string name="tool_adjust">Adjust</string>
     <string name="tool_filters">Filters</string>
@@ -193,6 +194,9 @@
     <string name="busy_adding_sticker">Adding sticker</string>
     <string name="busy_adding_image">Adding image</string>
     <string name="busy_adding_video">Adding video</string>
+    <string name="busy_adding_clip">Adding clip</string>
+    <string name="split_too_close">Move the playhead further from the clip\'s ends to split it</string>
+    <string name="add_clip">Add a video or photo at the end</string>
     <string name="busy_adding_music">Adding music</string>
     <string name="busy_removing_bg">Removing background</string>
     <string name="busy_saving">Saving</string>

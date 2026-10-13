@@ -49,11 +49,15 @@ import com.ndelic.kadar.model.withStrokes
 import com.ndelic.kadar.ui.editor.Timeline
 import com.ndelic.kadar.ui.editor.label
 import com.ndelic.kadar.video.Music
+import com.ndelic.kadar.video.Segment
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.VoiceClip
 import com.ndelic.kadar.video.composition
 import com.ndelic.kadar.video.exportVideo
 import com.ndelic.kadar.video.highBitrate
+import com.ndelic.kadar.video.moved
+import com.ndelic.kadar.video.sourceMs
+import com.ndelic.kadar.video.splitPoint
 import java.io.File
 import kotlin.math.max
 import kotlin.math.min
@@ -95,8 +99,10 @@ data class EditorUiState(
     val settings: AppSettings = AppSettings(),
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
-    /** Evenly spaced frames of the video, for the timeline. */
-    val filmstrip: List<Bitmap> = emptyList(),
+    /** Evenly spaced frames of each clip's source (a photo's one picture), for the timeline. */
+    val filmstrip: Map<Uri, List<Bitmap>> = emptyMap(),
+    /** Index of the clip picked on the timeline's clip strip; never set together with [selectedId]. */
+    val selectedClip: Int? = null,
     /** Output time the running voice recording started at; null when not recording. */
     val recordingFromMs: Long? = null,
 ) {
@@ -191,7 +197,8 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             dir.deleteRecursively()
             throw UserError(R.string.error_read_video)
         }
-        open(dir, Project(info.width, info.height, background = Color.BLACK, video = VideoClip(uri, info.durationMs, width = info.width, height = info.height, frameRate = info.frameRate)), frame)
+        val clip = VideoClip(listOf(Segment(uri, info.durationMs, info.width, info.height)), width = info.width, height = info.height, frameRate = info.frameRate)
+        open(dir, Project(info.width, info.height, background = Color.BLACK, video = clip), frame)
     }
 
     /** "Share to Kadar" from the gallery or another app: saves whatever is open, then starts a project from it. */
@@ -210,9 +217,10 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             val p = store.load(dir)
             // Projects from before the frame rate was saved; the export with video layers runs at it.
             val v = p.video?.takeIf { it.frameRate == 0f } ?: return@withContext p
-            p.copy(video = v.copy(frameRate = runCatching { mediaInfo(app, v.uri).frameRate }.getOrDefault(0f)))
+            val first = v.segments.firstOrNull { !it.isImage } ?: return@withContext p
+            p.copy(video = v.copy(frameRate = runCatching { mediaInfo(app, first.uri).frameRate }.getOrDefault(0f)))
         }
-        val frame = project.video?.let { v -> withContext(Dispatchers.IO) { runCatching { videoFrame(app, v.uri, v.startMs) }.getOrNull() } }
+        val frame = project.video?.let { v -> withContext(Dispatchers.IO) { segmentFrame(v.segments.first(), v.segments.first().startMs) } }
         if (project.video != null && frame == null) _effects.send(EditorEffect.Message(UiText.Res(R.string.error_video_missing)))
         open(dir, project, frame, saved = true)
     }
@@ -258,16 +266,25 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         nextId = (project.layers.maxOfOrNull { it.id } ?: 0) + 1
         undoStack.clear()
         redoStack.clear()
-        _uiState.update { it.copy(projectDir = dir, project = project, selectedId = null, canUndo = false, canRedo = false, filmstrip = emptyList()) }
-        project.video?.let { v ->
-            viewModelScope.launch {
-                val frames = withContext(Dispatchers.IO) {
-                    runCatching { (0 until FILMSTRIP_FRAMES).mapNotNull { videoFrame(app, v.uri, v.durationMs * it / FILMSTRIP_FRAMES) } }.getOrDefault(emptyList())
-                }
-                _uiState.update { if (it.projectDir == dir) it.copy(filmstrip = frames) else it }
+        _uiState.update { it.copy(projectDir = dir, project = project, selectedId = null, selectedClip = null, canUndo = false, canRedo = false, filmstrip = emptyMap()) }
+        project.video?.segments?.distinctBy { it.uri }?.forEach { loadFilmstrip(dir, it) }
+    }
+
+    private fun loadFilmstrip(dir: File, s: Segment) {
+        if (s.uri in _uiState.value.filmstrip) return
+        viewModelScope.launch {
+            val frames = withContext(Dispatchers.IO) {
+                if (s.isImage) listOfNotNull(segmentFrame(s, 0))
+                else runCatching { (0 until FILMSTRIP_FRAMES).mapNotNull { videoFrame(app, s.uri, s.durationMs * it / FILMSTRIP_FRAMES) } }.getOrDefault(emptyList())
             }
+            _uiState.update { if (it.projectDir == dir) it.copy(filmstrip = it.filmstrip + (s.uri to frames)) else it }
         }
     }
+
+    /** A small picture of clip [s] at source time [ms]; null when its file can't be read. Call off the main thread. */
+    private fun segmentFrame(s: Segment, ms: Long): Bitmap? = runCatching {
+        if (s.isImage) loadBitmap(app, s.uri, FRAME_SIZE) else videoFrame(app, s.uri, ms)
+    }.getOrNull()
 
     // Undo
 
@@ -311,7 +328,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // Layers
 
-    fun select(id: Long?) = _uiState.update { it.copy(selectedId = id) }
+    fun select(id: Long?) = _uiState.update { it.copy(selectedId = id, selectedClip = null) }
 
     /** Shows [text] the way the ViewModel's own messages show, for the UI's notes (e.g. about the preview player). */
     fun notify(text: UiText) {
@@ -469,7 +486,9 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     /** The video frame under the playhead ([positionMs], output time), as a guide for the draw screen; null for photos. */
     suspend fun frameAt(positionMs: Long): Bitmap? {
         val v = _uiState.value.project?.video ?: return null
-        return withContext(Dispatchers.IO) { runCatching { videoFrame(app, v.uri, v.startMs + (positionMs * v.speed).toLong()) }.getOrNull() }
+        val (i, into) = v.segmentAt(positionMs)
+        val s = v.segments[i]
+        return withContext(Dispatchers.IO) { segmentFrame(s, sourceMs(s.startMs, s.speed, into)) }
     }
 
     /** Result of the eraser screen: one undo step for the whole session. Same size as before, so the source offset still holds. */
@@ -546,6 +565,63 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     // Video
 
     fun updateClip(change: VideoClip.() -> VideoClip) = updateProject { p -> p.copy(video = p.video?.change()) }
+
+    /** Changes clip [index] of the main track (trim, speed, volume, adjust). */
+    fun updateSegment(index: Int, change: Segment.() -> Segment) =
+        updateClip { copy(segments = segments.mapIndexed { i, s -> if (i == index) s.change() else s }) }
+
+    /** Picks clip [index] on the clip strip, or none; a picked clip and a selected layer exclude each other. */
+    fun selectClip(index: Int?) = _uiState.update { it.copy(selectedClip = index, selectedId = null) }
+
+    /** Adds a video, or a photo as a still of [PHOTO_CLIP_MS], after the last clip and picks it. */
+    fun addClip(uri: Uri) = work(R.string.busy_adding_clip) {
+        val dir = _uiState.value.projectDir ?: return@work
+        val segment = if (app.contentResolver.getType(uri)?.startsWith("image/") == true) {
+            // Copied into the project like image layers, decoded upright and at a size the encoder takes.
+            val bitmap = withContext(Dispatchers.IO) { loadBitmap(app, uri, MAX_PHOTO) }
+            val file = withContext(Dispatchers.IO) { store.writeImage(dir, bitmap) }
+            Segment(Uri.fromFile(File(dir, file)), MAX_PHOTO_CLIP_MS, bitmap.width, bitmap.height, endMs = PHOTO_CLIP_MS, isImage = true)
+        } else {
+            keepAccess(uri)
+            val info = withContext(Dispatchers.IO) { mediaInfo(app, uri) }
+            if (info.width == 0 || info.durationMs == 0L) throw UserError(R.string.error_read_video)
+            Segment(uri, info.durationMs, info.width, info.height)
+        }
+        updateClip { copy(segments = segments + segment) }
+        _uiState.value.project?.video?.let { selectClip(it.segments.lastIndex) }
+        loadFilmstrip(dir, segment)
+    }
+
+    /** Cuts the clip under the playhead ([atMs], output time) in two there; a message when too close to its ends. */
+    fun splitClip(atMs: Long) {
+        val v = _uiState.value.project?.video ?: return
+        val (i, into) = v.segmentAt(atMs)
+        val s = v.segments[i]
+        val at = splitPoint(s.startMs, s.endMs, s.speed, into)
+        if (at == null) {
+            _effects.trySend(EditorEffect.Message(UiText.Res(R.string.split_too_close)))
+            return
+        }
+        updateClip { copy(segments = segments.take(i) + s.copy(endMs = at) + s.copy(startMs = at) + segments.drop(i + 1)) }
+        selectClip(i + 1)
+    }
+
+    fun duplicateClip(index: Int) {
+        updateClip { copy(segments = segments.take(index + 1) + segments[index] + segments.drop(index + 1)) }
+        selectClip(index + 1)
+    }
+
+    /** Removes clip [index], unless it's the only one. */
+    fun deleteClip(index: Int) {
+        updateClip { if (segments.size > 1) copy(segments = segments.filterIndexed { i, _ -> i != index }) else this }
+        selectClip(null)
+    }
+
+    fun moveClip(from: Int, to: Int) {
+        if (from == to) return
+        updateClip { copy(segments = segments.moved(from, to)) }
+        selectClip(to)
+    }
 
     fun setMusic(uri: Uri) = work(R.string.busy_adding_music) {
         keepAccess(uri)
@@ -716,6 +792,10 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         const val THUMB_SIZE = 360f
         const val MAX_UNDO = 50
         const val FILMSTRIP_FRAMES = 10
+        const val FRAME_SIZE = 480
         const val MIN_VIDEO_LAYER_MS = 1000L
+        const val PHOTO_CLIP_MS = 3000L
+        /** How long a photo clip can be trimmed out to. */
+        const val MAX_PHOTO_CLIP_MS = 30_000L
     }
 }

@@ -77,13 +77,17 @@
 - Fix: see-through parts of text, stickers and drawings (soft edges, shadows, fades, the highlighter) exported darker than the preview showed them
 - Fixes: paused video layers and the blurred canvas show their frame right away (they could stay black until you scrubbed), the Audio panel no longer squeezes the preview to a thumbnail, voiceovers are listed by start time, a new project says "Just now"
 
+## Done for the next release
+
+- Several clips in a row: add videos and photos (3 s stills) with the + after the clip strip, tap a clip to pick it, long-press to reorder, split at the playhead, duplicate, delete; trim, speed, volume, filter and adjust per clip
+
 ## Next
 
 Feature parity with the big phone editors, built from how their features behave, never from their code, assets or look (AGENTS.md rules 14 and 15). Offline only: no cloud AI.
 
 ### Video
 
-- [ ] Several clips in a row: add videos and photos (as stills) to one timeline, long-press to reorder, split at the playhead, duplicate, delete, replace; trim, speed, volume, filter and adjust per clip
+- [ ] Replace a clip with another video or photo, keeping its place and settings
 - [ ] Transitions between clips: fade, fade through black/white, wipes, slides, push, zoom, blur; a duration; apply to all
 - [ ] Clip tools: freeze frame, reverse, rotate and flip, crop the main clip, capture the frame as a photo, a blank color clip
 - [ ] Canvas: more ratios (3:4, 4:3, 2:3, 3:2, 2:1, 1:2, 2.35:1); zoom and move the clip inside the canvas; background color, blur strength or an image

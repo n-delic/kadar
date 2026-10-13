@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.SurfaceTexture
 import android.graphics.Typeface
+import android.net.Uri
 import android.os.SystemClock
 import android.view.Surface
 import android.view.TextureView
@@ -159,7 +160,16 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     var playing by remember { mutableStateOf(false) }
     var positionMs by remember { mutableLongStateOf(0L) }
     val overlayVideo = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let { uri -> vm.addVideo(uri, positionMs) } }
-    var trimming by rememberSaveable { mutableStateOf(false) }
+    val newClip = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::addClip) }
+    // The clip being trimmed, by index.
+    var trimming by rememberSaveable { mutableStateOf<Int?>(null) }
+    // The clip the clip tools act on: the one picked on the strip, else the one under the playhead.
+    val picked = state.selectedClip?.takeIf { video != null && it in video.segments.indices }
+    val clipIndex = picked ?: video?.segmentAt(positionMs)?.first ?: 0
+    // With several clips a clip tool picks the clip it acts on, so the strip shows which one that is.
+    fun pickClip() {
+        if (video != null && video.segments.size > 1 && picked == null) vm.selectClip(clipIndex)
+    }
     var erasing by remember { mutableStateOf<Pair<ImageLayer, Bitmap?>?>(null) }
     var cropping by remember { mutableStateOf<ImageLayer?>(null) }
     var croppingVideo by remember { mutableStateOf<Pair<VideoLayer, Bitmap>?>(null) }
@@ -170,7 +180,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     LaunchedEffect(state.selectedId) {
         // Selecting from the Layers list keeps the list open; anything else starts from the layer's tools.
         if (panel != Panel.Layers) panel = null
-        if (state.selectedId != null) trimming = false
+        if (state.selectedId != null) trimming = null
     }
     BackHandler {
         when {
@@ -188,7 +198,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         // BlurBackgroundPreview the blurred canvas, so the main player stays single-input. Media3 1.11's multi-input
         // preview fails mid-playback ("frame for an ended input") on devices; the export still composites everything.
         LaunchedEffect(player, video) {
-            val start = resumeAt[0].also { resumeAt[0] = 0 }
+            // After an edit (a split, a trim) the playhead stays where it was.
+            val start = resumeAt[0].also { resumeAt[0] = 0 }.takeIf { it > 0 } ?: positionMs.coerceAtMost(video.outputDurationMs)
             player.setComposition(video.copy(blur = false).composition(), start)
             player.prepare()
             // A paused player keeps showing the old frame after a new composition; seek once it's loaded to repaint.
@@ -244,7 +255,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             CircleButton(R.drawable.ic_share, stringResource(R.string.share)) { vm.export(share = true) }
         }
 
-        Stage(project, selected, player, if (video != null) positionMs else null, vm, onEditText = { typing = it.text }, Modifier.weight(1f).fillMaxWidth())
+        Stage(project, selected, player, if (video != null) positionMs else null, state.filmstrip, vm, onEditText = { typing = it.text }, Modifier.weight(1f).fillMaxWidth())
 
         if (video != null) {
             Box(Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
@@ -276,9 +287,9 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                 when (p) {
                     Panel.Sticker -> StickerPanel(state.stickers, vm)
                     Panel.Canvas -> CanvasPanel(project, state.settings.exportSize, vm)
-                    Panel.Speed -> video?.let { SpeedPanel(it, vm) }
+                    Panel.Speed -> video?.let { SpeedPanel(it.segments[clipIndex], clipIndex, vm) }
                     Panel.Audio -> video?.let { v ->
-                        AudioPanel(v, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }) {
+                        AudioPanel(v, clipIndex, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }) {
                             VoiceoverSection(v, state.recordingFromMs, positionMs, playing, player, vm, onPlay = { playing = it })
                         }
                     }
@@ -293,12 +304,12 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     Panel.Animate -> selected?.let { AnimationPanel(it, vm) }
                     Panel.Adjust -> when (val l = selected) {
                         is ImageLayer -> AdjustPanel(l.adjust) { a -> vm.editImage { copy(adjust = a) } }
-                        null -> video?.let { v -> AdjustPanel(v.adjust) { a -> vm.updateClip { copy(adjust = a) } } }
+                        null -> video?.let { v -> AdjustPanel(v.segments[clipIndex].adjust) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } }
                         else -> {}
                     }
                     Panel.Filters -> when (val l = selected) {
                         is ImageLayer -> FiltersPanel(l.bitmap, l.adjust) { a -> vm.editImage { copy(adjust = a) } }
-                        null -> video?.let { v -> FiltersPanel(state.filmstrip.firstOrNull(), v.adjust) { a -> vm.updateClip { copy(adjust = a) } } }
+                        null -> video?.segments?.get(clipIndex)?.let { s -> FiltersPanel(state.filmstrip[s.uri]?.firstOrNull(), s.adjust) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } }
                         else -> {}
                     }
                 }
@@ -306,7 +317,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         }
 
         val toolset = when (selected) {
-            null -> 0
+            null -> if (picked != null) 5 else 0
             is TextLayer -> 1
             is ImageLayer -> 2
             is VideoLayer -> 3
@@ -319,6 +330,14 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             ) {
                 fun toggle(p: Panel) {
                     panel = if (panel == p) null else p
+                }
+                fun toggleClip(p: Panel) {
+                    pickClip()
+                    toggle(p)
+                }
+                fun trim() {
+                    pickClip()
+                    trimming = if (trimming != null) null else clipIndex
                 }
                 fun draw() {
                     playing = false
@@ -334,12 +353,13 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_language, stringResource(R.string.tool_web), onClick = onBrowse)
                         if (video != null) {
                             IconTool(R.drawable.ic_movie, stringResource(R.string.video)) { overlayVideo.launch(PickVisualMediaRequest(PickVisualMedia.VideoOnly)) }
-                            IconTool(R.drawable.ic_content_cut, stringResource(R.string.tool_trim), trimming) { trimming = !trimming }
-                            IconTool(R.drawable.ic_speed, stringResource(R.string.tool_speed), panel == Panel.Speed) { toggle(Panel.Speed) }
+                            IconTool(R.drawable.ic_content_cut, stringResource(R.string.tool_trim), trimming != null, onClick = ::trim)
+                            IconTool(R.drawable.ic_split_scene, stringResource(R.string.tool_split)) { vm.splitClip(positionMs) }
+                            IconTool(R.drawable.ic_speed, stringResource(R.string.tool_speed), panel == Panel.Speed) { toggleClip(Panel.Speed) }
                             IconTool(R.drawable.ic_aspect_ratio, stringResource(R.string.tool_canvas), panel == Panel.VideoCanvas) { toggle(Panel.VideoCanvas) }
-                            IconTool(R.drawable.ic_tune, stringResource(R.string.tool_adjust), panel == Panel.Adjust) { toggle(Panel.Adjust) }
-                            IconTool(R.drawable.ic_filter_vintage, stringResource(R.string.tool_filters), panel == Panel.Filters) { toggle(Panel.Filters) }
-                            IconTool(R.drawable.ic_music_note, stringResource(R.string.tool_audio), panel == Panel.Audio) { toggle(Panel.Audio) }
+                            IconTool(R.drawable.ic_tune, stringResource(R.string.tool_adjust), panel == Panel.Adjust) { toggleClip(Panel.Adjust) }
+                            IconTool(R.drawable.ic_filter_vintage, stringResource(R.string.tool_filters), panel == Panel.Filters) { toggleClip(Panel.Filters) }
+                            IconTool(R.drawable.ic_music_note, stringResource(R.string.tool_audio), panel == Panel.Audio) { toggleClip(Panel.Audio) }
                         } else {
                             IconTool(R.drawable.ic_aspect_ratio, stringResource(R.string.tool_canvas), panel == Panel.Canvas) { toggle(Panel.Canvas) }
                         }
@@ -367,6 +387,18 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_flip_to_front, stringResource(R.string.tool_front), onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, stringResource(R.string.tool_back), onClick = vm::sendToBack)
                         IconTool(R.drawable.ic_delete, stringResource(R.string.delete), onClick = vm::deleteSelected)
+                    }
+                    5 -> {
+                        IconTool(R.drawable.ic_check, stringResource(R.string.done)) { vm.selectClip(null) }
+                        ToolDivider()
+                        IconTool(R.drawable.ic_content_cut, stringResource(R.string.tool_trim), trimming != null, onClick = ::trim)
+                        IconTool(R.drawable.ic_split_scene, stringResource(R.string.tool_split)) { vm.splitClip(positionMs) }
+                        IconTool(R.drawable.ic_speed, stringResource(R.string.tool_speed), panel == Panel.Speed) { toggle(Panel.Speed) }
+                        IconTool(R.drawable.ic_music_note, stringResource(R.string.tool_audio), panel == Panel.Audio) { toggle(Panel.Audio) }
+                        IconTool(R.drawable.ic_tune, stringResource(R.string.tool_adjust), panel == Panel.Adjust) { toggle(Panel.Adjust) }
+                        IconTool(R.drawable.ic_filter_vintage, stringResource(R.string.tool_filters), panel == Panel.Filters) { toggle(Panel.Filters) }
+                        IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate)) { vm.duplicateClip(clipIndex) }
+                        if (video != null && video.segments.size > 1) IconTool(R.drawable.ic_delete, stringResource(R.string.delete)) { vm.deleteClip(clipIndex) }
                     }
                     3 -> {
                         IconTool(R.drawable.ic_check, stringResource(R.string.done)) { vm.select(null) }
@@ -403,20 +435,24 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         }
 
         if (video != null && player != null) {
-            if (trimming) {
+            val trimmed = trimming?.let { i -> video.segments.getOrNull(i)?.let { i to it } }
+            if (trimmed != null) {
+                val (i, segment) = trimmed
                 TrimStrip(
-                    clip = video,
-                    frames = state.filmstrip,
+                    clip = segment,
+                    offsetMs = video.segmentStart(i),
+                    frames = state.filmstrip[segment.uri].orEmpty(),
                     positionMs = positionMs,
                     onSeek = { currentPlayer?.seekTo(it) },
-                    onTrim = { start, end -> vm.updateClip { copy(startMs = start, endMs = end) } },
-                    onDone = { trimming = false },
+                    onTrim = { start, end -> vm.updateSegment(i) { copy(startMs = start, endMs = end) } },
+                    onDone = { trimming = null },
                 )
             } else {
                 Timeline(
                     clip = video,
                     layers = project.layers,
                     selectedId = state.selectedId,
+                    pickedClip = picked,
                     frames = state.filmstrip,
                     positionMs = positionMs,
                     onSeek = { currentPlayer?.seekTo(it) },
@@ -424,10 +460,10 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     onLayerTime = vm::setLayerTime,
                     onFlags = vm::setFlags,
                     onMove = vm::moveLayer,
-                    onClipTap = {
-                        vm.select(null)
-                        trimming = true
-                    },
+                    // A second tap on the picked clip trims it, as one tap did when there was only one clip.
+                    onClipTap = { i -> if (i == picked) trimming = i else vm.selectClip(i) },
+                    onClipMove = vm::moveClip,
+                    onAddClip = { newClip.launch(PickVisualMediaRequest(PickVisualMedia.ImageAndVideo)) },
                 )
             }
         }
@@ -542,7 +578,7 @@ private val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF2DE1C2
  * double-tap a text layer to edit it.
  */
 @Composable
-private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?, timeMs: Long?, vm: EditorViewModel, onEditText: (TextLayer) -> Unit, modifier: Modifier) {
+private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?, timeMs: Long?, stills: Map<Uri, List<Bitmap>>, vm: EditorViewModel, onEditText: (TextLayer) -> Unit, modifier: Modifier) {
     // In a video only the layers on screen at the playhead show (and can be grabbed); the selected one always does, to edit it.
     fun Layer.onStage() = !hidden && (timeMs == null || visibleAt(timeMs) || id == selected?.id)
     val shown = project.layers.filter { it.onStage() }
@@ -642,7 +678,7 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
         ) {
             Box(Modifier.fillMaxSize().clipToBounds().background(if (transparent) Color(0xFF3A3A3A) else Color(project.background))) {
                 if (transparent) Checkerboard()
-                project.video?.takeIf { it.blurred }?.let { BlurBackgroundPreview(it, project.width, project.height, scale, player) }
+                project.video?.takeIf { it.blurred }?.let { BlurBackgroundPreview(it, stills, project.width, project.height, scale, player) }
                 player?.let { p -> VideoSurface(p, project.width, project.height, Modifier.fillMaxSize()) }
                 // Over the main video and under the top canvas (handles and the layers above every video layer), bottom
                 // layer first, each over the layers drawn under it, like the export.

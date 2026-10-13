@@ -67,6 +67,7 @@ import com.ndelic.kadar.ui.common.KToggle
 import com.ndelic.kadar.ui.common.PanelLabel
 import com.ndelic.kadar.ui.common.TextTabs
 import com.ndelic.kadar.video.Music
+import com.ndelic.kadar.video.Segment
 import com.ndelic.kadar.video.VideoClip
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -211,11 +212,11 @@ private fun AspectTile(label: String, ratio: Float, active: Boolean, onClick: ()
 }
 
 @Composable
-fun SpeedPanel(clip: VideoClip, vm: EditorViewModel) {
+fun SpeedPanel(clip: Segment, index: Int, vm: EditorViewModel) {
     Column {
-        TextTabs(SPEEDS, clip.speed, label = { "${it}x".replace(".0x", "x") }) { s -> vm.updateClip { copy(speed = s) } }
+        TextTabs(SPEEDS, clip.speed, label = { "${it}x".replace(".0x", "x") }) { s -> vm.updateSegment(index) { copy(speed = s) } }
         Text(stringResource(R.string.speed_length, formatMs(clip.outputDurationMs)), color = Ink.dim, fontSize = 12.sp, modifier = Modifier.padding(start = 12.dp, top = 4.dp))
-        KToggle(stringResource(R.string.keep_pitch), stringResource(R.string.keep_pitch_hint), clip.keepPitch) { on -> vm.updateClip { copy(keepPitch = on) } }
+        KToggle(stringResource(R.string.keep_pitch), stringResource(R.string.keep_pitch_hint), clip.keepPitch) { on -> vm.updateSegment(index) { copy(keepPitch = on) } }
     }
 }
 
@@ -275,12 +276,13 @@ fun SmallIcon(icon: Int, description: String, onClick: () -> Unit) {
     }
 }
 
+/** Music and voiceovers are the whole video's; the sound slider is clip [index]'s. */
 @Composable
-fun AudioPanel(clip: VideoClip, vm: EditorViewModel, onAddMusic: () -> Unit, voiceover: @Composable () -> Unit) {
+fun AudioPanel(clip: VideoClip, index: Int, vm: EditorViewModel, onAddMusic: () -> Unit, voiceover: @Composable () -> Unit) {
     // Scrolls once a few recordings are listed, so the stage keeps its room.
     Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         PanelLabel(stringResource(R.string.video_sound))
-        KSlider(R.drawable.ic_volume_up, clip.volume, 0f..1f, ::percent) { v -> vm.updateClip { copy(volume = v) } }
+        KSlider(R.drawable.ic_volume_up, clip.segments[index].volume, 0f..1f, ::percent) { v -> vm.updateSegment(index) { copy(volume = v) } }
         PanelLabel(stringResource(R.string.music))
         val music = clip.music
         if (music == null) {

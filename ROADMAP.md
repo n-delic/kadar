@@ -81,6 +81,11 @@
 
 - Speech bubbles: the text Bubble tool puts the caption in a speech bubble, a thought cloud or a shout burst (or the old box), white with a black outline to start, any fill and outline color. The text wraps inside, and the tail points wherever you drag its handle on the canvas
 - Shapes: rectangle, rounded rectangle, ellipse, arrow, star and line from the new Shape tool, with fill and outline color (or none), outline width, stretch and opacity; moved, resized, rotated, duplicated, animated and timed on the video timeline like any layer
+- Text: glow (any color, with a size), opacity, line height, and a wrap width you drag with the handles on the sides of the selected text (long captions still start sized to fit)
+- Text presets: Meme, Caption, Neon, Title, Subtitle and Bubble set the font, colors, box and glow in one tap (one undo step)
+- Loop animations for text, stickers and shapes in videos: Wiggle, Pulse or Bounce for as long as the layer shows; text also gets Typewriter (letters appear one by one) and Letters pop entrances. The preview and the export match
+- Add font: import a .ttf or .otf file from the Font panel; it stays in the app (offline) for every project. A project whose imported font is gone uses the default font
+- Fix: dragging a selection handle near the screen edge no longer triggers the system back gesture
 
 ## Next
 
@@ -106,13 +111,6 @@ Feature parity with the big phone editors, built from how their features behave,
 - [ ] Clone and stretch/warp brushes, curves, tilt-shift, motion trail
 - [ ] Collage: a grid of photos (2 to 9 cells) with spacing, rounded corners and a background
 - [ ] A CC0 sticker pack
-
-### Text (photo and video)
-
-- [ ] Glow, opacity, line spacing and a wrap width (drag the box sides)
-- [ ] Loop animations (wiggle, pulse, bounce) and per-letter animations (typewriter, letters pop in)
-- [ ] Our own style presets (outline meme, caption box, neon, shadow title)
-- [ ] Import a font file
 
 ## Later / maybe
 

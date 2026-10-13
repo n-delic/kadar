@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.icu.text.BreakIterator
 import android.net.Uri
 import android.text.Layout
 import android.text.StaticLayout
@@ -79,6 +80,7 @@ sealed interface Layer {
     /** Entrance and exit in a video (text, stickers and shapes); photos ignore them. */
     val animIn: Anim get() = Anim.None
     val animOut: Anim get() = Anim.None
+    val animLoop: Loop get() = Loop.None
 
     /** How far from its center it draws, unscaled: its box's half diagonal, or more for a bubble's tail. */
     val reach: Float get() = hypot(width, height) / 2
@@ -112,6 +114,7 @@ data class ImageLayer(
     override val locked: Boolean = false,
     override val animIn: Anim = Anim.None,
     override val animOut: Anim = Anim.None,
+    override val animLoop: Loop = Loop.None,
 ) : Layer {
     private val paint = if (adjust.isNone) bitmapPaint else Paint(bitmapPaint).apply { colorFilter = ColorMatrixColorFilter(adjust.filterMatrix()) }
     override val width get() = bitmap.width.toFloat()
@@ -267,12 +270,22 @@ data class TextLayer(
     /** Extra space between letters, in ems. */
     val spacing: Float = 0f,
     val align: TextAlign = TextAlign.Center,
+    /** Glow color around the letters, or null for none; [glowSize] (0 to 1) is how far it spreads. */
+    val glow: Int? = null,
+    val glowSize: Float = 0.5f,
+    /** 0 to 1, the whole layer (box included). */
+    val opacity: Float = 1f,
+    /** Line height as a multiple of the font's. */
+    val lineSpacing: Float = 1f,
+    /** Where the text wraps, in the layer's own pixels; null keeps the lines as typed (bubbles wrap to a round block). */
+    val wrap: Float? = null,
     override val startMs: Long = 0,
     override val endMs: Long = Long.MAX_VALUE,
     override val hidden: Boolean = false,
     override val locked: Boolean = false,
     override val animIn: Anim = Anim.None,
     override val animOut: Anim = Anim.None,
+    override val animLoop: Loop = Loop.None,
 ) : Layer {
     private val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).also {
         it.typeface = font.typeface
@@ -285,8 +298,8 @@ data class TextLayer(
     private val layout: StaticLayout = run {
         val line = text.lines().maxOf { paint.measureText(it) }
         // Bubbles wrap long text into a rounder block; the caption box keeps the lines as typed.
-        val word = if (isBubble) text.split(' ', '\n').maxOf { paint.measureText(it) } else 0f
-        val w = (if (isBubble) bubbleWrapWidth(line, paint.fontSpacing, word) else line).toInt() + 1
+        val word = if (isBubble && wrap == null) text.split(' ', '\n').maxOf { paint.measureText(it) } else 0f
+        val w = wrap?.roundToInt()?.coerceAtLeast(1) ?: ((if (isBubble) bubbleWrapWidth(line, paint.fontSpacing, word) else line).toInt() + 1)
         val alignment = when (align) {
             TextAlign.Left -> Layout.Alignment.ALIGN_NORMAL
             TextAlign.Center -> Layout.Alignment.ALIGN_CENTER
@@ -295,8 +308,18 @@ data class TextLayer(
         StaticLayout.Builder.obtain(text, 0, text.length, paint, w)
             .setAlignment(alignment)
             .setIncludePad(true)
+            .setLineSpacing(0f, lineSpacing)
             .build()
     }
+    /** The width the text wraps at now, [wrap] if set. */
+    val wrapWidth get() = layout.width.toFloat()
+
+    /** Wrapping where dragging its [side] edge (-1 left, 1 right) by [dx] own pixels puts it, the other edge staying put. */
+    fun wrapDragged(side: Float, dx: Float): TextLayer {
+        val w = (wrapWidth + side * dx).coerceAtLeast(size)
+        return copy(wrap = w, t = t.shiftedLocal(side * (w - wrapWidth) / 2, 0f))
+    }
+    private val glowRadius get() = if (glow == null) 0f else size * glowSize * 0.5f
     private val stroke get() = if (outline == null) 0f else size * 0.16f
     private val boxPadX get() = if (box == null) 0f else size * 0.3f
     private val boxPadY get() = if (box == null) 0f else size * 0.12f
@@ -312,9 +335,15 @@ data class TextLayer(
 
     override val width get() = if (isBubble) 2 * bubbleHalf[0] + boxStroke else layout.width + stroke + 2 * boxPadX
     override val height get() = if (isBubble) 2 * bubbleHalf[1] + boxStroke else layout.height + stroke + 2 * boxPadY
-    override val reach get() = maxOf(hypot(width, height) / 2, tailTip?.let { hypot(it.first, it.second) + boxStroke } ?: 0f)
+    override val reach get() = maxOf(hypot(width, height) / 2, tailTip?.let { hypot(it.first, it.second) + boxStroke } ?: 0f) + glowRadius
 
-    override fun drawContent(canvas: Canvas) {
+    override fun drawContent(canvas: Canvas) = drawContent(canvas, null)
+
+    /** With [reveal] (a per-letter entrance in progress) the letters are drawn one by one, each as [letterScale] says. */
+    fun drawContent(canvas: Canvas, reveal: Reveal?) {
+        // Like a fade: one offscreen layer, so the outline and box don't show through the letters. Room for a shadow.
+        val r = reach * 1.2f
+        val count = if (opacity < 1f) canvas.saveLayerAlpha(-r, -r, r, r, (opacity * 255).roundToInt()) else canvas.save()
         if (box != null) {
             boxPaint.style = Paint.Style.FILL
             boxPaint.color = box
@@ -335,20 +364,64 @@ data class TextLayer(
             }
         }
         canvas.translate(-layout.width / 2f, -layout.height / 2f)
+        fun draw() = if (reveal == null) layout.draw(canvas) else drawLetters(canvas, reveal)
+        paint.strokeJoin = Paint.Join.ROUND
+        paint.strokeWidth = stroke
+        if (glow != null) {
+            // The letters (and outline) in the glow color, blurred around; the passes below cover the letters themselves.
+            paint.style = if (outline != null) Paint.Style.FILL_AND_STROKE else Paint.Style.FILL
+            paint.color = glow
+            paint.setShadowLayer(glowRadius, 0f, 0f, glow)
+            // Twice: one blurred pass spreads thin and reads as a soft shadow, not a glow.
+            repeat(2) { draw() }
+            paint.clearShadowLayer()
+        }
         // The shadow goes on the first pass only, so it sits under the outline instead of over it.
         if (shadow) paint.setShadowLayer(size * 0.08f, 0f, size * 0.04f, 0xAA000000.toInt())
         if (outline != null) {
             paint.style = Paint.Style.STROKE
-            paint.strokeWidth = stroke
-            paint.strokeJoin = Paint.Join.ROUND
             paint.color = outline
-            layout.draw(canvas)
+            draw()
             paint.clearShadowLayer()
         }
         paint.style = Paint.Style.FILL
         paint.color = color
-        layout.draw(canvas)
+        draw()
         paint.clearShadowLayer()
+        canvas.restoreToCount(count)
+    }
+
+    /** Where each letter (grapheme, so an emoji stays whole) starts in [text], plus the text's end. */
+    private val letters by lazy {
+        val b = BreakIterator.getCharacterInstance()
+        b.setText(text)
+        buildList {
+            var i = b.first()
+            while (i != BreakIterator.DONE) {
+                add(i)
+                i = b.next()
+            }
+        }
+    }
+
+    /**
+     * The layout's letters one at a time at the layout's own positions, so they land where [StaticLayout.draw] puts them.
+     * shortcut: joined scripts (Arabic, Devanagari) lose their joins while the letters come in; shape whole runs if users need them.
+     */
+    private fun drawLetters(canvas: Canvas, reveal: Reveal) {
+        val n = letters.size - 1
+        for (i in 0 until n) {
+            val s = letters[i]
+            val e = letters[i + 1]
+            val k = letterScale(reveal.anim, reveal.p, i, n)
+            if (k <= 0f || text[s].isWhitespace()) continue
+            val x = layout.getPrimaryHorizontal(s)
+            val y = layout.getLineBaseline(layout.getLineForOffset(s)).toFloat()
+            canvas.save()
+            canvas.scale(k, k, x + paint.measureText(text, s, e) / 2, y - size * 0.35f)
+            canvas.drawText(text, s, e, x, y, paint)
+            canvas.restore()
+        }
     }
 
     override fun withTransform(t: Transform) = copy(t = t)
@@ -412,6 +485,7 @@ data class ShapeLayer(
     override val locked: Boolean = false,
     override val animIn: Anim = Anim.None,
     override val animOut: Anim = Anim.None,
+    override val animLoop: Loop = Loop.None,
 ) : Layer {
     // Per layer, like the text paints: the video export draws copies of animated layers off the main thread.
     private val paint by lazy {
@@ -490,12 +564,13 @@ fun shapeSize(kind: ShapeKind, size: Float) = when (kind) {
 
 private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
 
-fun Canvas.drawLayer(layer: Layer) {
+/** [reveal] is a per-letter entrance in progress, which only text has. */
+fun Canvas.drawLayer(layer: Layer, reveal: Reveal? = null) {
     save()
     translate(layer.t.x, layer.t.y)
     rotate(layer.t.rotation)
     scale(layer.t.scale, layer.t.scale)
-    layer.drawContent(this)
+    if (layer is TextLayer) layer.drawContent(this, reveal) else layer.drawContent(this)
     restore()
 }
 

@@ -6,6 +6,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.ImageDecoder
 import android.graphics.Paint
+import android.graphics.Typeface
+import android.graphics.fonts.FontFamily
 import android.media.MediaMetadataRetriever
 import android.media.MediaRecorder
 import android.net.Uri
@@ -185,6 +187,53 @@ fun displayName(context: Context, uri: Uri): String =
     context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
         if (it.moveToFirst()) it.getString(0) else null
     } ?: "Music"
+
+private const val MAX_FONT = 20L * 1024 * 1024
+
+/**
+ * Copies a picked font file into [dir] as `<name>.ttf` or `.otf`, named after the file (made unique against [taken]),
+ * and returns it. The file is untrusted: it's capped at [MAX_FONT] and kept only if Android can load it as a font.
+ */
+fun importFont(context: Context, uri: Uri, dir: File, taken: Set<String>): File {
+    val picked = displayName(context, uri)
+    val base = picked.substringBeforeLast('.').replace(Regex("[^\\p{L}\\p{N} _-]"), "").trim().take(32).ifEmpty { "Font" }
+    var name = base
+    var n = 2
+    while (name in taken) name = "$base ${n++}"
+    val ext = if (picked.endsWith(".otf", ignoreCase = true)) "otf" else "ttf"
+    dir.mkdirs()
+    val tmp = File(dir, "import.tmp")
+    try {
+        val input = context.contentResolver.openInputStream(uri) ?: throw UserError(R.string.error_font_unreadable)
+        input.use { i ->
+            tmp.outputStream().use { o ->
+                val buffer = ByteArray(64 * 1024)
+                var total = 0L
+                while (true) {
+                    val read = i.read(buffer)
+                    if (read < 0) break
+                    total += read
+                    if (total > MAX_FONT) throw UserError(R.string.error_font_too_large)
+                    o.write(buffer, 0, read)
+                }
+            }
+        }
+        loadFont(tmp) ?: throw UserError(R.string.error_font_unreadable)
+        val file = File(dir, "$name.$ext")
+        if (!tmp.renameTo(file)) throw UserError(R.string.error_font_unreadable)
+        return file
+    } finally {
+        tmp.delete()
+    }
+}
+
+/** The font in [file], or null if it isn't one Android can load. */
+fun loadFont(file: File): Typeface? = try {
+    Typeface.CustomFallbackBuilder(FontFamily.Builder(android.graphics.fonts.Font.Builder(file).build()).build()).build()
+} catch (e: Exception) {
+    // IOException for unreadable files, IllegalArgumentException for data that isn't a font.
+    null
+}
 
 /** Writes a new file into Pictures/Kadar or Movies/Kadar. No storage permission needed on Android 10+. */
 fun saveToGallery(context: Context, mime: String, write: (OutputStream) -> Unit): Uri {

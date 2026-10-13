@@ -80,6 +80,7 @@ import com.ndelic.kadar.R
 import com.ndelic.kadar.model.DrawLayer
 import com.ndelic.kadar.model.ImageLayer
 import com.ndelic.kadar.model.Layer
+import com.ndelic.kadar.model.ShapeLayer
 import com.ndelic.kadar.model.TextLayer
 import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.ui.common.Ink
@@ -297,6 +298,7 @@ private fun Track(
         is ImageLayer -> Ink.teal
         is VideoLayer -> Ink.violet
         is DrawLayer -> Ink.coral
+        is ShapeLayer -> Ink.sky
     }
     Box(
         Modifier
@@ -406,6 +408,7 @@ private fun Track(
                         layer is TextLayer -> R.drawable.ic_title
                         layer is VideoLayer -> R.drawable.ic_movie
                         layer is DrawLayer -> R.drawable.ic_draw
+                        layer is ShapeLayer -> layer.kind.icon
                         else -> R.drawable.ic_image
                     }
                     KIcon(icon, Modifier.size(14.dp), Ink.onAccent)

@@ -55,6 +55,7 @@ import com.ndelic.kadar.model.ExportSize
 import com.ndelic.kadar.model.ImageLayer
 import com.ndelic.kadar.model.Layer
 import com.ndelic.kadar.model.Project
+import com.ndelic.kadar.model.ShapeLayer
 import com.ndelic.kadar.model.TextAlign
 import com.ndelic.kadar.model.TextLayer
 import com.ndelic.kadar.model.VideoLayer
@@ -240,6 +241,7 @@ fun LayersPanel(layers: List<Layer>, selectedId: Long?, vm: EditorViewModel) {
                         is TextLayer -> Text("T", color = Ink.text, fontFamily = FontFamily(l.font.typeface), fontSize = 18.sp)
                         is VideoLayer -> KIcon(R.drawable.ic_movie, Modifier.size(22.dp), Ink.violet)
                         is DrawLayer -> KIcon(R.drawable.ic_draw, Modifier.size(22.dp), Ink.coral)
+                        is ShapeLayer -> KIcon(l.kind.icon, Modifier.size(22.dp), Ink.sky)
                     }
                 }
                 Spacer(Modifier.width(12.dp))
@@ -266,6 +268,7 @@ val Layer.label: String
         is ImageLayer -> stringResource(R.string.image)
         is VideoLayer -> stringResource(R.string.video)
         is DrawLayer -> stringResource(R.string.drawing)
+        is ShapeLayer -> stringResource(kind.label)
     }
 
 @Composable

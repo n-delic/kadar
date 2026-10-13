@@ -3,7 +3,6 @@ package com.ndelic.kadar.model
 import android.graphics.Canvas
 import androidx.annotation.StringRes
 import com.ndelic.kadar.R
-import kotlin.math.hypot
 import kotlin.math.roundToInt
 
 /** How a text or sticker layer enters or leaves a video. */
@@ -72,7 +71,7 @@ fun Canvas.drawLayer(layer: Layer, m: Motion, canvasHeight: Int) {
     val y = layer.t.y + m.dy * canvasHeight
     // A fade goes through one offscreen layer, so an outline doesn't show through its fill. Its bounds cover any
     // rotation, with room for a text shadow.
-    val r = hypot(layer.width, layer.height) * layer.t.scale * m.scale * 0.6f
+    val r = layer.reach * layer.t.scale * m.scale * 1.2f
     val count = if (m.alpha < 1f) saveLayerAlpha(x - r, y - r, x + r, y + r, (m.alpha * 255).roundToInt()) else save()
     translate(x, y)
     scale(m.scale, m.scale)

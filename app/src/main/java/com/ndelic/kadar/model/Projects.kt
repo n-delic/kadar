@@ -149,6 +149,9 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
                 color = j.getInt("color"),
                 outline = if (j.has("outline")) j.getInt("outline") else null,
                 box = if (j.has("box")) j.getInt("box") else null,
+                bubble = enumOr(j.optString("bubble"), Bubble.Box),
+                boxOutline = if (j.has("boxOutline")) j.getInt("boxOutline") else null,
+                tail = if (j.has("tailX")) j.getDouble("tailX").toFloat() to j.getDouble("tailY").toFloat() else null,
                 shadow = j.optBoolean("shadow"),
                 spacing = j.optDouble("spacing", 0.0).toFloat(),
                 align = runCatching { TextAlign.valueOf(j.optString("align")) }.getOrDefault(TextAlign.Center),
@@ -191,6 +194,24 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
                 locked = j.optBoolean("locked"),
                 startMs = start,
                 endMs = end,
+            )
+            // Versions before shapes skip this type too.
+            "shape" -> ShapeLayer(
+                id = id,
+                t = t,
+                kind = enumOr(j.optString("kind"), ShapeKind.Rect),
+                w = j.getDouble("w").toFloat(),
+                h = j.getDouble("h").toFloat(),
+                fill = if (j.has("fill")) j.getInt("fill") else null,
+                outline = if (j.has("outline")) j.getInt("outline") else null,
+                stroke = j.optDouble("stroke", 0.0).toFloat(),
+                opacity = j.optDouble("opacity", 1.0).toFloat(),
+                hidden = j.optBoolean("hidden"),
+                locked = j.optBoolean("locked"),
+                startMs = start,
+                endMs = end,
+                animIn = animIn,
+                animOut = animOut,
             )
             else -> null
         }
@@ -276,6 +297,12 @@ private fun Layer.toJson() = JSONObject().apply {
             put("color", layer.color)
             layer.outline?.let { put("outline", it) }
             layer.box?.let { put("box", it) }
+            put("bubble", layer.bubble.name)
+            layer.boxOutline?.let { put("boxOutline", it) }
+            layer.tail?.let { (x, y) ->
+                put("tailX", x.toDouble())
+                put("tailY", y.toDouble())
+            }
             put("shadow", layer.shadow)
             put("spacing", layer.spacing.toDouble())
             put("align", layer.align.name)
@@ -301,6 +328,16 @@ private fun Layer.toJson() = JSONObject().apply {
                     put("points", JSONArray(stroke.points.map { (it * 10).roundToInt() / 10.0 }))
                 }
             }))
+        }
+        is ShapeLayer -> {
+            put("type", "shape")
+            put("kind", layer.kind.name)
+            put("w", layer.w.toDouble())
+            put("h", layer.h.toDouble())
+            layer.fill?.let { put("fill", it) }
+            layer.outline?.let { put("outline", it) }
+            put("stroke", layer.stroke.toDouble())
+            put("opacity", layer.opacity.toDouble())
         }
     }
 }

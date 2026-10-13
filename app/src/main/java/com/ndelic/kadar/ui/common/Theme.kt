@@ -75,6 +75,8 @@ object Ink {
     val violet = Color(0xFFB79CFF)
     /** Drawing tracks. */
     val coral = Color(0xFFFF8A65)
+    /** Shape tracks. */
+    val sky = Color(0xFF6FB7FF)
 }
 
 /** Swatches for text, outline and background: neutrals first, then warm to cool. */

@@ -136,6 +136,7 @@ Avoid it if the platform or an existing library already does the job. If you mus
 
 - Use Conventional Commits: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `build:`.
 - One logical change per commit.
+- No session or chat links in commit messages or PR descriptions (for example a `Claude-Session:` line). AI agents may add a `Co-Authored-By:` line, nothing else.
 - In the PR description, say what changed, why, and how you tested it. Add a screenshot for UI changes.
 - Before opening a PR, `./gradlew testDebugUnitTest assembleDebug` must pass.
 

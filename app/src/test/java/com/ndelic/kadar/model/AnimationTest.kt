@@ -1,5 +1,6 @@
 package com.ndelic.kadar.model
 
+import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -61,5 +62,50 @@ class AnimationTest {
         assertEquals(listOf(1000L to 1300L, 2700L to 3000L), animationSpans(Anim.Fade, Anim.Pop, 1000, 3000))
         assertEquals(listOf(2700L to 3000L), animationSpans(Anim.None, Anim.Pop, 1000, 3000))
         assertEquals(emptyList<Pair<Long, Long>>(), animationSpans(Anim.Fade, Anim.Fade, 3000, 3000))
+    }
+
+    @Test
+    fun aLoopAnimatesTheWholeTimeAndStartsAtRest() {
+        assertEquals(listOf(1000L to 3000L), animationSpans(Anim.None, Anim.Fade, 1000, 3000, Loop.Pulse))
+        assertEquals(Steady, motionAt(Anim.None, Anim.None, 1000, 3000, 1000, Loop.Wiggle))
+        assertTrue(abs(motionAt(Anim.None, Anim.None, 1000, 3000, 1175, Loop.Wiggle).rotation) > 5f)
+        assertTrue(motionAt(Anim.None, Anim.None, 1000, 3000, 1450, Loop.Pulse).scale > 1.07f)
+        assertTrue(motionAt(Anim.None, Anim.None, 1000, 3000, 1325, Loop.Bounce).dy < -0.02f)
+        assertEquals(Steady, motionAt(Anim.None, Anim.None, 1000, 3000, 3000, Loop.Bounce))
+    }
+
+    @Test
+    fun aLoopAddsToTheEntrance() {
+        val m = motionAt(Anim.Fade, Anim.None, 0, 3000, 150, Loop.Wiggle)
+        assertEquals(0.875f, m.alpha, 0.001f)
+        assertTrue(m.rotation != 0f)
+    }
+
+    @Test
+    fun perLetterEntrancesRunLongerAndCarryTheirProgress() {
+        assertEquals(Reveal(Anim.Typewriter, 0.5f), motionAt(Anim.Typewriter, Anim.None, 0, 5000, 600).reveal)
+        assertEquals(Steady, motionAt(Anim.Typewriter, Anim.None, 0, 5000, 1200))
+        // A short layer still gets half its time.
+        assertEquals(Reveal(Anim.LettersPop, 0.5f), motionAt(Anim.LettersPop, Anim.Fade, 0, 1000, 250).reveal)
+        assertEquals(listOf(0L to 1200L), animationSpans(Anim.Typewriter, Anim.None, 0, 5000))
+    }
+
+    @Test
+    fun typewriterShowsTheFirstLettersInTurn() {
+        assertEquals(listOf(0f, 0f, 0f, 0f), (0 until 4).map { letterScale(Anim.Typewriter, 0f, it, 4) })
+        assertEquals(listOf(1f, 1f, 0f, 0f), (0 until 4).map { letterScale(Anim.Typewriter, 0.5f, it, 4) })
+        assertEquals(listOf(1f, 1f, 1f, 1f), (0 until 4).map { letterScale(Anim.Typewriter, 0.99f, it, 4) })
+    }
+
+    @Test
+    fun lettersPopOneAfterAnother() {
+        assertEquals(0f, letterScale(Anim.LettersPop, 0f, 0, 5), 0.001f)
+        // Mid-way the first letters have landed, the middle one is popping and the last hasn't started.
+        assertEquals(1f, letterScale(Anim.LettersPop, 0.5f, 0, 5), 0.001f)
+        assertTrue(letterScale(Anim.LettersPop, 0.5f, 2, 5) in 0.01f..1.2f)
+        assertEquals(0f, letterScale(Anim.LettersPop, 0.5f, 4, 5), 0.001f)
+        assertEquals(1f, letterScale(Anim.LettersPop, 1f, 4, 5), 0.001f)
+        assertTrue((0..100).any { letterScale(Anim.LettersPop, it / 100f, 1, 3) > 1.02f })
+        assertEquals(1f, letterScale(Anim.LettersPop, 1f, 0, 1), 0.001f)
     }
 }

@@ -106,6 +106,8 @@
     <string name="tool_stroke">Obrub</string>
     <string name="tool_box">Oblačić</string>
     <string name="tool_style">Stil</string>
+    <string name="tool_presets">Predlošci</string>
+    <string name="tool_glow">Sjaj</string>
     <string name="tool_animate">Animacija</string>
     <string name="tool_front">Naprijed</string>
     <string name="tool_back">Nazad</string>
@@ -128,6 +130,15 @@
     <string name="saturation">Zasićenost</string>
     <string name="shadow">Sjenka</string>
     <string name="spacing">Razmak</string>
+    <string name="line_height">Prored</string>
+    <string name="glow_size">Veličina sjaja</string>
+    <string name="font_import">Dodaj font</string>
+    <string name="preset_meme">Mem</string>
+    <string name="preset_caption">Natpis</string>
+    <string name="preset_neon">Neon</string>
+    <string name="preset_title">Naslov</string>
+    <string name="preset_subtitle">Titl</string>
+    <string name="preset_speech">Oblačić</string>
     <string name="align_left">Lijevo</string>
     <string name="align_center">Sredina</string>
     <string name="align_right">Desno</string>
@@ -154,6 +165,12 @@
     <string name="anim_fade">Blijeđenje</string>
     <string name="anim_pop">Iskoči</string>
     <string name="anim_slide_up">Klizi gore</string>
+    <string name="anim_typewriter">Kucanje</string>
+    <string name="anim_letters_pop">Slova iskaču</string>
+    <string name="anim_loop">Ponavljanje</string>
+    <string name="loop_wiggle">Njihanje</string>
+    <string name="loop_pulse">Pulsiranje</string>
+    <string name="loop_bounce">Skakanje</string>
     <string name="opacity">Neprozirnost</string>
     <string name="sound">Zvuk</string>
     <string name="starts_at">Počinje od</string>
@@ -221,6 +238,7 @@
     <string name="busy_saving_video">Spremam video</string>
     <string name="export_cancelled">Izvoz otkazan</string>
     <string name="busy_cropping">Izrezujem</string>
+    <string name="busy_importing_font">Dodajem font</string>
 
     <!-- Messages -->
     <string name="saved_to_stickers">Spremljeno u Moje stikere</string>
@@ -239,6 +257,8 @@
     <string name="error_nothing_recorded">Ništa nije snimljeno</string>
     <string name="error_download_http">Preuzimanje nije uspjelo (HTTP %1$d)</string>
     <string name="error_image_too_large">Slika je prevelika</string>
+    <string name="error_font_unreadable">Ova datoteka nije font koji Kadar može koristiti</string>
+    <string name="error_font_too_large">Datoteka fonta je prevelika</string>
     <string name="error_cant_download">Ova slika se ne može preuzeti</string>
     <string name="error_not_image">Taj link nije slika koju Kadar može otvoriti</string>
     <string name="error_gallery_file">Nije moguće napraviti fajl u galeriji</string>

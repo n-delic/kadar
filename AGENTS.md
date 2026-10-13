@@ -12,7 +12,9 @@ The owner's phone is a Galaxy S25; it also runs on older phones, hence `minSdk 2
 
 - **Photo**: open a photo, blank canvas, or web image; add text (meme outline style), emoji, images and saved stickers as layers; move, pinch-resize, rotate; remove backgrounds on-device; change canvas aspect and background; export JPEG/PNG to `Pictures/Kadar`.
 - **Video (NLE)**: a main track of clips in a row (`VideoClip.segments`, each a `Segment` with its own trim, speed (0.25x to 4x), volume, keep-pitch and filter/adjust; photos are stills of 3 s, trimmable to 30 s, copied into the project folder). The "+" after the clip strip adds a video or photo; tap a clip to pick it (the clip tools act on it, else on the clip under the playhead), long-press-drag to reorder, Split at the playhead, Duplicate, Delete (not the last); the size and frame rate come from the first clip and the others are fitted into its frame. Project-wide: a music track (volume, start offset, loops to fit, fade in/out over 1.5 s: `video/MusicFade.kt`), and voiceovers recorded from the playhead in the Audio panel (`ui/editor/VoiceoverPanel.kt`; `VideoClip.voices`, each its own audio-only sequence). Text/sticker layers sit on their own timeline tracks above the clip, each with a start and end time, an eye and a lock at its left, and long-press-drag to reorder. Pinch the timeline to zoom, slide two fingers to scroll (view-only, `TimelineViewport`); one finger always edits or scrubs. Video layers (picture-in-picture) put more clips on top, placed like stickers, stacked with text and stickers in track order (a caption under a video layer's track is covered by it), with their own track, opacity, volume, in-point (`clipStartMs`, the Edit panel `ui/editor/VideoLayerPanel.kt`) and crop (`VideoLayer.crop`, a `CropRect` of the frame picked in the shared `CropScreen`; the layer's size is the cropped size, the export adds a Media3 `Crop` before its `Presentation`, the preview clips a full-frame `TextureView` to the layer box); export H.264/AAC MP4 to `Movies/Kadar`.
-- **In/out animations** (`model/Animation.kt`, `ui/editor/AnimationPanel.kt`): video text, sticker and shape layers get an entrance and an exit (None, Fade, Pop, Slide up), 300 ms each, at most half the layer's time. `motionAt` turns a layer and an output time into alpha, scale and offset, and `Canvas.drawLayer(layer, motion, canvasHeight)` applies it around `drawLayer`; the stage uses it with the player position (every frame while playing), the export's `timedOverlay` with each frame's timestamp.
+- **Animations** (`model/Animation.kt`, `ui/editor/AnimationPanel.kt`): video text, sticker and shape layers get an entrance and an exit (None, Fade, Pop, Slide up), 300 ms each, at most half the layer's time, and a loop (`Loop`: Wiggle, Pulse, Bounce) all the time they show. Text also gets per-letter entrances (`Anim.perLetter`: Typewriter, Letters pop, 1.2 s): the `Motion` carries a `Reveal`, `letterScale` says how big each letter draws, and `TextLayer.drawContent(canvas, reveal)` draws the letters one by one at the layout's positions, so it stays the one text drawing path. `motionAt` turns a layer and an output time into alpha, scale, offset, rotation and reveal, and `Canvas.drawLayer(layer, motion, canvasHeight)` applies it around `drawLayer`; the stage uses it with the player position (every frame while playing), the export's `timedOverlay` with each frame's timestamp (a looping layer's stretch is drawn per frame all through).
+- **Text look** (`TextLayer`): glow (`glow` color, `glowSize`, `ui/editor/GlowPanel.kt`), opacity (the whole layer through one offscreen layer), `lineSpacing` and `wrap` (where the text wraps, in layer pixels; null keeps the lines as typed). The side handles of a selected text drag its wrap with the other edge kept in place (`TextLayer.wrapDragged`). Presets (`model/TextPresets.kt`, `ui/editor/TextPresetsPanel.kt`, tiles drawn with `drawLayer`) set font, colors, box/bubble, glow, shadow and spacing in one undo step.
+- **Imported fonts**: Font > Add font copies a picked `.ttf`/`.otf` into `filesDir/fonts` (`media/Media.kt` `importFont`: size-capped, kept only if `loadFont` can load it), listed after the bundled fonts in `EditorUiState.fonts` and used in every project, like stickers. Projects store the font name (the file name); a missing one falls back to the default font.
 - **Undo / redo** for every edit (gestures and timeline drags count once per drag).
 - **Snapping** to the canvas center and 0°/90°, caption boxes behind text, a Layers panel (photos only, top-bar button; video shows layers as timeline tracks), keep-pitch for speed changes.
 - **Speech bubbles** (`ui/editor/BubblePanel.kt`, geometry in `model/Shapes.kt`): a text layer's box has a `Bubble` style (the caption `Box`, or `Speech`, `Thought`, `Shout`) with a fill (`box`) and an outline (`boxOutline`). Bubbles wrap the text (`bubbleWrapWidth`) into an ellipse, and their tail points at `TextLayer.tail` (layer pixels from its center; null is the default spot), dragged with a third handle on the stage (`Transform.toLocal`). Body and tail are merged into one `Path` (`Path.op`), so the outline never crosses the inside. `Layer.reach` covers the tail, so a fade's offscreen layer doesn't clip it.
@@ -51,14 +53,16 @@ app/src/main/java/com/ndelic/kadar/
                            Bubble, ShapeKind, bubble paths, Adjust, drawLayer, renderLayers, opaqueBounds
     Shapes.kt              Shape and bubble geometry: star and arrow points, bubble wrap width, tail, thought trail, cloud bumps, spikes
     Looks.kt               Filters: Look matrices, Adjust.filterMatrix(), glRgbMatrix() for Media3
-    Animation.kt           In/out animations: Anim, motionAt() (alpha/scale/offset at a time), drawLayer with a Motion
+    Animation.kt           Animations: Anim (in/out, per-letter), Loop, motionAt() (alpha/scale/offset/rotation/reveal at a time),
+                           letterScale, drawLayer with a Motion
+    TextPresets.kt         Text style presets (TextPreset) and TextLayer.styled
     Strokes.kt             Freehand strokes: PenStroke, smoothing, bounds, DrawLayer.withStrokes (re-centering)
     Projects.kt            Project, ProjectStore (one folder per project: project.json, thumb.jpg, images, voice .m4a), JSON
     ProjectList.kt         Home grid logic: default project label, search filter, ProjectSort
     Settings.kt            AppSettings (search engine, export size, export quality, project sort), SettingsStore
     UiText.kt              UiText (string resource, plural or raw text, resolved by the UI) and UserError
   media/
-    Media.kt               Bitmap decode/download, emoji render, video info and frames, gallery export, ML Kit cut-out
+    Media.kt               Bitmap decode/download, emoji render, video info and frames, gallery export, ML Kit cut-out, font import
   video/
     VideoEdit.kt           VideoClip / Segment / Music, VideoClip.composition() (preview + export), exportVideo()
     Segments.kt            Pure math for the main track: output length, clip at an output time, source time, split point, reorder
@@ -78,10 +82,12 @@ app/src/main/java/com/ndelic/kadar/
     EditorScreen.kt        Top bar, Stage (canvas, gestures, handles, view zoom, video preview), tool row, TextEntry
     Timeline.kt            NLE timeline (layer tracks + clip strip with +, pick, reorder) and TrimStrip (one clip)
     TimelineMath.kt        TimelineViewport (zoom/scroll: time to x, pinch, follow the playhead), ruler steps, filmstrip frames
-    Panels.kt              Tool panels: stickers, canvas, speed, audio, font, style, adjust, layers
+    Panels.kt              Tool panels: stickers, canvas, speed, audio, font (with Add font), style, adjust, layers
     FiltersPanel.kt        Look tiles and strength slider
-    AnimationPanel.kt      In and Out animation choices for a video text/sticker/shape layer
+    AnimationPanel.kt      In, Out and Loop animation choices for a video text/sticker/shape layer
     BubblePanel.kt         Box or bubble behind the selected text: style, fill and outline colors
+    GlowPanel.kt           Glow color and size of the selected text
+    TextPresetsPanel.kt    Text preset tiles, each a sample drawn in its look
     ShapePanel.kt          Shape kinds (adds one, or changes the selected), stretch, opacity, fill and outline panels
     VideoLayerPanel.kt     Opacity, sound and "Starts at" (in-point) of the selected video layer
     VideoLayerPreview.kt   A video layer on the stage: its own ExoPlayer in a TextureView, placed like the layer, synced to the main preview

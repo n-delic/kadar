@@ -51,6 +51,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -119,6 +120,7 @@ import com.ndelic.kadar.model.DrawLayer
 import com.ndelic.kadar.model.Font
 import com.ndelic.kadar.model.ImageLayer
 import com.ndelic.kadar.model.Layer
+import com.ndelic.kadar.model.Loop
 import com.ndelic.kadar.model.Project
 import com.ndelic.kadar.model.ShapeKind
 import com.ndelic.kadar.model.ShapeLayer
@@ -143,7 +145,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Font, Color, Stroke, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Shape, ShapeFill, ShapeOutline }
+enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Presets, Font, Color, Stroke, Glow, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Shape, ShapeFill, ShapeOutline }
 
 @Composable
 fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
@@ -295,7 +297,9 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                             VoiceoverSection(v, state.recordingFromMs, positionMs, playing, player, vm, onPlay = { playing = it })
                         }
                     }
-                    Panel.Font -> (selected as? TextLayer)?.let { FontPanel(it, vm) }
+                    Panel.Presets -> if (selected is TextLayer) TextPresetsPanel(state.fonts, vm)
+                    Panel.Font -> (selected as? TextLayer)?.let { FontPanel(it, state.fonts, vm) }
+                    Panel.Glow -> (selected as? TextLayer)?.let { GlowPanel(it, vm) }
                     Panel.Color -> (selected as? TextLayer)?.let { t -> ColorRow(t.color, allowNone = false) { c -> c?.let { vm.editText { copy(color = it) } } } }
                     Panel.Stroke -> (selected as? TextLayer)?.let { t -> ColorRow(t.outline, allowNone = true) { vm.editText { copy(outline = it) } } }
                     Panel.Box -> (selected as? TextLayer)?.let { BubblePanel(it, vm) }
@@ -375,9 +379,11 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_check, stringResource(R.string.done)) { vm.select(null) }
                         ToolDivider()
                         IconTool(R.drawable.ic_edit, stringResource(R.string.edit)) { (state.selected as? TextLayer)?.let { typing = it.text } }
+                        IconTool(R.drawable.ic_style, stringResource(R.string.tool_presets), panel == Panel.Presets) { toggle(Panel.Presets) }
                         IconTool(R.drawable.ic_match_case, stringResource(R.string.tool_font), panel == Panel.Font) { toggle(Panel.Font) }
                         IconTool(R.drawable.ic_palette, stringResource(R.string.tool_color), panel == Panel.Color) { toggle(Panel.Color) }
                         IconTool(R.drawable.ic_border_color, stringResource(R.string.tool_stroke), panel == Panel.Stroke) { toggle(Panel.Stroke) }
+                        IconTool(R.drawable.ic_flare, stringResource(R.string.tool_glow), panel == Panel.Glow) { toggle(Panel.Glow) }
                         IconTool(R.drawable.ic_chat_bubble, stringResource(R.string.tool_box), panel == Panel.Box) { toggle(Panel.Box) }
                         IconTool(R.drawable.ic_text_fields, stringResource(R.string.tool_style), panel == Panel.Style) { toggle(Panel.Style) }
                         if (video != null) IconTool(R.drawable.ic_animation, stringResource(R.string.tool_animate), panel == Panel.Animate) { toggle(Panel.Animate) }
@@ -541,7 +547,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         val layer = selected as? TextLayer
         TextEntry(
             initial = initial,
-            font = layer?.font?.typeface ?: vm.fonts.first().typeface,
+            font = layer?.font?.typeface ?: state.fonts.first().typeface,
             color = layer?.color ?: android.graphics.Color.WHITE,
             onDone = { text, color ->
                 typing = null
@@ -564,7 +570,7 @@ private fun ToolDivider() {
     Box(Modifier.padding(horizontal = 4.dp).size(width = 1.dp, height = 32.dp).background(Ink.line))
 }
 
-private enum class Handle { Delete, Scale, Tail }
+private enum class Handle { Delete, Scale, Tail, WrapLeft, WrapRight }
 
 /** Which snaps are active during a drag: drives the guide lines and a tick of haptic feedback when one engages. */
 private class Snaps(private val haptics: HapticFeedback) {
@@ -616,7 +622,7 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
         val layers by rememberUpdatedState(shown)
         // Entrances and exits follow the player on every frame while it plays; [timeMs] only updates every 50 ms.
         val videoEnd = project.video?.outputDurationMs
-        val animated = player != null && videoEnd != null && project.layers.any { it.animIn != Anim.None || it.animOut != Anim.None }
+        val animated = player != null && videoEnd != null && project.layers.any { it.animIn != Anim.None || it.animOut != Anim.None || it.animLoop != Loop.None }
         val clock = remember { mutableLongStateOf(0L) }
         if (animated && player != null) {
             LaunchedEffect(player) {
@@ -734,6 +740,17 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                                         first = false
                                         change.consume()
                                     }
+                                } else if (sel is TextLayer && (handle == Handle.WrapLeft || handle == Handle.WrapRight)) {
+                                    val side = if (handle == Handle.WrapRight) 1f else -1f
+                                    fun localX(at: Offset) = sel.t.toLocal(at.x / scale, at.y / scale).first
+                                    var first = true
+                                    while (true) {
+                                        val change = awaitPointerEvent().changes.first()
+                                        if (!change.pressed) break
+                                        vm.dragWrap(sel, side, localX(change.position) - localX(down.position), first)
+                                        first = false
+                                        change.consume()
+                                    }
                                 } else {
                                     val center = Offset(sel.t.x * scale, sel.t.y * scale)
                                     val v0 = down.position - center
@@ -816,6 +833,7 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                 HandleDot(R.drawable.ic_close, cornerOf(l, -1f, scale), Color(0xFFFF3B5C))
                 HandleDot(R.drawable.ic_open_in_full, cornerOf(l, 1f, scale), Ink.accent)
                 tailOf(l, scale)?.let { HandleDot(R.drawable.ic_chat_bubble, it, Color.White) }
+                if (l is TextLayer) for (side in listOf(-1f, 1f)) HandleDot(R.drawable.ic_arrow_range, sideOf(l, side, scale), Color.White)
             }
         }
         if (viewZoom > 1.01f) {
@@ -851,12 +869,20 @@ private fun tailOf(layer: Layer, scale: Float): Offset? = (layer as? TextLayer)?
     Offset(t.x * scale, t.y * scale)
 }
 
-private fun handleAt(layer: Layer, point: Offset, scale: Float, radius: Float): Handle? = when {
-    tailOf(layer, scale)?.let { (point - it).getDistance() < radius } == true -> Handle.Tail
-    (point - cornerOf(layer, -1f, scale)).getDistance() < radius -> Handle.Delete
-    (point - cornerOf(layer, 1f, scale)).getDistance() < radius -> Handle.Scale
-    else -> null
+/** Screen position of the middle of the layer's left ([side] = -1) or right (+1) edge. */
+private fun sideOf(layer: Layer, side: Float, scale: Float): Offset {
+    val t = layer.t.shiftedLocal(side * layer.width / 2, 0f)
+    return Offset(t.x * scale, t.y * scale)
 }
+
+/** The handle nearest to [point] within [radius]: on a one-line caption the side handles sit close to the corners. */
+private fun handleAt(layer: Layer, point: Offset, scale: Float, radius: Float): Handle? = listOfNotNull(
+    tailOf(layer, scale)?.let { Handle.Tail to it },
+    Handle.Delete to cornerOf(layer, -1f, scale),
+    Handle.Scale to cornerOf(layer, 1f, scale),
+    (Handle.WrapLeft to sideOf(layer, -1f, scale)).takeIf { layer is TextLayer },
+    (Handle.WrapRight to sideOf(layer, 1f, scale)).takeIf { layer is TextLayer },
+).map { (h, at) -> h to (point - at).getDistance() }.filter { it.second < radius }.minByOrNull { it.second }?.first
 
 @Composable
 private fun HandleDot(icon: Int, at: Offset, background: Color) {
@@ -865,6 +891,8 @@ private fun HandleDot(icon: Int, at: Offset, background: Color) {
         Modifier
             .offset { IntOffset(at.x.roundToInt() - half, at.y.roundToInt() - half) }
             .size(28.dp)
+            // Handles can sit at the screen edge (a full-width caption's sides); keep the back gesture off them.
+            .systemGestureExclusion()
             .clip(CircleShape)
             .background(background)
             // Visible on both light and dark photos.

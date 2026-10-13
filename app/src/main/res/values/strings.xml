@@ -106,6 +106,8 @@
     <string name="tool_stroke">Stroke</string>
     <string name="tool_box">Bubble</string>
     <string name="tool_style">Style</string>
+    <string name="tool_presets">Presets</string>
+    <string name="tool_glow">Glow</string>
     <string name="tool_animate">Animate</string>
     <string name="tool_front">Front</string>
     <string name="tool_back">Back</string>
@@ -128,6 +130,15 @@
     <string name="saturation">Saturation</string>
     <string name="shadow">Shadow</string>
     <string name="spacing">Spacing</string>
+    <string name="line_height">Line height</string>
+    <string name="glow_size">Glow size</string>
+    <string name="font_import">Add font</string>
+    <string name="preset_meme">Meme</string>
+    <string name="preset_caption">Caption</string>
+    <string name="preset_neon">Neon</string>
+    <string name="preset_title">Title</string>
+    <string name="preset_subtitle">Subtitle</string>
+    <string name="preset_speech">Bubble</string>
     <string name="align_left">Left</string>
     <string name="align_center">Center</string>
     <string name="align_right">Right</string>
@@ -156,6 +167,12 @@
     <string name="anim_fade">Fade</string>
     <string name="anim_pop">Pop</string>
     <string name="anim_slide_up">Slide up</string>
+    <string name="anim_typewriter">Typewriter</string>
+    <string name="anim_letters_pop">Letters pop</string>
+    <string name="anim_loop">Loop</string>
+    <string name="loop_wiggle">Wiggle</string>
+    <string name="loop_pulse">Pulse</string>
+    <string name="loop_bounce">Bounce</string>
     <string name="opacity">Opacity</string>
     <string name="sound">Sound</string>
     <string name="starts_at">Starts at</string>
@@ -223,6 +240,7 @@
     <string name="export_cancelled">Export cancelled</string>
     <string name="percent" translatable="false">%1$d%%</string>
     <string name="busy_cropping">Cropping</string>
+    <string name="busy_importing_font">Adding font</string>
 
     <!-- Messages -->
     <string name="saved_to_stickers">Saved to My stickers</string>
@@ -241,6 +259,8 @@
     <string name="error_nothing_recorded">Nothing was recorded</string>
     <string name="error_download_http">Download failed (HTTP %1$d)</string>
     <string name="error_image_too_large">Image is too large</string>
+    <string name="error_font_unreadable">This file isn\'t a font Kadar can use</string>
+    <string name="error_font_too_large">This font file is too large</string>
     <string name="error_cant_download">This image can\'t be downloaded</string>
     <string name="error_not_image">That link isn\'t an image Kadar can open</string>
     <string name="error_gallery_file">Could not create a file in the gallery</string>

@@ -18,7 +18,9 @@ import androidx.media3.common.util.UnstableApi
 import com.ndelic.kadar.media.cutOutSubject
 import com.ndelic.kadar.media.displayName
 import com.ndelic.kadar.media.downloadImage
+import com.ndelic.kadar.media.importFont
 import com.ndelic.kadar.media.loadBitmap
+import com.ndelic.kadar.media.loadFont
 import com.ndelic.kadar.media.mediaInfo
 import com.ndelic.kadar.media.renderEmoji
 import com.ndelic.kadar.media.saveToGallery
@@ -42,12 +44,14 @@ import com.ndelic.kadar.model.SettingsStore
 import com.ndelic.kadar.model.ShapeKind
 import com.ndelic.kadar.model.ShapeLayer
 import com.ndelic.kadar.model.TextLayer
+import com.ndelic.kadar.model.TextPreset
 import com.ndelic.kadar.model.Transform
 import com.ndelic.kadar.model.UiText
 import com.ndelic.kadar.model.UserError
 import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.model.newShape
 import com.ndelic.kadar.model.renderLayers
+import com.ndelic.kadar.model.styled
 import com.ndelic.kadar.model.withStrokes
 import com.ndelic.kadar.ui.editor.Timeline
 import com.ndelic.kadar.ui.editor.label
@@ -108,6 +112,8 @@ data class EditorUiState(
     val selectedClip: Int? = null,
     /** Output time the running voice recording started at; null when not recording. */
     val recordingFromMs: Long? = null,
+    /** The bundled fonts, then the imported ones by name. */
+    val fonts: List<Font> = emptyList(),
 ) {
     val selected get() = project?.layers?.firstOrNull { it.id == selectedId }
 }
@@ -121,7 +127,7 @@ sealed interface EditorEffect {
 class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // Projects store a font by name: add new ones, never rename or remove these.
-    val fonts = listOf(
+    private val fonts = listOf(
         Font("Meme", app.resources.getFont(R.font.anton)),
         Font("Tall", app.resources.getFont(R.font.bebas_neue)),
         Font("Narrow", app.resources.getFont(R.font.oswald_bold)),
@@ -137,9 +143,11 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         Font("Script", Typeface.create("cursive", Typeface.NORMAL)),
     )
 
-    private val store = ProjectStore(File(app.filesDir, "projects"), fonts)
+    private val store = ProjectStore(File(app.filesDir, "projects")) { _uiState.value.fonts }
     private val settingsStore = SettingsStore(app)
     private val stickerDir = File(app.filesDir, "stickers")
+    /** Imported fonts, reused in every project like stickers; a file's name (without extension) is the font's name. */
+    private val fontDir = File(app.filesDir, "fonts")
     private val saveLock = Mutex()
     private var videoFrame: Bitmap? = null
     /** What's on disk for the open project, so just opening one doesn't rewrite it (and bump it to the top). */
@@ -153,14 +161,18 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     /** The running voice recording and its file; here rather than in the UI so it survives rotation. */
     private var recorder: Pair<MediaRecorder, File>? = null
 
-    private val _uiState = MutableStateFlow(EditorUiState(settings = settingsStore.load()))
+    private val _uiState = MutableStateFlow(EditorUiState(settings = settingsStore.load(), fonts = fonts))
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
 
     private val _effects = Channel<EditorEffect>(Channel.BUFFERED)
     val effects = _effects.receiveAsFlow()
 
     init {
-        refreshProjects()
+        viewModelScope.launch {
+            // Before the project list, so a project using an imported font opens with it.
+            loadFonts()
+            refreshProjects()
+        }
         loadStickers()
         viewModelScope.launch {
             @kotlin.OptIn(FlowPreview::class)
@@ -422,6 +434,11 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     /** Tail drags on the stage; like gestures, only the first update of a drag ([first]) becomes an undo step. */
     fun setTail(x: Float, y: Float, first: Boolean) = updateSelected(record = first) { if (it is TextLayer) it.copy(tail = x to y) else it }
 
+    /** Wrap-handle drags of text [from] as the drag started; only the first update of a drag ([first]) is an undo step. */
+    fun dragWrap(from: TextLayer, side: Float, dx: Float, first: Boolean) = updateSelected(record = first) { if (it.id == from.id) from.wrapDragged(side, dx) else it }
+
+    fun applyPreset(preset: TextPreset) = editText { styled(preset, _uiState.value.fonts) }
+
     fun setFlags(id: Long, hidden: Boolean, locked: Boolean) = updateLayer(id) { it.withFlags(hidden, locked) }
 
     /** Video canvas: [ratio] null keeps the video's shape. Layers keep their place relative to the center. */
@@ -563,6 +580,23 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             }
             _uiState.update { it.copy(stickers = list) }
         }
+    }
+
+    // Fonts
+
+    /** Copies a picked font file into app storage, lists it and gives it to the selected text. */
+    fun importFont(uri: Uri) = work(R.string.busy_importing_font) {
+        val file = withContext(Dispatchers.IO) { importFont(app, uri, fontDir, _uiState.value.fonts.map { it.name }.toSet()) }
+        loadFonts()
+        _uiState.value.fonts.firstOrNull { it.name == file.nameWithoutExtension }?.let { f -> editText { copy(font = f) } }
+    }
+
+    private suspend fun loadFonts() {
+        val imported = withContext(Dispatchers.IO) {
+            fontDir.listFiles().orEmpty().filter { it.extension == "ttf" || it.extension == "otf" }.sortedBy { it.name.lowercase() }
+                .mapNotNull { f -> loadFont(f)?.let { Font(f.nameWithoutExtension, it) } }
+        }
+        _uiState.update { it.copy(fonts = fonts + imported) }
     }
 
     // Canvas

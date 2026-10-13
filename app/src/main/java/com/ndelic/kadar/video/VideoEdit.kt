@@ -42,6 +42,7 @@ import androidx.media3.transformer.VideoEncoderSettings
 import com.ndelic.kadar.media.await
 import com.ndelic.kadar.model.Adjust
 import com.ndelic.kadar.model.Layer
+import com.ndelic.kadar.model.Loop
 import com.ndelic.kadar.model.Steady
 import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.model.animationSpans
@@ -361,13 +362,14 @@ private fun VideoClip.overlaySettings(inputs: List<Pair<VideoLayer, Pair<Long, L
 fun timedOverlay(width: Int, height: Int, layers: List<Layer>, durationMs: Long): TextureOverlay {
     val shown = layers.filter { !it.hidden }
     fun Layer.until() = minOf(endMs, durationMs)
-    val bounds = shown.flatMap { listOf(it.startMs to it.endMs) + animationSpans(it.animIn, it.animOut, it.startMs, it.until()) }
+    val bounds = shown.flatMap { listOf(it.startMs to it.endMs) + animationSpans(it.animIn, it.animOut, it.startMs, it.until(), it.animLoop) }
     val stretches = segmentBounds(bounds, durationMs).mapNotNull { (start, end) ->
         val mid = (start + end) / 2
         val visible = shown.filter { it.visibleAt(mid) }
         when {
             visible.isEmpty() -> null
-            visible.any { it.motionAt(mid, it.until()) != Steady } -> Stretch(start * 1000, end * 1000, null, visible.map { it.withTransform(it.t) })
+            // A loop can be at rest right at [mid], so it counts as animated all through.
+            visible.any { it.animLoop != Loop.None || it.motionAt(mid, it.until()) != Steady } -> Stretch(start * 1000, end * 1000, null, visible.map { it.withTransform(it.t) })
             else -> Stretch(start * 1000, end * 1000, renderLayers(width, height, android.graphics.Color.TRANSPARENT, visible).straightAlpha(), visible)
         }
     }

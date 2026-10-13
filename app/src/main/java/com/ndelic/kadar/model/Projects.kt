@@ -38,7 +38,7 @@ data class SavedProject(val dir: File, val modified: Long, val thumb: Bitmap?, v
  * (photos, cutouts, web downloads), so images never land in the phone's gallery. Videos and music stay
  * where they are and are referenced by their content URI.
  */
-class ProjectStore(private val root: File, private val fonts: List<Font>) {
+class ProjectStore(private val root: File, private val fonts: () -> List<Font>) {
 
     /** A new, empty project folder; names are timestamps, bumped when several are made in the same millisecond. */
     fun create(): File {
@@ -122,6 +122,7 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
         val end = j.optLong("endMs", Long.MAX_VALUE)
         val animIn = enumOr(j.optString("animIn"), Anim.None)
         val animOut = enumOr(j.optString("animOut"), Anim.None)
+        val loop = enumOr(j.optString("loop"), Loop.None)
         return when (j.getString("type")) {
             "image" -> {
                 val file = j.getString("file")
@@ -139,6 +140,7 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
                         endMs = end,
                         animIn = animIn,
                         animOut = animOut,
+                        animLoop = loop,
                     )
                 }
             }
@@ -146,7 +148,8 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
                 id = id,
                 t = t,
                 text = j.getString("text"),
-                font = fonts.firstOrNull { it.name == j.getString("font") } ?: fonts.first(),
+                // An imported font that was removed falls back to the default one.
+                font = fonts().let { f -> f.firstOrNull { it.name == j.getString("font") } ?: f.first() },
                 size = j.getDouble("size").toFloat(),
                 color = j.getInt("color"),
                 outline = if (j.has("outline")) j.getInt("outline") else null,
@@ -157,12 +160,18 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
                 shadow = j.optBoolean("shadow"),
                 spacing = j.optDouble("spacing", 0.0).toFloat(),
                 align = runCatching { TextAlign.valueOf(j.optString("align")) }.getOrDefault(TextAlign.Center),
+                glow = if (j.has("glow")) j.getInt("glow") else null,
+                glowSize = j.optDouble("glowSize", 0.5).toFloat(),
+                opacity = j.optDouble("opacity", 1.0).toFloat(),
+                lineSpacing = j.optDouble("lineSpacing", 1.0).toFloat(),
+                wrap = if (j.has("wrap")) j.getDouble("wrap").toFloat() else null,
                 hidden = j.optBoolean("hidden"),
                 locked = j.optBoolean("locked"),
                 startMs = start,
                 endMs = end,
                 animIn = animIn,
                 animOut = animOut,
+                animLoop = loop,
             )
             // Versions before video layers skip this type (the `else` below) rather than fail the whole project.
             "video" -> VideoLayer(
@@ -214,6 +223,7 @@ class ProjectStore(private val root: File, private val fonts: List<Font>) {
                 endMs = end,
                 animIn = animIn,
                 animOut = animOut,
+                animLoop = loop,
             )
             else -> null
         }
@@ -291,6 +301,7 @@ private fun Layer.toJson() = JSONObject().apply {
     put("locked", locked)
     if (animIn != Anim.None) put("animIn", animIn.name)
     if (animOut != Anim.None) put("animOut", animOut.name)
+    if (animLoop != Loop.None) put("loop", animLoop.name)
     when (val layer = this@toJson) {
         is ImageLayer -> {
             put("type", "image")
@@ -319,6 +330,11 @@ private fun Layer.toJson() = JSONObject().apply {
             put("shadow", layer.shadow)
             put("spacing", layer.spacing.toDouble())
             put("align", layer.align.name)
+            layer.glow?.let { put("glow", it) }
+            put("glowSize", layer.glowSize.toDouble())
+            put("opacity", layer.opacity.toDouble())
+            put("lineSpacing", layer.lineSpacing.toDouble())
+            layer.wrap?.let { put("wrap", it.toDouble()) }
         }
         is VideoLayer -> {
             put("type", "video")

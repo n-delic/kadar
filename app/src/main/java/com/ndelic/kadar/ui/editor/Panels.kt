@@ -1,5 +1,7 @@
 package com.ndelic.kadar.ui.editor
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -52,6 +54,7 @@ import com.ndelic.kadar.Sticker
 import com.ndelic.kadar.model.Adjust
 import com.ndelic.kadar.model.DrawLayer
 import com.ndelic.kadar.model.ExportSize
+import com.ndelic.kadar.model.Font
 import com.ndelic.kadar.model.ImageLayer
 import com.ndelic.kadar.model.Layer
 import com.ndelic.kadar.model.Project
@@ -170,10 +173,16 @@ fun AdjustPanel(adjust: Adjust, onChange: (Adjust) -> Unit) {
 }
 
 @Composable
-private fun LabeledSlider(label: String, value: Float, onCommit: (Float) -> Unit) {
+private fun LabeledSlider(
+    label: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float> = -1f..1f,
+    valueLabel: (Float) -> String = { "${(it * 100).roundToInt()}" },
+    onCommit: (Float) -> Unit,
+) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, color = Ink.dim, fontSize = 12.sp, modifier = Modifier.width(76.dp))
-        Box(Modifier.weight(1f)) { KSlider(null, value, -1f..1f, { "${(it * 100).roundToInt()}" }, onCommit) }
+        Box(Modifier.weight(1f)) { KSlider(null, value, range, valueLabel, onCommit) }
     }
 }
 
@@ -183,6 +192,8 @@ fun TextStylePanel(layer: TextLayer, vm: EditorViewModel) {
         TextTabs(TextAlign.entries, layer.align, label = { stringResource(it.label) }) { a -> vm.editText { copy(align = a) } }
         KToggle(stringResource(R.string.shadow), null, layer.shadow) { on -> vm.editText { copy(shadow = on) } }
         LabeledSlider(stringResource(R.string.spacing), layer.spacing * 2) { v -> vm.editText { copy(spacing = v / 2) } }
+        LabeledSlider(stringResource(R.string.line_height), layer.lineSpacing, 0.6f..2f, { "${(it * 10).roundToInt() / 10f}" }) { v -> vm.editText { copy(lineSpacing = v) } }
+        LabeledSlider(stringResource(R.string.opacity), layer.opacity, 0.05f..1f, ::percent) { v -> vm.editText { copy(opacity = v) } }
     }
 }
 
@@ -324,10 +335,15 @@ fun AudioPanel(clip: VideoClip, index: Int, vm: EditorViewModel, onAddMusic: () 
     }
 }
 
+/** Font files the picker offers: the font types, and the generic one some file managers give `.ttf` files. */
+private val FONT_TYPES = arrayOf("font/*", "application/font-sfnt", "application/x-font-ttf", "application/x-font-otf", "application/vnd.ms-opentype", "application/octet-stream")
+
+/** [fonts] are the bundled ones, then the imported ones; the last tile imports a font file. */
 @Composable
-fun FontPanel(layer: TextLayer, vm: EditorViewModel) {
+fun FontPanel(layer: TextLayer, fonts: List<Font>, vm: EditorViewModel) {
+    val pick = rememberLauncherForActivityResult(OpenDocument()) { it?.let(vm::importFont) }
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        items(vm.fonts) { f ->
+        items(fonts, key = { it.name }) { f ->
             val active = layer.font.name == f.name
             val shape = RoundedCornerShape(10.dp)
             Box(
@@ -344,6 +360,16 @@ fun FontPanel(layer: TextLayer, vm: EditorViewModel) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
+        }
+        item {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(10.dp)).clickable { pick.launch(FONT_TYPES) }.padding(horizontal = 10.dp),
+            ) {
+                KIcon(R.drawable.ic_add, Modifier.size(22.dp), Ink.accent)
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.font_import), color = Ink.accent, fontWeight = FontWeight.SemiBold)
             }
         }
     }

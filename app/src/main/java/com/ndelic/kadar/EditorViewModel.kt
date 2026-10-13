@@ -39,11 +39,14 @@ import com.ndelic.kadar.model.Project
 import com.ndelic.kadar.model.ProjectStore
 import com.ndelic.kadar.model.SavedProject
 import com.ndelic.kadar.model.SettingsStore
+import com.ndelic.kadar.model.ShapeKind
+import com.ndelic.kadar.model.ShapeLayer
 import com.ndelic.kadar.model.TextLayer
 import com.ndelic.kadar.model.Transform
 import com.ndelic.kadar.model.UiText
 import com.ndelic.kadar.model.UserError
 import com.ndelic.kadar.model.VideoLayer
+import com.ndelic.kadar.model.newShape
 import com.ndelic.kadar.model.renderLayers
 import com.ndelic.kadar.model.withStrokes
 import com.ndelic.kadar.ui.editor.Timeline
@@ -373,6 +376,11 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         else updateLayer(id) { (it as? DrawLayer)?.withStrokes(strokes) ?: it }
     }
 
+    fun addShape(kind: ShapeKind) {
+        val p = _uiState.value.project ?: return
+        addLayer { newShape(it, kind, Transform(p.width / 2f, p.height / 2f), min(p.width, p.height) * 0.4f) }
+    }
+
     private fun addLayer(make: (Long) -> Layer) {
         val layer = make(nextId++)
         updateProject { it.copy(layers = it.layers + layer) }
@@ -391,6 +399,11 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     fun editImage(change: ImageLayer.() -> ImageLayer) = updateSelected { if (it is ImageLayer) it.change() else it }
 
     fun editVideo(change: VideoLayer.() -> VideoLayer) = updateSelected { if (it is VideoLayer) it.change() else it }
+
+    fun editShape(change: ShapeLayer.() -> ShapeLayer) = updateSelected { if (it is ShapeLayer) it.change() else it }
+
+    /** Tail drags on the stage; like gestures, only the first update of a drag ([first]) becomes an undo step. */
+    fun setTail(x: Float, y: Float, first: Boolean) = updateSelected(record = first) { if (it is TextLayer) it.copy(tail = x to y) else it }
 
     fun setFlags(id: Long, hidden: Boolean, locked: Boolean) = updateLayer(id) { it.withFlags(hidden, locked) }
 
@@ -428,6 +441,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
                 is TextLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
                 is VideoLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
                 is DrawLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
+                is ShapeLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
             }
         }
     }

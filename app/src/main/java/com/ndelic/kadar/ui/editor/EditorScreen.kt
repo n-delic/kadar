@@ -119,6 +119,8 @@ import com.ndelic.kadar.model.Font
 import com.ndelic.kadar.model.ImageLayer
 import com.ndelic.kadar.model.Layer
 import com.ndelic.kadar.model.Project
+import com.ndelic.kadar.model.ShapeKind
+import com.ndelic.kadar.model.ShapeLayer
 import com.ndelic.kadar.model.TextLayer
 import com.ndelic.kadar.model.Transform
 import com.ndelic.kadar.model.UiText
@@ -140,7 +142,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Font, Color, Stroke, Box, Style, Adjust, Filters, Layers, Overlay, Animate }
+enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Font, Color, Stroke, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Shape, ShapeFill, ShapeOutline }
 
 @Composable
 fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
@@ -285,7 +287,10 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     Panel.Font -> (selected as? TextLayer)?.let { FontPanel(it, vm) }
                     Panel.Color -> (selected as? TextLayer)?.let { t -> ColorRow(t.color, allowNone = false) { c -> c?.let { vm.editText { copy(color = it) } } } }
                     Panel.Stroke -> (selected as? TextLayer)?.let { t -> ColorRow(t.outline, allowNone = true) { vm.editText { copy(outline = it) } } }
-                    Panel.Box -> (selected as? TextLayer)?.let { t -> ColorRow(t.box, allowNone = true) { vm.editText { copy(box = it) } } }
+                    Panel.Box -> (selected as? TextLayer)?.let { BubblePanel(it, vm) }
+                    Panel.Shape -> ShapePanel(selected as? ShapeLayer, vm)
+                    Panel.ShapeFill -> (selected as? ShapeLayer)?.let { ShapeFillPanel(it, vm) }
+                    Panel.ShapeOutline -> (selected as? ShapeLayer)?.let { ShapeOutlinePanel(it, vm) }
                     Panel.Layers -> LayersPanel(project.layers, state.selectedId, vm)
                     Panel.VideoCanvas -> video?.let { VideoCanvasPanel(project, it, state.settings.exportSize, vm) }
                     Panel.Style -> (selected as? TextLayer)?.let { TextStylePanel(it, vm) }
@@ -311,6 +316,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             is ImageLayer -> 2
             is VideoLayer -> 3
             is DrawLayer -> 4
+            is ShapeLayer -> 5
         }
         AnimatedContent(targetState = toolset, transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(100)) }, label = "tools") { tools ->
             Row(
@@ -330,6 +336,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_title, stringResource(R.string.tool_text)) { typing = "" }
                         IconTool(R.drawable.ic_sentiment_satisfied, stringResource(R.string.sticker), panel == Panel.Sticker) { toggle(Panel.Sticker) }
                         IconTool(R.drawable.ic_draw, stringResource(R.string.tool_draw), onClick = ::draw)
+                        IconTool(R.drawable.ic_shapes, stringResource(R.string.tool_shape), panel == Panel.Shape) { toggle(Panel.Shape) }
                         IconTool(R.drawable.ic_image, stringResource(R.string.image)) { image.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) }
                         IconTool(R.drawable.ic_language, stringResource(R.string.tool_web), onClick = onBrowse)
                         if (video != null) {
@@ -351,7 +358,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_match_case, stringResource(R.string.tool_font), panel == Panel.Font) { toggle(Panel.Font) }
                         IconTool(R.drawable.ic_palette, stringResource(R.string.tool_color), panel == Panel.Color) { toggle(Panel.Color) }
                         IconTool(R.drawable.ic_border_color, stringResource(R.string.tool_stroke), panel == Panel.Stroke) { toggle(Panel.Stroke) }
-                        IconTool(R.drawable.ic_rectangle, stringResource(R.string.tool_box), panel == Panel.Box) { toggle(Panel.Box) }
+                        IconTool(R.drawable.ic_chat_bubble, stringResource(R.string.tool_box), panel == Panel.Box) { toggle(Panel.Box) }
                         IconTool(R.drawable.ic_text_fields, stringResource(R.string.tool_style), panel == Panel.Style) { toggle(Panel.Style) }
                         if (video != null) IconTool(R.drawable.ic_animation, stringResource(R.string.tool_animate), panel == Panel.Animate) { toggle(Panel.Animate) }
                         IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
@@ -363,6 +370,20 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_check, stringResource(R.string.done)) { vm.select(null) }
                         ToolDivider()
                         IconTool(R.drawable.ic_draw, stringResource(R.string.tool_draw), onClick = ::draw)
+                        IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
+                        IconTool(R.drawable.ic_flip_to_front, stringResource(R.string.tool_front), onClick = vm::bringToFront)
+                        IconTool(R.drawable.ic_flip_to_back, stringResource(R.string.tool_back), onClick = vm::sendToBack)
+                        IconTool(R.drawable.ic_delete, stringResource(R.string.delete), onClick = vm::deleteSelected)
+                    }
+                    5 -> {
+                        IconTool(R.drawable.ic_check, stringResource(R.string.done)) { vm.select(null) }
+                        ToolDivider()
+                        IconTool(R.drawable.ic_shapes, stringResource(R.string.tool_shape), panel == Panel.Shape) { toggle(Panel.Shape) }
+                        if ((state.selected as? ShapeLayer)?.kind != ShapeKind.Line) {
+                            IconTool(R.drawable.ic_format_color_fill, stringResource(R.string.tool_fill), panel == Panel.ShapeFill) { toggle(Panel.ShapeFill) }
+                        }
+                        IconTool(R.drawable.ic_border_color, stringResource(R.string.tool_outline), panel == Panel.ShapeOutline) { toggle(Panel.ShapeOutline) }
+                        if (video != null) IconTool(R.drawable.ic_animation, stringResource(R.string.tool_animate), panel == Panel.Animate) { toggle(Panel.Animate) }
                         IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, stringResource(R.string.tool_front), onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, stringResource(R.string.tool_back), onClick = vm::sendToBack)
@@ -507,7 +528,7 @@ private fun ToolDivider() {
     Box(Modifier.padding(horizontal = 4.dp).size(width = 1.dp, height = 32.dp).background(Ink.line))
 }
 
-private enum class Handle { Delete, Scale }
+private enum class Handle { Delete, Scale, Tail }
 
 /** Which snaps are active during a drag: drives the guide lines and a tick of haptic feedback when one engages. */
 private class Snaps(private val haptics: HapticFeedback) {
@@ -667,6 +688,16 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                                 if (handle == Handle.Delete) {
                                     while (awaitPointerEvent().changes.any { it.pressed }) Unit
                                     vm.deleteSelected()
+                                } else if (handle == Handle.Tail) {
+                                    var first = true
+                                    while (true) {
+                                        val change = awaitPointerEvent().changes.first()
+                                        if (!change.pressed) break
+                                        val (x, y) = sel.t.toLocal(change.position.x / scale, change.position.y / scale)
+                                        vm.setTail(x, y, first)
+                                        first = false
+                                        change.consume()
+                                    }
                                 } else {
                                     val center = Offset(sel.t.x * scale, sel.t.y * scale)
                                     val v0 = down.position - center
@@ -748,6 +779,7 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
             selected?.takeUnless { it.locked || it.hidden }?.let { l ->
                 HandleDot(R.drawable.ic_close, cornerOf(l, -1f, scale), Color(0xFFFF3B5C))
                 HandleDot(R.drawable.ic_open_in_full, cornerOf(l, 1f, scale), Ink.accent)
+                tailOf(l, scale)?.let { HandleDot(R.drawable.ic_chat_bubble, it, Color.White) }
             }
         }
         if (viewZoom > 1.01f) {
@@ -777,7 +809,14 @@ private fun cornerOf(layer: Layer, side: Float, scale: Float): Offset {
     return Offset(t.x * scale, t.y * scale)
 }
 
+/** Screen position of a bubble's tail tip, or null without one. */
+private fun tailOf(layer: Layer, scale: Float): Offset? = (layer as? TextLayer)?.tailTip?.let { (x, y) ->
+    val t = layer.t.shiftedLocal(x, y)
+    Offset(t.x * scale, t.y * scale)
+}
+
 private fun handleAt(layer: Layer, point: Offset, scale: Float, radius: Float): Handle? = when {
+    tailOf(layer, scale)?.let { (point - it).getDistance() < radius } == true -> Handle.Tail
     (point - cornerOf(layer, -1f, scale)).getDistance() < radius -> Handle.Delete
     (point - cornerOf(layer, 1f, scale)).getDistance() < radius -> Handle.Scale
     else -> null
@@ -796,7 +835,7 @@ private fun HandleDot(icon: Int, at: Offset, background: Color) {
             .border(1.5.dp, Color.Black.copy(alpha = 0.35f), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        KIcon(icon, Modifier.size(16.dp), if (background == Ink.accent) Ink.onAccent else Color.White)
+        KIcon(icon, Modifier.size(16.dp), if (background == Ink.accent || background == Color.White) Ink.onAccent else Color.White)
     }
 }
 

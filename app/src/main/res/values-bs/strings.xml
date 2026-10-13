@@ -103,7 +103,7 @@
     <string name="tool_font">Font</string>
     <string name="tool_color">Boja</string>
     <string name="tool_stroke">Obrub</string>
-    <string name="tool_box">Podloga</string>
+    <string name="tool_box">Oblačić</string>
     <string name="tool_style">Stil</string>
     <string name="tool_animate">Animacija</string>
     <string name="tool_front">Naprijed</string>
@@ -112,6 +112,9 @@
     <string name="tool_eraser">Gumica</string>
     <string name="tool_crop">Izreži</string>
     <string name="tool_save_sticker">U stikere</string>
+    <string name="tool_shape">Oblik</string>
+    <string name="tool_fill">Ispuna</string>
+    <string name="tool_outline">Obrub</string>
 
     <!-- Panels -->
     <string name="my_stickers">Moji stikeri</string>
@@ -162,6 +165,21 @@
     <string name="look_vivid">Živo</string>
     <string name="look_fade">Blijedo</string>
     <string name="look_teal_orange">Kino</string>
+    <string name="bubble_none">Bez</string>
+    <string name="bubble_box">Podloga</string>
+    <string name="bubble_speech">Govor</string>
+    <string name="bubble_thought">Misao</string>
+    <string name="bubble_shout">Uzvik</string>
+    <string name="fill">Ispuna</string>
+    <string name="outline">Obrub</string>
+    <string name="outline_width">Debljina</string>
+    <string name="stretch">Razvuci</string>
+    <string name="shape_rect">Pravougao</string>
+    <string name="shape_round_rect">Zaobljen</string>
+    <string name="shape_ellipse">Elipsa</string>
+    <string name="shape_arrow">Strelica</string>
+    <string name="shape_star">Zvijezda</string>
+    <string name="shape_line">Linija</string>
 
     <!-- Full-screen tools -->
     <string name="undo_stroke">Poništi potez</string>

@@ -103,7 +103,7 @@
     <string name="tool_font">Font</string>
     <string name="tool_color">Color</string>
     <string name="tool_stroke">Stroke</string>
-    <string name="tool_box">Box</string>
+    <string name="tool_box">Bubble</string>
     <string name="tool_style">Style</string>
     <string name="tool_animate">Animate</string>
     <string name="tool_front">Front</string>
@@ -112,6 +112,9 @@
     <string name="tool_eraser">Eraser</string>
     <string name="tool_crop">Crop</string>
     <string name="tool_save_sticker">Save sticker</string>
+    <string name="tool_shape">Shape</string>
+    <string name="tool_fill">Fill</string>
+    <string name="tool_outline">Outline</string>
 
     <!-- Panels -->
     <string name="my_stickers">My stickers</string>
@@ -164,6 +167,21 @@
     <string name="look_vivid">Vivid</string>
     <string name="look_fade">Fade</string>
     <string name="look_teal_orange">Teal &amp; Orange</string>
+    <string name="bubble_none">None</string>
+    <string name="bubble_box">Box</string>
+    <string name="bubble_speech">Speech</string>
+    <string name="bubble_thought">Thought</string>
+    <string name="bubble_shout">Shout</string>
+    <string name="fill">Fill</string>
+    <string name="outline">Outline</string>
+    <string name="outline_width">Width</string>
+    <string name="stretch">Stretch</string>
+    <string name="shape_rect">Rectangle</string>
+    <string name="shape_round_rect">Rounded</string>
+    <string name="shape_ellipse">Ellipse</string>
+    <string name="shape_arrow">Arrow</string>
+    <string name="shape_star">Star</string>
+    <string name="shape_line">Line</string>
 
     <!-- Full-screen tools -->
     <string name="undo_stroke">Undo stroke</string>

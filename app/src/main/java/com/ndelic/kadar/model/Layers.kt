@@ -17,6 +17,7 @@ import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.composition
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
@@ -25,12 +26,16 @@ data class Transform(val x: Float, val y: Float, val scale: Float = 1f, val rota
 
     /** True if canvas point ([px], [py]) falls inside a [width]×[height] box placed by this transform. */
     fun contains(width: Float, height: Float, px: Float, py: Float): Boolean {
+        val (lx, ly) = toLocal(px, py)
+        return abs(lx) <= width / 2 && abs(ly) <= height / 2
+    }
+
+    /** Canvas point ([px], [py]) in the layer's own unscaled, unrotated pixels from its center; the inverse of [shiftedLocal]. */
+    fun toLocal(px: Float, py: Float): Pair<Float, Float> {
         val r = Math.toRadians(-rotation.toDouble())
         val dx = px - x
         val dy = py - y
-        val lx = (dx * cos(r) - dy * sin(r)) / scale
-        val ly = (dx * sin(r) + dy * cos(r)) / scale
-        return abs(lx) <= width / 2 && abs(ly) <= height / 2
+        return ((dx * cos(r) - dy * sin(r)) / scale).toFloat() to ((dx * sin(r) + dy * cos(r)) / scale).toFloat()
     }
 
     /** Pulls the center onto the canvas center lines ([cx], [cy]) and the angle onto a multiple of 90° when they're close. */
@@ -71,9 +76,12 @@ sealed interface Layer {
     val hidden: Boolean
     val locked: Boolean
 
-    /** Entrance and exit in a video (text and stickers only); photos ignore them. */
+    /** Entrance and exit in a video (text, stickers and shapes); photos ignore them. */
     val animIn: Anim get() = Anim.None
     val animOut: Anim get() = Anim.None
+
+    /** How far from its center it draws, unscaled: its box's half diagonal, or more for a bubble's tail. */
+    val reach: Float get() = hypot(width, height) / 2
 
     fun visibleAt(ms: Long) = ms >= startMs && ms < endMs
     fun withTime(startMs: Long, endMs: Long): Layer
@@ -236,6 +244,9 @@ data class Adjust(
 
 enum class TextAlign(@StringRes val label: Int) { Left(R.string.align_left), Center(R.string.align_center), Right(R.string.align_right) }
 
+/** The shape of a text layer's box: the rounded caption box, or a bubble with a tail. */
+enum class Bubble(@StringRes val label: Int) { Box(R.string.bubble_box), Speech(R.string.bubble_speech), Thought(R.string.bubble_thought), Shout(R.string.bubble_shout) }
+
 data class TextLayer(
     override val id: Long,
     override val t: Transform,
@@ -245,8 +256,13 @@ data class TextLayer(
     val color: Int,
     /** Outline color, or null for no outline. */
     val outline: Int?,
-    /** Rounded box behind the text (caption style), or null for none. */
+    /** Fill of the box or bubble behind the text, or null for none. */
     val box: Int? = null,
+    val bubble: Bubble = Bubble.Box,
+    /** Outline of the box or bubble, or null for none. */
+    val boxOutline: Int? = null,
+    /** Where a bubble's tail points, in the layer's own pixels from its center; null for the default, down and to the left. */
+    val tail: Pair<Float, Float>? = null,
     val shadow: Boolean = false,
     /** Extra space between letters, in ems. */
     val spacing: Float = 0f,
@@ -265,8 +281,12 @@ data class TextLayer(
     }
     // Per layer, like [paint]: the video export draws copies of animated layers off the main thread.
     private val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val isBubble get() = box != null && bubble != Bubble.Box
     private val layout: StaticLayout = run {
-        val w = text.lines().maxOf { paint.measureText(it) }.toInt() + 1
+        val line = text.lines().maxOf { paint.measureText(it) }
+        // Bubbles wrap long text into a rounder block; the caption box keeps the lines as typed.
+        val word = if (isBubble) text.split(' ', '\n').maxOf { paint.measureText(it) } else 0f
+        val w = (if (isBubble) bubbleWrapWidth(line, paint.fontSpacing, word) else line).toInt() + 1
         val alignment = when (align) {
             TextAlign.Left -> Layout.Alignment.ALIGN_NORMAL
             TextAlign.Center -> Layout.Alignment.ALIGN_CENTER
@@ -281,13 +301,38 @@ data class TextLayer(
     private val boxPadX get() = if (box == null) 0f else size * 0.3f
     private val boxPadY get() = if (box == null) 0f else size * 0.12f
 
-    override val width get() = layout.width + stroke + 2 * boxPadX
-    override val height get() = layout.height + stroke + 2 * boxPadY
+    private val boxStroke get() = if (boxOutline == null) 0f else size * 0.07f
+    /** Half the size of the ellipse a bubble's text sits in. */
+    private val oval = ellipseAround(layout.width + stroke + size * 0.5f, layout.height + stroke + size * 0.4f)
+    private val bubbleHalf by lazy { bubbleHalfSize(bubble, oval[0], oval[1]) }
+    private val bubblePath by lazy { bubblePath(bubble, oval[0], oval[1], bubbleHalf, tailTip) }
+
+    /** Where a bubble's tail points, or null when there's no bubble. */
+    val tailTip get() = if (isBubble) tail ?: (-bubbleHalf[0] * 0.4f to bubbleHalf[1] + size * 1.2f) else null
+
+    override val width get() = if (isBubble) 2 * bubbleHalf[0] + boxStroke else layout.width + stroke + 2 * boxPadX
+    override val height get() = if (isBubble) 2 * bubbleHalf[1] + boxStroke else layout.height + stroke + 2 * boxPadY
+    override val reach get() = maxOf(hypot(width, height) / 2, tailTip?.let { hypot(it.first, it.second) + boxStroke } ?: 0f)
 
     override fun drawContent(canvas: Canvas) {
         if (box != null) {
+            boxPaint.style = Paint.Style.FILL
             boxPaint.color = box
-            canvas.drawRoundRect(-width / 2, -height / 2, width / 2, height / 2, size * 0.25f, size * 0.25f, boxPaint)
+            if (isBubble) canvas.drawPath(bubblePath, boxPaint)
+            else canvas.drawRoundRect(-width / 2, -height / 2, width / 2, height / 2, size * 0.25f, size * 0.25f, boxPaint)
+        }
+        if (box != null && boxOutline != null) {
+            boxPaint.style = Paint.Style.STROKE
+            boxPaint.strokeJoin = Paint.Join.ROUND
+            boxPaint.strokeWidth = boxStroke
+            boxPaint.color = boxOutline
+            if (isBubble) {
+                canvas.drawPath(bubblePath, boxPaint)
+            } else {
+                // Inside the caption box, so adding an outline doesn't change its size.
+                val i = boxStroke / 2
+                canvas.drawRoundRect(-width / 2 + i, -height / 2 + i, width / 2 - i, height / 2 - i, size * 0.25f, size * 0.25f, boxPaint)
+            }
         }
         canvas.translate(-layout.width / 2f, -layout.height / 2f)
         // The shadow goes on the first pass only, so it sits under the outline instead of over it.
@@ -309,6 +354,138 @@ data class TextLayer(
     override fun withTransform(t: Transform) = copy(t = t)
     override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = endMs)
     override fun withFlags(hidden: Boolean, locked: Boolean) = copy(hidden = hidden, locked = locked)
+}
+
+/**
+ * One outline for a bubble around the ellipse ([rx], [ry]) that is [half] wide and tall without its tail, with the tail
+ * pointing at [tip]: everything is merged, so the outline never runs across the inside.
+ */
+private fun bubblePath(bubble: Bubble, rx: Float, ry: Float, half: FloatArray, tip: Pair<Float, Float>?): Path {
+    val oval = Path().apply { addOval(-rx, -ry, rx, ry, Path.Direction.CW) }
+    val body = when (bubble) {
+        Bubble.Thought -> oval.apply { op(circles(cloudBumps(rx, ry)), Path.Op.UNION) }
+        Bubble.Shout -> polygon(spikyPoints(rx, ry))
+        else -> oval
+    }
+    val tail = when {
+        tip == null -> return body
+        bubble == Bubble.Thought -> circles(thoughtTrail(half[0], half[1], tip.first, tip.second))
+        else -> polygon(tailPoints(rx, ry, tip.first, tip.second))
+    }
+    return body.apply { op(tail, Path.Op.UNION) }
+}
+
+private fun polygon(p: FloatArray) = Path().apply {
+    if (p.isEmpty()) return@apply
+    moveTo(p[0], p[1])
+    for (i in 2 until p.size step 2) lineTo(p[i], p[i + 1])
+    close()
+}
+
+/** Overlapping circles (x, y, radius triples) merged into one outline. */
+private fun circles(c: FloatArray) = Path().apply {
+    for (i in 0 until c.size / 3) op(Path().apply { addCircle(c[i * 3], c[i * 3 + 1], c[i * 3 + 2], Path.Direction.CW) }, Path.Op.UNION)
+}
+
+enum class ShapeKind(@StringRes val label: Int) {
+    Rect(R.string.shape_rect), RoundRect(R.string.shape_round_rect), Ellipse(R.string.shape_ellipse),
+    Arrow(R.string.shape_arrow), Star(R.string.shape_star), Line(R.string.shape_line),
+}
+
+/**
+ * A [kind] of shape [w]×[h] in its own pixels, with a [fill] and an [outline] [stroke] wide (either null for none) and an
+ * [opacity] (0 to 1). A line runs across [w] in the outline color (the fill if it has none); [h] doesn't apply to it.
+ */
+data class ShapeLayer(
+    override val id: Long,
+    override val t: Transform,
+    val kind: ShapeKind,
+    val w: Float,
+    val h: Float,
+    val fill: Int?,
+    val outline: Int?,
+    val stroke: Float,
+    val opacity: Float = 1f,
+    override val startMs: Long = 0,
+    override val endMs: Long = Long.MAX_VALUE,
+    override val hidden: Boolean = false,
+    override val locked: Boolean = false,
+    override val animIn: Anim = Anim.None,
+    override val animOut: Anim = Anim.None,
+) : Layer {
+    // Per layer, like the text paints: the video export draws copies of animated layers off the main thread.
+    private val paint by lazy {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            strokeJoin = Paint.Join.ROUND
+            strokeCap = Paint.Cap.ROUND
+        }
+    }
+    private val path by lazy {
+        when (kind) {
+            ShapeKind.Arrow -> polygon(arrowPoints(w, h))
+            ShapeKind.Star -> polygon(starPoints(w, h))
+            else -> null
+        }
+    }
+    private val lineColor get() = outline ?: fill
+    private val pad get() = if (kind == ShapeKind.Line || outline != null) stroke else 0f
+    override val width get() = w + pad
+    // A line's box is a little taller than the line, so it can still be grabbed.
+    override val height get() = if (kind == ShapeKind.Line) stroke * 3 else h + pad
+
+    override fun drawContent(canvas: Canvas) {
+        val count = if (opacity < 1f) canvas.saveLayerAlpha(-width / 2, -height / 2, width / 2, height / 2, (opacity * 255).roundToInt()) else canvas.save()
+        if (kind == ShapeKind.Line) {
+            lineColor?.let {
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = stroke
+                paint.color = it
+                canvas.drawLine(-w / 2, 0f, w / 2, 0f, paint)
+            }
+        } else {
+            fill?.let {
+                paint.style = Paint.Style.FILL
+                paint.color = it
+                drawShape(canvas)
+            }
+            outline?.let {
+                paint.style = Paint.Style.STROKE
+                paint.strokeWidth = stroke
+                paint.color = it
+                drawShape(canvas)
+            }
+        }
+        canvas.restoreToCount(count)
+    }
+
+    private fun drawShape(canvas: Canvas) {
+        when (kind) {
+            ShapeKind.Rect -> canvas.drawRect(-w / 2, -h / 2, w / 2, h / 2, paint)
+            ShapeKind.RoundRect -> canvas.drawRoundRect(-w / 2, -h / 2, w / 2, h / 2, minOf(w, h) * 0.2f, minOf(w, h) * 0.2f, paint)
+            ShapeKind.Ellipse -> canvas.drawOval(-w / 2, -h / 2, w / 2, h / 2, paint)
+            else -> path?.let { canvas.drawPath(it, paint) }
+        }
+    }
+
+    override fun withTransform(t: Transform) = copy(t = t)
+    override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = endMs)
+    override fun withFlags(hidden: Boolean, locked: Boolean) = copy(hidden = hidden, locked = locked)
+}
+
+/** A new [kind] of shape about [size] canvas pixels big: outlined in red, or filled red for an arrow or a star. */
+fun newShape(id: Long, kind: ShapeKind, at: Transform, size: Float): ShapeLayer {
+    val red = 0xFFFF1744.toInt()
+    val solid = kind == ShapeKind.Arrow || kind == ShapeKind.Star
+    val (w, h) = shapeSize(kind, size)
+    return ShapeLayer(id, at, kind, w, h, fill = if (solid) red else null, outline = if (solid) null else red, stroke = size * 0.04f)
+}
+
+/** A [kind]'s starting proportions at about [size] wide. */
+fun shapeSize(kind: ShapeKind, size: Float) = when (kind) {
+    ShapeKind.Arrow -> size to size * 0.45f
+    ShapeKind.Star -> size to size
+    ShapeKind.Line -> size to size * 0.04f
+    else -> size to size * 0.7f
 }
 
 private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)

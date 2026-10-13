@@ -77,6 +77,11 @@
 - Fix: see-through parts of text, stickers and drawings (soft edges, shadows, fades, the highlighter) exported darker than the preview showed them
 - Fixes: paused video layers and the blurred canvas show their frame right away (they could stay black until you scrubbed), the Audio panel no longer squeezes the preview to a thumbnail, voiceovers are listed by start time, a new project says "Just now"
 
+## Done for the next release
+
+- Speech bubbles: the text Bubble tool puts the caption in a speech bubble, a thought cloud or a shout burst (or the old box), white with a black outline to start, any fill and outline color. The text wraps inside, and the tail points wherever you drag its handle on the canvas
+- Shapes: rectangle, rounded rectangle, ellipse, arrow, star and line from the new Shape tool, with fill and outline color (or none), outline width, stretch and opacity; moved, resized, rotated, duplicated, animated and timed on the video timeline like any layer
+
 ## Next
 
 Feature parity with the big phone editors, built from how their features behave, never from their code, assets or look (AGENTS.md rules 14 and 15). Offline only: no cloud AI.
@@ -95,8 +100,6 @@ Feature parity with the big phone editors, built from how their features behave,
 
 ### Photo
 
-- [ ] Speech bubbles: text inside a round, cloud or shout bubble with a tail you can point
-- [ ] Shapes: rectangle, rounded rectangle, circle, arrow, star, line, with fill, outline and opacity
 - [ ] Effects: blur, pixelate, glitch, posterize, pop art, vignette, sharpen, noise, duotone, with strength
 - [ ] Layer tools: flip, opacity, blend modes, shape crop (circle, heart, star), outline and shadow around cut-outs
 - [ ] Canvas tools: free crop and rotate of the whole picture, resize, perspective, border and frame, fit with a blurred or colored background

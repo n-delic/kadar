@@ -22,7 +22,7 @@ The owner's phone is a Galaxy S25; it also runs on older phones, hence `minSdk 2
 - **Shapes** (`ShapeLayer` in `model/Layers.kt`, points in `model/Shapes.kt`, `ui/editor/ShapePanel.kt`): rectangle, rounded rectangle, ellipse, arrow, star and line, `w`×`h` in their own pixels, with a fill and an outline (either none), an outline width and an opacity (one offscreen layer, so the outline doesn't show through the fill). The Shape tool adds one (`newShape`); with a shape selected it changes the kind, the stretch (width to height) and the opacity.
 - **Drawing** (`model/Strokes.kt`, `ui/editor/DrawScreen.kt`): the Draw tool opens a full-screen pad (one finger draws, two zoom/pan) with marker and highlighter pens, colors, size and undo-last-stroke. Apply makes one `DrawLayer` (strokes in its own pixels, centered on its origin by `withStrokes`, smoothed by `smoothSegments`); Draw on a selected drawing adds strokes to it.
 - **Filters** (`model/Looks.kt`, `ui/editor/FiltersPanel.kt`): in-house looks as 4x5 color matrices, blended by a strength and stored on `Adjust` (`look`, `amount`). `Adjust.filterMatrix()` (look, then the sliders) is the one matrix for the image layer paint and, through `glRgbMatrix`, the video's Media3 `RgbMatrix`, so photos and video match.
-- **Eraser / restore brush and crop** for image layers (`ui/editor/ImageTools.kt`). `ImageLayer.source` + `sourceX/Y` remember the untouched original and where the layer's bitmap sits in it; keep them right in any new operation that resizes or crops a bitmap.
+- **Eraser / restore brush and crop** for image layers (`ui/editor/ImageTools.kt`). The brush has a hardness (soft edge, a `BlurMaskFilter`) and undo/redo: strokes are kept and replayed onto the layer's bitmap, and each move repaints the stroke in progress over the picture from before it, so a soft edge doesn't build up. Crop has ratios, and for image layers quarter turns and straightening (±45°, an angle dial; `model/Crop.kt` for the math, `turnBitmap` in `media/`); a turned crop turns the source too (`turnedSourceOffset`), so restore still lines up. `ImageLayer.source` + `sourceX/Y` remember the untouched original and where the layer's bitmap sits in it; keep them right in any new operation that resizes or crops a bitmap.
 - **Settings** (`model/Settings.kt`, `ui/home/SettingsScreen.kt`): image search engine, default export size (per-project override in the Canvas panels), video export quality (Standard is Media3's bitrate, High is `highBitrate` in `video/VideoEdit.kt`), the home grid's sort order, About with the bundled license texts (`third_party/` is packaged as app assets).
 - **Share to Kadar**: `MainActivity` (singleTask) takes `ACTION_SEND` images and videos and calls `EditorViewModel.openShared`.
 - **Projects**: every edit autosaves into the app's private storage and shows up on the home screen; reopen, or long-press to select and duplicate, rename or delete. Each has an optional `name` in `project.json` (unnamed ones show "Photo · Oct 12" from the type and the folder's creation timestamp); `ProjectStore.rename` edits only that field and keeps the file's modified time. The grid sorts by Recent / Name / Type (videos first), remembered in `AppSettings.projectSort`, and gets a search field past 6 projects; the filtering and sorting is `model/ProjectList.kt`.
@@ -57,13 +57,15 @@ app/src/main/java/com/ndelic/kadar/
     Animation.kt           Animations: Anim (in/out, per-letter), Loop, motionAt() (alpha/scale/offset/rotation/reveal at a time),
                            letterScale, drawLayer with a Motion
     TextPresets.kt         Text style presets (TextPreset) and TextLayer.styled
+    Crop.kt                Crop math: a turned picture's bounds, the largest straightened rectangle, turned source offset
     Strokes.kt             Freehand strokes: PenStroke, smoothing, bounds, DrawLayer.withStrokes (re-centering)
     Projects.kt            Project, ProjectStore (one folder per project: project.json, thumb.jpg, images, voice .m4a), JSON
     ProjectList.kt         Home grid logic: default project label, search filter, ProjectSort
     Settings.kt            AppSettings (search engine, export size, export quality, project sort), SettingsStore
     UiText.kt              UiText (string resource, plural or raw text, resolved by the UI) and UserError
   media/
-    Media.kt               Bitmap decode/download, emoji render, video info and frames, gallery export, ML Kit cut-out, font import
+    Media.kt               Bitmap decode/download, emoji render, video info and frames, gallery export, ML Kit cut-out, font import,
+                           turnBitmap (crop rotation)
   video/
     VideoEdit.kt           VideoClip / Segment / Music, VideoClip.composition() (preview + export), exportVideo()
     Segments.kt            Pure math for the main track: output length, clip at an output time, source time, split point, reorder

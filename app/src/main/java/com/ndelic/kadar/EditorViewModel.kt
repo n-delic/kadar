@@ -27,6 +27,7 @@ import com.ndelic.kadar.media.saveToGallery
 import com.ndelic.kadar.media.scaleDown
 import com.ndelic.kadar.media.startVoiceRecording
 import com.ndelic.kadar.media.trimTransparent
+import com.ndelic.kadar.media.turnBitmap
 import com.ndelic.kadar.media.videoFrame
 import com.ndelic.kadar.model.AppSettings
 import com.ndelic.kadar.model.CropRect
@@ -52,6 +53,9 @@ import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.model.newShape
 import com.ndelic.kadar.model.renderLayers
 import com.ndelic.kadar.model.styled
+import com.ndelic.kadar.model.turned
+import com.ndelic.kadar.model.turnedBounds
+import com.ndelic.kadar.model.turnedSourceOffset
 import com.ndelic.kadar.model.withStrokes
 import com.ndelic.kadar.ui.editor.Timeline
 import com.ndelic.kadar.ui.editor.label
@@ -67,6 +71,7 @@ import com.ndelic.kadar.video.moved
 import com.ndelic.kadar.video.sourceMs
 import com.ndelic.kadar.video.splitPoint
 import java.io.File
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -530,16 +535,41 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         updateLayer(id) { (it as ImageLayer).copy(bitmap = bitmap, file = file) }
     }
 
-    /** Crops the layer to `[left, top, right, bottom)` of its bitmap, keeping the kept part where it was on screen. */
-    fun applyCrop(id: Long, left: Int, top: Int, right: Int, bottom: Int) = work(R.string.busy_cropping) {
+    /**
+     * Crops the layer to `[left, top, right, bottom)` of its bitmap turned by [turns] quarter turns and [angle] degrees
+     * (the crop screen's frame: the bitmap's box after the quarter turns, same center), keeping the kept part where it
+     * was on screen.
+     */
+    fun applyCrop(id: Long, left: Int, top: Int, right: Int, bottom: Int, turns: Int = 0, angle: Float = 0f) = work(R.string.busy_cropping) {
         val layer = _uiState.value.project?.layers?.firstOrNull { it.id == id } as? ImageLayer ?: return@work
         val dir = _uiState.value.projectDir ?: return@work
-        val cut = Bitmap.createBitmap(layer.bitmap, left, top, right - left, bottom - top)
-        val file = withContext(Dispatchers.IO) { store.writeImage(dir, cut) }
-        val t = layer.t.shiftedLocal((left + right) / 2f - layer.width / 2, (top + bottom) / 2f - layer.height / 2)
-        updateLayer(id) {
-            layer.copy(t = t, bitmap = cut, file = file, source = layer.source ?: layer.file, sourceX = layer.sourceX + left, sourceY = layer.sourceY + top)
+        val degrees = turns * 90 + angle
+        if (degrees % 360f == 0f) {
+            val cut = Bitmap.createBitmap(layer.bitmap, left, top, right - left, bottom - top)
+            val file = withContext(Dispatchers.IO) { store.writeImage(dir, cut) }
+            val t = layer.t.shiftedLocal((left + right) / 2f - layer.width / 2, (top + bottom) / 2f - layer.height / 2)
+            updateLayer(id) {
+                layer.copy(t = t, bitmap = cut, file = file, source = layer.source ?: layer.file, sourceX = layer.sourceX + left, sourceY = layer.sourceY + top)
+            }
+            return@work
         }
+        val (fw, fh) = if (turns % 2 == 0) layer.width to layer.height else layer.height to layer.width
+        // The crop's center from the frame's center, in the turned picture.
+        val dx = (left + right) / 2f - fw / 2
+        val dy = (top + bottom) / 2f - fh / 2
+        // The restore brush paints from the source by offset only, so the source turns with the layer.
+        val original = loadSource(layer)
+        val src = original ?: layer.bitmap
+        val (tw, th) = turnedBounds(src.width.toFloat(), src.height.toFloat(), degrees).let { (w, h) -> ceil(w).toInt() to ceil(h).toInt() }
+        val (sx, sy) = turnedSourceOffset(
+            layer.bitmap.width, layer.bitmap.height, if (original != null) layer.sourceX else 0, if (original != null) layer.sourceY else 0,
+            src.width, src.height, degrees, tw, th, left - fw / 2, top - fh / 2,
+        )
+        val cut = withContext(Dispatchers.Default) { turnBitmap(layer.bitmap, degrees, right - left, bottom - top, dx, dy) }
+        val file = withContext(Dispatchers.IO) { store.writeImage(dir, cut) }
+        val source = withContext(Dispatchers.IO) { store.writeImage(dir, turnBitmap(src, degrees, tw, th)) }
+        val (lx, ly) = turned(dx, dy, -degrees)
+        updateLayer(id) { layer.copy(t = layer.t.shiftedLocal(lx, ly), bitmap = cut, file = file, source = source, sourceX = sx.roundToInt(), sourceY = sy.roundToInt()) }
     }
 
     /** A frame of video layer [layer] at the playhead ([positionMs]), else its nearest end, to crop on; null (with a message) if unreadable. */

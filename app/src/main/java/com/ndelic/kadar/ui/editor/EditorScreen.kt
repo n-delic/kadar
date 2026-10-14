@@ -520,11 +520,12 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     cropping?.let { layer ->
         CropScreen(
             bitmap = layer.bitmap,
-            onDone = { r ->
+            onDone = { r, turns, angle ->
                 cropping = null
-                vm.applyCrop(layer.id, r[0], r[1], r[2], r[3])
+                vm.applyCrop(layer.id, r[0], r[1], r[2], r[3], turns, angle)
             },
             onCancel = { cropping = null },
+            turnable = true,
         )
     }
     croppingVideo?.let { (layer, frame) ->
@@ -533,7 +534,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         CropScreen(
             bitmap = frame,
             initial = layer.crop.run { Rect(left * fw, top * fh, right * fw, bottom * fh) },
-            onDone = { r ->
+            onDone = { r, _, _ ->
                 croppingVideo = null
                 vm.cropVideo(layer.id, CropRect(r[0] / fw, r[1] / fh, r[2] / fw, r[3] / fh))
             },

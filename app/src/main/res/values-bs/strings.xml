@@ -205,6 +205,12 @@
     <string name="pen_highlighter">Signir</string>
     <string name="brush_erase">Briši</string>
     <string name="brush_restore">Vrati</string>
+    <string name="redo_stroke">Ponovi potez</string>
+    <string name="pen_eraser">Gumica</string>
+    <string name="rotate_90">Okreni za 90°</string>
+    <string name="straighten">Izravnaj</string>
+    <string name="degrees">%1$d°</string>
+    <string name="blank_create">Napravi</string>
     <string name="crop_free">Slobodno</string>
 
     <!-- Web images -->

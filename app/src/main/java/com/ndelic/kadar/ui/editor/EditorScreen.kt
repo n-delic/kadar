@@ -55,6 +55,7 @@ import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -128,6 +129,7 @@ import com.ndelic.kadar.model.TextLayer
 import com.ndelic.kadar.model.Transform
 import com.ndelic.kadar.model.UiText
 import com.ndelic.kadar.model.VideoLayer
+import com.ndelic.kadar.model.defaultTextSize
 import com.ndelic.kadar.model.drawLayer
 import com.ndelic.kadar.model.motionAt
 import com.ndelic.kadar.ui.common.CircleButton
@@ -136,6 +138,7 @@ import com.ndelic.kadar.ui.common.IconTool
 import com.ndelic.kadar.ui.common.Ink
 import com.ndelic.kadar.ui.common.KIcon
 import com.ndelic.kadar.ui.common.KSlider
+import com.ndelic.kadar.ui.common.LocalEyedropper
 import com.ndelic.kadar.ui.common.blockTouches
 import com.ndelic.kadar.ui.common.fullWidthPanel
 import com.ndelic.kadar.video.VideoClip
@@ -148,7 +151,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Presets, Font, Color, Stroke, Glow, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Opacity, Shape, ShapeFill, ShapeOutline, Transition }
+enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Presets, Font, Color, Stroke, Shadow, Glow, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Opacity, Shape, ShapeFill, ShapeOutline, Transition }
 
 @Composable
 fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
@@ -188,6 +191,9 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     // Open draw screen: the drawing to add to (null for a new one) and the video frame under the playhead.
     var drawing by remember { mutableStateOf<Pair<Long?, Bitmap?>?>(null) }
     val scope = rememberCoroutineScope()
+    // The eyedropper while it's on: the stage picture it picks from and where the color goes.
+    var dropper by remember { mutableStateOf<Pair<Bitmap, (Int) -> Unit>?>(null) }
+    LaunchedEffect(panel, state.selectedId) { dropper = null }
 
     LaunchedEffect(state.selectedId) {
         // Selecting from the Layers list keeps the list open; anything else starts from the layer's tools.
@@ -196,6 +202,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     }
     BackHandler {
         when {
+            dropper != null -> dropper = null
             panel != null -> panel = null
             selected != null -> vm.select(null)
             else -> vm.close()
@@ -267,7 +274,15 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             CircleButton(R.drawable.ic_share, stringResource(R.string.share)) { vm.export(share = true) }
         }
 
-        Stage(project, selected, player, if (video != null) positionMs else null, state.filmstrip, vm, onEditText = { typing = it.text }, Modifier.weight(1f).fillMaxWidth())
+        Stage(
+            project, selected, player, if (video != null) positionMs else null, state.filmstrip, vm, onEditText = { typing = it.text },
+            picking = dropper?.first,
+            onPicked = { c ->
+                dropper?.second?.invoke(c)
+                dropper = null
+            },
+            Modifier.weight(1f).fillMaxWidth(),
+        )
 
         if (video != null) {
             Box(Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
@@ -290,46 +305,53 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             }
         }
 
-        AnimatedContent(
-            targetState = panel,
-            transitionSpec = { (fadeIn(tween(160)) togetherWith fadeOut(tween(120))).using(SizeTransform(clip = true)) },
-            label = "panel",
-        ) { p ->
-            if (p != null) Box(Modifier.fullWidthPanel()) {
-                when (p) {
-                    Panel.Sticker -> StickerPanel(state.stickers, vm)
-                    Panel.Canvas -> CanvasPanel(project, state.settings.exportSize, vm)
-                    Panel.Speed -> video?.let { SpeedPanel(it, clipIndex, vm) }
-                    Panel.Audio -> video?.let { v ->
-                        AudioPanel(v, clipIndex, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }) {
-                            VoiceoverSection(v, state.recordingFromMs, positionMs, playing, player, vm, onPlay = { playing = it })
+        val eyedropper: ((Int) -> Unit) -> Unit = { onColor ->
+            playing = false
+            scope.launch { vm.stagePicture(positionMs)?.let { dropper = it to onColor } }
+        }
+        CompositionLocalProvider(LocalEyedropper provides eyedropper) {
+            AnimatedContent(
+                targetState = panel,
+                transitionSpec = { (fadeIn(tween(160)) togetherWith fadeOut(tween(120))).using(SizeTransform(clip = true)) },
+                label = "panel",
+            ) { p ->
+                if (p != null) Box(Modifier.fullWidthPanel()) {
+                    when (p) {
+                        Panel.Sticker -> StickerPanel(state.stickers, vm)
+                        Panel.Canvas -> CanvasPanel(project, state.settings.exportSize, vm)
+                        Panel.Speed -> video?.let { SpeedPanel(it, clipIndex, vm) }
+                        Panel.Audio -> video?.let { v ->
+                            AudioPanel(v, clipIndex, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }) {
+                                VoiceoverSection(v, state.recordingFromMs, positionMs, playing, player, vm, onPlay = { playing = it })
+                            }
                         }
-                    }
-                    Panel.Presets -> if (selected is TextLayer) TextPresetsPanel(state.fonts, vm)
-                    Panel.Font -> (selected as? TextLayer)?.let { FontPanel(it, state.fonts, vm) }
-                    Panel.Glow -> (selected as? TextLayer)?.let { GlowPanel(it, vm) }
-                    Panel.Color -> (selected as? TextLayer)?.let { t -> ColorRow(t.color, allowNone = false) { c -> c?.let { vm.editText { copy(color = it) } } } }
-                    Panel.Stroke -> (selected as? TextLayer)?.let { t -> ColorRow(t.outline, allowNone = true) { vm.editText { copy(outline = it) } } }
-                    Panel.Box -> (selected as? TextLayer)?.let { BubblePanel(it, vm) }
-                    Panel.Shape -> ShapePanel(selected as? ShapeLayer, vm)
-                    Panel.ShapeFill -> (selected as? ShapeLayer)?.let { ShapeFillPanel(it, vm) }
-                    Panel.ShapeOutline -> (selected as? ShapeLayer)?.let { ShapeOutlinePanel(it, vm) }
-                    Panel.Layers -> LayersPanel(project.layers, state.selectedId, vm)
-                    Panel.VideoCanvas -> video?.let { VideoCanvasPanel(project, it, state.settings.exportSize, vm) }
-                    Panel.Style -> (selected as? TextLayer)?.let { TextStylePanel(it, vm) }
-                    Panel.Overlay -> (selected as? VideoLayer)?.let { VideoLayerPanel(it, vm) }
-                    Panel.Animate -> selected?.let { AnimationPanel(it, vm) }
-                    Panel.Opacity -> (selected as? ImageLayer)?.let { l -> KSlider(R.drawable.ic_opacity, l.opacity, 0.05f..1f, ::percent) { v -> vm.editImage { copy(opacity = v) } } }
-                    Panel.Transition -> video?.let { v -> transitionAt?.takeIf { it in 1 until v.segments.size }?.let { TransitionPanel(v, it, vm) } }
-                    Panel.Adjust -> when (val l = selected) {
-                        is ImageLayer -> AdjustPanel(l.adjust) { a -> vm.editImage { copy(adjust = a) } }
-                        null -> video?.let { v -> AdjustPanel(v.segments[clipIndex].adjust, applyAdjustToAll(v)) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } }
-                        else -> {}
-                    }
-                    Panel.Filters -> when (val l = selected) {
-                        is ImageLayer -> FiltersPanel(l.bitmap, l.adjust) { a -> vm.editImage { copy(adjust = a) } }
-                        null -> video?.let { v -> v.segments[clipIndex].let { s -> FiltersPanel(state.filmstrip[s.uri]?.firstOrNull(), s.adjust, applyAdjustToAll(v)) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } } }
-                        else -> {}
+                        Panel.Presets -> if (selected is TextLayer) TextPresetsPanel(state.fonts, vm)
+                        Panel.Font -> (selected as? TextLayer)?.let { FontPanel(it, state.fonts, defaultTextSize(project.width, project.height), vm) }
+                        Panel.Glow -> (selected as? TextLayer)?.let { GlowPanel(it, vm) }
+                        Panel.Color -> (selected as? TextLayer)?.let { t -> ColorRow(t.color, allowNone = false) { c -> c?.let { vm.editText { copy(color = it) } } } }
+                        Panel.Stroke -> (selected as? TextLayer)?.let { OutlinePanel(it, vm) }
+                        Panel.Shadow -> (selected as? TextLayer)?.let { ShadowPanel(it, vm) }
+                        Panel.Box -> (selected as? TextLayer)?.let { BubblePanel(it, vm) }
+                        Panel.Shape -> ShapePanel(selected as? ShapeLayer, vm)
+                        Panel.ShapeFill -> (selected as? ShapeLayer)?.let { ShapeFillPanel(it, vm) }
+                        Panel.ShapeOutline -> (selected as? ShapeLayer)?.let { ShapeOutlinePanel(it, vm) }
+                        Panel.Layers -> LayersPanel(project.layers, state.selectedId, vm)
+                        Panel.VideoCanvas -> video?.let { VideoCanvasPanel(project, it, state.settings.exportSize, vm) }
+                        Panel.Style -> (selected as? TextLayer)?.let { TextStylePanel(it, vm) }
+                        Panel.Overlay -> (selected as? VideoLayer)?.let { VideoLayerPanel(it, vm) }
+                        Panel.Animate -> selected?.let { AnimationPanel(it, vm) }
+                        Panel.Opacity -> (selected as? ImageLayer)?.let { l -> KSlider(R.drawable.ic_opacity, l.opacity, 0.05f..1f, ::percent) { v -> vm.editImage { copy(opacity = v) } } }
+                        Panel.Transition -> video?.let { v -> transitionAt?.takeIf { it in 1 until v.segments.size }?.let { TransitionPanel(v, it, vm) } }
+                        Panel.Adjust -> when (val l = selected) {
+                            is ImageLayer -> AdjustPanel(l.adjust) { a -> vm.editImage { copy(adjust = a) } }
+                            null -> video?.let { v -> AdjustPanel(v.segments[clipIndex].adjust, applyAdjustToAll(v)) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } }
+                            else -> {}
+                        }
+                        Panel.Filters -> when (val l = selected) {
+                            is ImageLayer -> FiltersPanel(l.bitmap, l.adjust) { a -> vm.editImage { copy(adjust = a) } }
+                            null -> video?.let { v -> v.segments[clipIndex].let { s -> FiltersPanel(state.filmstrip[s.uri]?.firstOrNull(), s.adjust, applyAdjustToAll(v)) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } } }
+                            else -> {}
+                        }
                     }
                 }
             }
@@ -405,6 +427,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_match_case, stringResource(R.string.tool_font), panel == Panel.Font) { toggle(Panel.Font) }
                         IconTool(R.drawable.ic_palette, stringResource(R.string.tool_color), panel == Panel.Color) { toggle(Panel.Color) }
                         IconTool(R.drawable.ic_border_color, stringResource(R.string.tool_stroke), panel == Panel.Stroke) { toggle(Panel.Stroke) }
+                        IconTool(R.drawable.ic_shadow, stringResource(R.string.shadow), panel == Panel.Shadow) { toggle(Panel.Shadow) }
                         IconTool(R.drawable.ic_flare, stringResource(R.string.tool_glow), panel == Panel.Glow) { toggle(Panel.Glow) }
                         IconTool(R.drawable.ic_chat_bubble, stringResource(R.string.tool_box), panel == Panel.Box) { toggle(Panel.Box) }
                         IconTool(R.drawable.ic_text_fields, stringResource(R.string.tool_style), panel == Panel.Style) { toggle(Panel.Style) }
@@ -641,10 +664,22 @@ private val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF2DE1C2
 /**
  * The canvas: video preview underneath, layers drawn on top at screen scale.
  * Drag, pinch and twist move the selected layer; the corner handles delete it or scale and rotate it with one finger;
- * double-tap a text layer to edit it.
+ * double-tap a text layer to edit it. With [picking] (the stage picture) a touch on the canvas picks a color from it for
+ * [onPicked] instead.
  */
 @Composable
-private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?, timeMs: Long?, stills: Map<Uri, List<Bitmap>>, vm: EditorViewModel, onEditText: (TextLayer) -> Unit, modifier: Modifier) {
+private fun Stage(
+    project: Project,
+    selected: Layer?,
+    player: CompositionPlayer?,
+    timeMs: Long?,
+    stills: Map<Uri, List<Bitmap>>,
+    vm: EditorViewModel,
+    onEditText: (TextLayer) -> Unit,
+    picking: Bitmap?,
+    onPicked: (Int) -> Unit,
+    modifier: Modifier,
+) {
     // In a video only the layers on screen at the playhead show (and can be grabbed); the selected one always does, to edit it.
     fun Layer.onStage() = !hidden && (timeMs == null || visibleAt(timeMs) || id == selected?.id)
     val shown = project.layers.filter { it.onStage() }
@@ -683,6 +718,10 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
         }
         val current by rememberUpdatedState(selected)
         val editText by rememberUpdatedState(onEditText)
+        val picture by rememberUpdatedState(picking)
+        val picked by rememberUpdatedState(onPicked)
+        // The eyedropper's finger and the color under it, while it touches.
+        var loupe by remember { mutableStateOf<Pair<Offset, Int>?>(null) }
         val lastTap = remember { longArrayOf(-1, 0) } // layer id, time
         val haptics = LocalHapticFeedback.current
         val snaps = remember { Snaps(haptics) }
@@ -778,6 +817,23 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                             val down = awaitFirstDown()
                             // Gestures that start on the canvas are the canvas's, not the surrounding stage's.
                             down.consume()
+                            picture?.let { pic ->
+                                fun colorAt(at: Offset) = pic.getPixel(
+                                    (at.x / scale * pic.width / project.width).toInt().coerceIn(0, pic.width - 1),
+                                    (at.y / scale * pic.height / project.height).toInt().coerceIn(0, pic.height - 1),
+                                ) or 0xFF000000.toInt()
+                                var at = down.position
+                                while (true) {
+                                    loupe = at to colorAt(at)
+                                    val change = awaitPointerEvent().changes.first()
+                                    if (!change.pressed) break
+                                    at = change.position
+                                    change.consume()
+                                }
+                                loupe = null
+                                picked(colorAt(at))
+                                return@awaitEachGesture
+                            }
                             val sel = current?.takeUnless { it.locked }
                             val handle = sel?.let { handleAt(it, down.position, scale, handleRadius) }
                             if (sel != null && handle != null) {
@@ -882,6 +938,12 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                         if (snaps.x) c.drawLine(cx, 0f, cx, project.height.toFloat(), guidePaint.also { it.strokeWidth = 2 / scale })
                         if (snaps.y) c.drawLine(0f, cy, project.width.toFloat(), cy, guidePaint.also { it.strokeWidth = 2 / scale })
                     }
+                    loupe?.let { (at, color) ->
+                        // Above the finger, so it stays in sight.
+                        val o = at - Offset(0f, 56.dp.toPx() / viewZoom)
+                        drawCircle(Color.White, 24.dp.toPx() / viewZoom, o)
+                        drawCircle(Color(color), 21.dp.toPx() / viewZoom, o)
+                    }
                 }
             }
             selected?.takeUnless { it.locked || it.hidden }?.let { l ->
@@ -890,6 +952,15 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                 tailOf(l, scale)?.let { HandleDot(R.drawable.ic_chat_bubble, it, Color.White) }
                 if (l is TextLayer) for (side in listOf(-1f, 1f)) HandleDot(R.drawable.ic_arrow_range, sideOf(l, side, scale), Color.White)
             }
+        }
+        if (picking != null) {
+            Text(
+                stringResource(R.string.eyedropper_hint),
+                color = Ink.onAccent,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.TopCenter).clip(RoundedCornerShape(14.dp)).background(Ink.accent).padding(horizontal = 14.dp, vertical = 6.dp),
+            )
         }
         if (viewZoom > 1.01f) {
             Text(

@@ -98,9 +98,9 @@ Feature parity with the big phone editors, built from how their features behave,
 
 ### Existing tools that do less than the big editors
 
-- [ ] Text outline width (fixed at 0.16 of the size today) and shadow color, blur and distance (on/off today); box opacity
-- [ ] Custom colors for text, shapes and boxes: a color wheel with hex, and an eyedropper from the picture
-- [ ] Text format: bold, italic, underline, all caps toggles and a size slider
+- [x] Text outline width (fixed at 0.16 of the size today) and shadow color, blur and distance (on/off today); box opacity
+- [x] Custom colors for text, shapes and boxes: a color wheel with hex, and an eyedropper from the picture
+- [x] Text format: bold, italic, underline, all caps toggles and a size slider
 - [x] Text, sticker and shape animations: slide in from all four sides, zoom out, and an adjustable length (300 ms today)
 - [x] Flip (horizontal and vertical) and opacity for image and sticker layers
 - [x] Layer tracks: Split at the playhead and Move here (to the playhead)

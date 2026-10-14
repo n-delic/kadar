@@ -267,6 +267,12 @@ enum class TextAlign(@StringRes val label: Int) { Left(R.string.align_left), Cen
 /** The shape of a text layer's box: the rounded caption box, or a bubble with a tail. */
 enum class Bubble(@StringRes val label: Int) { Box(R.string.bubble_box), Speech(R.string.bubble_speech), Thought(R.string.bubble_thought), Shout(R.string.bubble_shout) }
 
+/** A new text's size on a [width]×[height] canvas, and 100% on the size slider. */
+fun defaultTextSize(width: Int, height: Int) = minOf(width, height) * 0.1f
+
+/** The one shadow text had before it got a color: black, a little see-through. */
+const val DEFAULT_SHADOW = 0xAA000000.toInt()
+
 data class TextLayer(
     override val id: Long,
     override val t: Transform,
@@ -278,12 +284,24 @@ data class TextLayer(
     val outline: Int?,
     /** Fill of the box or bubble behind the text, or null for none. */
     val box: Int? = null,
+    /** 0 to 1, the box or bubble fill only. */
+    val boxOpacity: Float = 1f,
     val bubble: Bubble = Bubble.Box,
     /** Outline of the box or bubble, or null for none. */
     val boxOutline: Int? = null,
     /** Where a bubble's tail points, in the layer's own pixels from its center; null for the default, down and to the left. */
     val tail: Pair<Float, Float>? = null,
-    val shadow: Boolean = false,
+    /** Shadow color, or null for none; [shadowBlur] and [shadowDistance] (straight down) are in multiples of [size]. */
+    val shadow: Int? = null,
+    val shadowBlur: Float = 0.08f,
+    val shadowDistance: Float = 0.04f,
+    /** Outline thickness, a multiple of [size]. */
+    val outlineWidth: Float = 0.16f,
+    val bold: Boolean = false,
+    val italic: Boolean = false,
+    val underline: Boolean = false,
+    /** Draws the letters in capitals; [text] keeps what was typed. */
+    val caps: Boolean = false,
     /** Extra space between letters, in ems. */
     val spacing: Float = 0f,
     val align: TextAlign = TextAlign.Center,
@@ -307,24 +325,33 @@ data class TextLayer(
     override val animOutMs: Long? = null,
 ) : Layer {
     private val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).also {
-        it.typeface = font.typeface
+        // The platform fakes bold and italic for fonts that have no such style.
+        it.typeface = when {
+            bold && italic -> Typeface.create(font.typeface, Typeface.BOLD_ITALIC)
+            bold -> Typeface.create(font.typeface, Typeface.BOLD)
+            italic -> Typeface.create(font.typeface, Typeface.ITALIC)
+            else -> font.typeface
+        }
         it.textSize = size
         it.letterSpacing = spacing
+        it.isUnderlineText = underline
     }
+    private val shown = if (caps) text.uppercase() else text
     // Per layer, like [paint]: the video export draws copies of animated layers off the main thread.
     private val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val isBubble get() = box != null && bubble != Bubble.Box
     private val layout: StaticLayout = run {
-        val line = text.lines().maxOf { paint.measureText(it) }
+        // Italic letters lean past their measured width; the room keeps the last one inside the box.
+        val line = shown.lines().maxOf { paint.measureText(it) } + if (italic) size * 0.3f else 0f
         // Bubbles wrap long text into a rounder block; the caption box keeps the lines as typed.
-        val word = if (isBubble && wrap == null) text.split(' ', '\n').maxOf { paint.measureText(it) } else 0f
+        val word = if (isBubble && wrap == null) shown.split(' ', '\n').maxOf { paint.measureText(it) } else 0f
         val w = wrap?.roundToInt()?.coerceAtLeast(1) ?: ((if (isBubble) bubbleWrapWidth(line, paint.fontSpacing, word) else line).toInt() + 1)
         val alignment = when (align) {
             TextAlign.Left -> Layout.Alignment.ALIGN_NORMAL
             TextAlign.Center -> Layout.Alignment.ALIGN_CENTER
             TextAlign.Right -> Layout.Alignment.ALIGN_OPPOSITE
         }
-        StaticLayout.Builder.obtain(text, 0, text.length, paint, w)
+        StaticLayout.Builder.obtain(shown, 0, shown.length, paint, w)
             .setAlignment(alignment)
             .setIncludePad(true)
             .setLineSpacing(0f, lineSpacing)
@@ -339,7 +366,8 @@ data class TextLayer(
         return copy(wrap = w, t = t.shiftedLocal(side * (w - wrapWidth) / 2, 0f))
     }
     private val glowRadius get() = if (glow == null) 0f else size * glowSize * 0.5f
-    private val stroke get() = if (outline == null) 0f else size * 0.16f
+    private val stroke get() = if (outline == null) 0f else size * outlineWidth
+    private val shadowReach get() = if (shadow == null) 0f else size * (shadowBlur + shadowDistance)
     private val boxPadX get() = if (box == null) 0f else size * 0.3f
     private val boxPadY get() = if (box == null) 0f else size * 0.12f
 
@@ -354,7 +382,7 @@ data class TextLayer(
 
     override val width get() = if (isBubble) 2 * bubbleHalf[0] + boxStroke else layout.width + stroke + 2 * boxPadX
     override val height get() = if (isBubble) 2 * bubbleHalf[1] + boxStroke else layout.height + stroke + 2 * boxPadY
-    override val reach get() = maxOf(hypot(width, height) / 2, tailTip?.let { hypot(it.first, it.second) + boxStroke } ?: 0f) + glowRadius
+    override val reach get() = maxOf(hypot(width, height) / 2, tailTip?.let { hypot(it.first, it.second) + boxStroke } ?: 0f) + maxOf(glowRadius, shadowReach)
 
     override fun drawContent(canvas: Canvas) = drawContent(canvas, null)
 
@@ -366,6 +394,7 @@ data class TextLayer(
         if (box != null) {
             boxPaint.style = Paint.Style.FILL
             boxPaint.color = box
+            boxPaint.alpha = (boxPaint.alpha * boxOpacity).roundToInt()
             if (isBubble) canvas.drawPath(bubblePath, boxPaint)
             else canvas.drawRoundRect(-width / 2, -height / 2, width / 2, height / 2, size * 0.25f, size * 0.25f, boxPaint)
         }
@@ -396,7 +425,8 @@ data class TextLayer(
             paint.clearShadowLayer()
         }
         // The shadow goes on the first pass only, so it sits under the outline instead of over it.
-        if (shadow) paint.setShadowLayer(size * 0.08f, 0f, size * 0.04f, 0xAA000000.toInt())
+        // A zero radius would remove the shadow, so a sharp one still gets a tiny blur.
+        if (shadow != null) paint.setShadowLayer(maxOf(size * shadowBlur, 0.5f), 0f, size * shadowDistance, shadow)
         if (outline != null) {
             paint.style = Paint.Style.STROKE
             paint.color = outline
@@ -410,10 +440,10 @@ data class TextLayer(
         canvas.restoreToCount(count)
     }
 
-    /** Where each letter (grapheme, so an emoji stays whole) starts in [text], plus the text's end. */
+    /** Where each letter (grapheme, so an emoji stays whole) starts in the drawn text, plus its end. */
     private val letters by lazy {
         val b = BreakIterator.getCharacterInstance()
-        b.setText(text)
+        b.setText(shown)
         buildList {
             var i = b.first()
             while (i != BreakIterator.DONE) {
@@ -433,12 +463,12 @@ data class TextLayer(
             val s = letters[i]
             val e = letters[i + 1]
             val k = letterScale(reveal.anim, reveal.p, i, n)
-            if (k <= 0f || text[s].isWhitespace()) continue
+            if (k <= 0f || shown[s].isWhitespace()) continue
             val x = layout.getPrimaryHorizontal(s)
             val y = layout.getLineBaseline(layout.getLineForOffset(s)).toFloat()
             canvas.save()
-            canvas.scale(k, k, x + paint.measureText(text, s, e) / 2, y - size * 0.35f)
-            canvas.drawText(text, s, e, x, y, paint)
+            canvas.scale(k, k, x + paint.measureText(shown, s, e) / 2, y - size * 0.35f)
+            canvas.drawText(shown, s, e, x, y, paint)
             canvas.restore()
         }
     }

@@ -12,17 +12,19 @@ enum class TextPreset(@StringRes val label: Int) {
 
 /**
  * This text in [preset]'s look, its fonts picked by name from [fonts] (the current one if missing). The text, size,
- * alignment, wrap, line spacing, place and timing stay; every other look property is set, so presets don't mix.
+ * alignment, wrap, line spacing, bold, italic, underline, caps, place and timing stay; every other look property is set, so presets don't mix.
  */
 fun TextLayer.styled(preset: TextPreset, fonts: List<Font>): TextLayer {
     fun font(name: String) = fonts.firstOrNull { it.name == name } ?: font
-    val plain = copy(outline = null, box = null, bubble = Bubble.Box, boxOutline = null, tail = null, shadow = false, spacing = 0f, glow = null, opacity = 1f)
+    val plain = copy(outline = null, box = null, bubble = Bubble.Box, boxOutline = null, tail = null, shadow = null, spacing = 0f, glow = null, opacity = 1f,
+        boxOpacity = 1f, outlineWidth = 0.16f, shadowBlur = 0.08f, shadowDistance = 0.04f,
+    )
     return when (preset) {
         TextPreset.Meme -> plain.copy(font = font("Meme"), color = Color.WHITE, outline = Color.BLACK)
         TextPreset.Caption -> plain.copy(font = font("Heavy"), color = Color.BLACK, box = Color.WHITE)
         TextPreset.Neon -> plain.copy(font = font("Retro"), color = 0xFFFFF2FB.toInt(), glow = 0xFFFF2BD6.toInt(), glowSize = 0.6f)
-        TextPreset.Title -> plain.copy(font = font("Tall"), color = Color.WHITE, shadow = true, spacing = 0.06f)
-        TextPreset.Subtitle -> plain.copy(font = font("Sans"), color = Color.WHITE, box = 0xB3000000.toInt())
+        TextPreset.Title -> plain.copy(font = font("Tall"), color = Color.WHITE, shadow = DEFAULT_SHADOW, spacing = 0.06f)
+        TextPreset.Subtitle -> plain.copy(font = font("Sans"), color = Color.WHITE, box = Color.BLACK, boxOpacity = 0.7f)
         TextPreset.Speech -> plain.copy(font = font("Casual"), color = Color.BLACK, box = Color.WHITE, bubble = Bubble.Speech, boxOutline = Color.BLACK)
     }
 }

@@ -50,6 +50,7 @@ import com.ndelic.kadar.model.Transform
 import com.ndelic.kadar.model.UiText
 import com.ndelic.kadar.model.UserError
 import com.ndelic.kadar.model.VideoLayer
+import com.ndelic.kadar.model.defaultTextSize
 import com.ndelic.kadar.model.newShape
 import com.ndelic.kadar.model.renderLayers
 import com.ndelic.kadar.model.styled
@@ -359,7 +360,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         // Black text gets a white outline so it stays readable; everything else gets the classic black one.
         val outline = if (color == Color.BLACK) Color.WHITE else Color.BLACK
         addLayer { id ->
-            val layer = TextLayer(id, Transform(p.width / 2f, p.height / 2f), text, fonts.first(), min(p.width, p.height) * 0.1f, color, outline)
+            val layer = TextLayer(id, Transform(p.width / 2f, p.height / 2f), text, fonts.first(), defaultTextSize(p.width, p.height), color, outline)
             // Long captions start shrunk to fit the canvas width instead of running off both edges.
             layer.copy(t = layer.t.copy(scale = min(1f, p.width * 0.9f / layer.width)))
         }
@@ -539,6 +540,14 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val dir = _uiState.value.projectDir ?: return null
         val name = layer.source ?: return null
         return withContext(Dispatchers.IO) { BitmapFactory.decodeFile(File(dir, name).path) }
+    }
+
+    /** The stage's picture at [positionMs] (output time; ignored for photos), at most [PICK_SIZE] wide or tall, for the eyedropper. */
+    suspend fun stagePicture(positionMs: Long): Bitmap? {
+        val p = _uiState.value.project ?: return null
+        // shortcut: video layers and the blurred canvas are left out (players draw them); render their frames if users pick from them.
+        val layers = if (p.video == null) p.layers else p.layers.filter { it.visibleAt(positionMs) }
+        return renderLayers(p.width, p.height, p.background, layers, min(1f, PICK_SIZE / max(p.width, p.height)), frameAt(positionMs))
     }
 
     /** The video frame under the playhead ([positionMs], output time), as a guide for the draw screen; null for photos. */
@@ -873,6 +882,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         const val MAX_PHOTO = 2160
         const val MAX_LAYER = 1440
         const val THUMB_SIZE = 360f
+        const val PICK_SIZE = 1080f
         const val MAX_UNDO = 50
         const val FILMSTRIP_FRAMES = 10
         const val FRAME_SIZE = 480

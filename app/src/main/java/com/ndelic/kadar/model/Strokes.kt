@@ -1,6 +1,7 @@
 package com.ndelic.kadar.model
 
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.sin
 
@@ -54,6 +55,49 @@ fun strokeBounds(strokes: List<PenStroke>): FloatArray? {
         }
     }
     return if (r < l) null else floatArrayOf(l, t, r, b)
+}
+
+/**
+ * [strokes] less what an eraser of [radius] dragged from ([ax], [ay]) to ([bx], [by]) touches: the points it reaches go,
+ * so a stroke cut in the middle becomes two and leftover single points are dropped. Strokes it misses stay as they are.
+ */
+fun erased(strokes: List<PenStroke>, ax: Float, ay: Float, bx: Float, by: Float, radius: Float): List<PenStroke> = strokes.flatMap { s ->
+    val reach = radius + s.width / 2
+    val n = s.points.size / 2
+    val keep = BooleanArray(n) { i -> distanceToSegment(s.points[2 * i], s.points[2 * i + 1], ax, ay, bx, by) > reach }
+    if (keep.all { it }) return@flatMap listOf(s)
+    val parts = ArrayList<PenStroke>()
+    var i = 0
+    while (i < n) {
+        if (!keep[i]) {
+            i++
+            continue
+        }
+        val from = i
+        while (i < n && keep[i]) i++
+        if (i - from > 1) parts += PenStroke(s.color, s.width, s.points.copyOfRange(2 * from, 2 * i))
+    }
+    parts
+}
+
+private fun distanceToSegment(px: Float, py: Float, ax: Float, ay: Float, bx: Float, by: Float): Float {
+    val dx = bx - ax
+    val dy = by - ay
+    val len2 = dx * dx + dy * dy
+    val t = if (len2 == 0f) 0f else (((px - ax) * dx + (py - ay) * dy) / len2).coerceIn(0f, 1f)
+    return hypot(px - (ax + t * dx), py - (ay + t * dy))
+}
+
+/** This layer's strokes in canvas pixels (moved, scaled and turned like the layer), the inverse of [withStrokes]. */
+fun DrawLayer.canvasStrokes(): List<PenStroke> = strokes.map { s ->
+    val p = s.points
+    PenStroke(s.color, s.width * t.scale, FloatArray(p.size).also { out ->
+        for (i in 0 until p.size / 2) {
+            val (x, y) = turned(p[2 * i] * t.scale, p[2 * i + 1] * t.scale, t.rotation)
+            out[2 * i] = x + t.x
+            out[2 * i + 1] = y + t.y
+        }
+    })
 }
 
 /**

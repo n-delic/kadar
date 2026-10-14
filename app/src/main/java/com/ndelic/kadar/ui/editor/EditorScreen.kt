@@ -544,8 +544,10 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     drawing?.let { (target, under) ->
         DrawScreen(
             project = project,
-            layers = project.layers.filter { !it.hidden && (video == null || it.visibleAt(positionMs) || it.id == target) },
+            // The drawing being edited is drawn by the pad itself, so its strokes can be erased.
+            layers = project.layers.filter { !it.hidden && it.id != target && (video == null || it.visibleAt(positionMs)) },
             under = under,
+            target = project.layers.firstOrNull { it.id == target } as? DrawLayer,
             onDone = { strokes ->
                 drawing = null
                 vm.applyDrawing(target, strokes)

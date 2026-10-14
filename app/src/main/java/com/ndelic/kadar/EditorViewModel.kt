@@ -404,11 +404,19 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         addLayer { VideoLayer(it, Transform(p.width / 2f, p.height / 2f, p.width * 0.5f / info.width), uri, info.durationMs, info.width, info.height, startMs = start) }
     }
 
-    /** Result of the draw screen, one undo step: [strokes] (canvas pixels) become a new layer, or go onto drawing [id]. */
+    /**
+     * Result of the draw screen, one undo step: [strokes] (canvas pixels) become a new layer, or replace drawing [id]'s
+     * (keeping its rotation and scale); a drawing erased to nothing is deleted.
+     */
     fun applyDrawing(id: Long?, strokes: List<PenStroke>) {
-        if (strokes.isEmpty()) return
-        if (id == null) addLayer { DrawLayer(it, Transform(0f, 0f), emptyList()).withStrokes(strokes) }
-        else updateLayer(id) { (it as? DrawLayer)?.withStrokes(strokes) ?: it }
+        when {
+            id == null -> if (strokes.isNotEmpty()) addLayer { DrawLayer(it, Transform(0f, 0f), emptyList()).withStrokes(strokes) }
+            strokes.isEmpty() -> {
+                updateProject { p -> p.copy(layers = p.layers.filter { it.id != id }) }
+                select(null)
+            }
+            else -> updateLayer(id) { (it as? DrawLayer)?.copy(strokes = emptyList())?.withStrokes(strokes) ?: it }
+        }
     }
 
     fun addShape(kind: ShapeKind) {

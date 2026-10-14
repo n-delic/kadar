@@ -62,11 +62,15 @@ import com.ndelic.kadar.model.turnedSourceOffset
 import com.ndelic.kadar.model.withStrokes
 import com.ndelic.kadar.ui.editor.Timeline
 import com.ndelic.kadar.ui.editor.label
+import com.ndelic.kadar.video.AudioPart
+import com.ndelic.kadar.video.AudioRef
 import com.ndelic.kadar.video.Music
 import com.ndelic.kadar.video.Segment
 import com.ndelic.kadar.video.Transition
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.VoiceClip
+import com.ndelic.kadar.video.audioPart
+import com.ndelic.kadar.video.audioStartMs
 import com.ndelic.kadar.video.composition
 import com.ndelic.kadar.video.exportVideo
 import com.ndelic.kadar.video.highBitrate
@@ -74,7 +78,9 @@ import com.ndelic.kadar.video.layerMovedTo
 import com.ndelic.kadar.video.layerSplitPoint
 import com.ndelic.kadar.video.moved
 import com.ndelic.kadar.video.sourceMs
+import com.ndelic.kadar.video.splitAt
 import com.ndelic.kadar.video.splitPoint
+import com.ndelic.kadar.video.withAudio
 import java.io.File
 import kotlin.math.ceil
 import kotlin.math.max
@@ -121,6 +127,8 @@ data class EditorUiState(
     val filmstrip: Map<Uri, List<Bitmap>> = emptyMap(),
     /** Index of the clip picked on the timeline's clip strip; never set together with [selectedId]. */
     val selectedClip: Int? = null,
+    /** The music or voiceover track picked on the timeline; never set together with [selectedId] or [selectedClip]. */
+    val selectedAudio: AudioRef? = null,
     /** Output time the running voice recording started at; null when not recording. */
     val recordingFromMs: Long? = null,
     /** The bundled fonts, then the imported ones by name. */
@@ -296,7 +304,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         nextId = (project.layers.maxOfOrNull { it.id } ?: 0) + 1
         undoStack.clear()
         redoStack.clear()
-        _uiState.update { it.copy(projectDir = dir, project = project, selectedId = null, selectedClip = null, canUndo = false, canRedo = false, filmstrip = emptyMap()) }
+        _uiState.update { it.copy(projectDir = dir, project = project, selectedId = null, selectedClip = null, selectedAudio = null, canUndo = false, canRedo = false, filmstrip = emptyMap()) }
         project.video?.segments?.distinctBy { it.uri }?.forEach { loadFilmstrip(dir, it) }
     }
 
@@ -358,7 +366,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // Layers
 
-    fun select(id: Long?) = _uiState.update { it.copy(selectedId = id, selectedClip = null) }
+    fun select(id: Long?) = _uiState.update { it.copy(selectedId = id, selectedClip = null, selectedAudio = null) }
 
     /** Shows [text] the way the ViewModel's own messages show, for the UI's notes (e.g. about the preview player). */
     fun notify(text: UiText) {
@@ -708,7 +716,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     fun updateAllSegments(change: Segment.() -> Segment) = updateClip { copy(segments = segments.map { it.change() }) }
 
     /** Picks clip [index] on the clip strip, or none; a picked clip and a selected layer exclude each other. */
-    fun selectClip(index: Int?) = _uiState.update { it.copy(selectedClip = index, selectedId = null) }
+    fun selectClip(index: Int?) = _uiState.update { it.copy(selectedClip = index, selectedId = null, selectedAudio = null) }
 
     /** Adds a video, or a photo as a still of [PHOTO_CLIP_MS], after the last clip and picks it. */
     fun addClip(uri: Uri) = work(R.string.busy_adding_clip) {
@@ -765,11 +773,50 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         selectClip(to)
     }
 
-    fun setMusic(uri: Uri) = work(R.string.busy_adding_music) {
+    /** Adds a song on a track of its own from [atMs] (output time; the start when under a second is left) to the end. */
+    fun addMusic(uri: Uri, atMs: Long) = work(R.string.busy_adding_music) {
         keepAccess(uri)
         val (info, name) = withContext(Dispatchers.IO) { mediaInfo(app, uri) to displayName(app, uri) }
         if (info.durationMs == 0L) throw UserError(R.string.error_read_audio)
-        updateClip { copy(music = Music(uri, name, info.durationMs)) }
+        updateClip { copy(music = music + Music(uri, name, info.durationMs, part = AudioPart(atMs = audioStartMs(atMs, outputDurationMs)))) }
+        selectAudio(AudioRef(voice = false, index = _uiState.value.project?.video?.music?.lastIndex ?: 0))
+    }
+
+    /** Picks a music or voiceover track on the timeline, or none; it excludes a selected layer and a picked clip. */
+    fun selectAudio(ref: AudioRef?) = _uiState.update { it.copy(selectedAudio = ref, selectedId = null, selectedClip = null) }
+
+    /** Sets audio track [ref]'s part (a timeline drag, once at its end). */
+    fun setAudioPart(ref: AudioRef, part: AudioPart) = updateClip { withAudio(ref) { listOf(part) } }
+
+    /** Changes the selected audio track's part (volume, fades). */
+    fun editAudio(change: AudioPart.() -> AudioPart) {
+        val ref = _uiState.value.selectedAudio ?: return
+        updateClip { withAudio(ref) { listOf(it.change()) } }
+    }
+
+    /** Where the selected song starts (and loops back to) in the song. */
+    fun setSongStart(startMs: Long) {
+        val ref = _uiState.value.selectedAudio?.takeIf { !it.voice } ?: return
+        updateClip { copy(music = music.mapIndexed { i, m -> if (i == ref.index) m.copy(startMs = startMs) else m }) }
+    }
+
+    /** Cuts the selected audio track at [atMs] (output time) into two that sound as it did, and picks the second. */
+    fun splitAudio(atMs: Long) {
+        val ref = _uiState.value.selectedAudio ?: return
+        val video = _uiState.value.project?.video ?: return
+        val parts = video.audioPart(ref)?.splitAt(atMs, video.outputDurationMs)
+        if (parts == null) {
+            _effects.trySend(EditorEffect.Message(UiText.Res(R.string.split_audio_outside)))
+            return
+        }
+        updateClip { withAudio(ref) { parts.toList() } }
+        selectAudio(ref.copy(index = ref.index + 1))
+    }
+
+    fun deleteAudio() {
+        val ref = _uiState.value.selectedAudio ?: return
+        updateClip { withAudio(ref) { emptyList() } }
+        selectAudio(null)
     }
 
     /** Starts recording a voiceover that will play from [atMs] (output time). False when the microphone can't be used. */
@@ -815,7 +862,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             _effects.send(EditorEffect.Message(UiText.Res(R.string.error_nothing_recorded)))
             return
         }
-        updateClip { copy(voices = voices + VoiceClip(file, start, durationMs)) }
+        updateClip { copy(voices = voices + VoiceClip(file, durationMs, AudioPart(atMs = start, lengthMs = durationMs))) }
     }
 
     override fun onCleared() {

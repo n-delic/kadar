@@ -74,8 +74,10 @@ import com.ndelic.kadar.ui.common.KSlider
 import com.ndelic.kadar.ui.common.KToggle
 import com.ndelic.kadar.ui.common.PanelLabel
 import com.ndelic.kadar.ui.common.TextTabs
-import com.ndelic.kadar.video.Music
+import com.ndelic.kadar.video.AudioRef
+import com.ndelic.kadar.video.MAX_FADE_MS
 import com.ndelic.kadar.video.VideoClip
+import com.ndelic.kadar.video.audioPart
 import com.ndelic.kadar.video.speedAt
 import com.ndelic.kadar.video.speedPosition
 import kotlin.math.abs
@@ -326,48 +328,43 @@ fun SmallIcon(icon: Int, description: String, onClick: () -> Unit) {
     }
 }
 
-/** Music and voiceovers are the whole video's; the sound slider is clip [index]'s. */
+/**
+ * The selected music or voiceover track's [audio] settings; with none selected, clip [index]'s sound, adding music and
+ * recording a voiceover.
+ */
 @Composable
-fun AudioPanel(clip: VideoClip, index: Int, vm: EditorViewModel, onAddMusic: () -> Unit, voiceover: @Composable () -> Unit) {
-    // Scrolls once a few recordings are listed, so the stage keeps its room.
+fun AudioPanel(clip: VideoClip, index: Int, audio: AudioRef?, vm: EditorViewModel, onAddMusic: () -> Unit, voiceover: @Composable () -> Unit) {
+    // Scrolls if it gets taller than the others, so the stage keeps its room.
     Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        val part = audio?.let { clip.audioPart(it) }
+        if (audio != null && part != null) {
+            PanelLabel(stringResource(if (audio.voice) R.string.voiceover else R.string.music))
+            KSlider(R.drawable.ic_volume_up, part.volume, 0f..1f, ::percent) { v -> vm.editAudio { copy(volume = v) } }
+            if (!audio.voice) {
+                val music = clip.music[audio.index]
+                // Leave at least a second of song, so a repeat is never empty.
+                KSlider(R.drawable.ic_play_arrow, music.startMs.toFloat(), 0f..maxOf(0f, music.durationMs - 1000f), { formatMs(it.toLong()) }) { v -> vm.setSongStart(v.toLong()) }
+            }
+            PanelLabel(stringResource(R.string.audio_fades))
+            val seconds = stringResource(R.string.transition_seconds)
+            fun fadeMs(v: Float) = (v / 100).roundToInt() * 100L
+            KSlider(R.drawable.ic_trending_up, part.fadeInMs.toFloat(), 0f..MAX_FADE_MS.toFloat(), { seconds.format(fadeMs(it) / 1000f) }) { v -> vm.editAudio { copy(fadeInMs = fadeMs(v)) } }
+            KSlider(R.drawable.ic_trending_down, part.fadeOutMs.toFloat(), 0f..MAX_FADE_MS.toFloat(), { seconds.format(fadeMs(it) / 1000f) }) { v -> vm.editAudio { copy(fadeOutMs = fadeMs(v)) } }
+            return@Column
+        }
         PanelLabel(stringResource(R.string.video_sound))
         KSlider(R.drawable.ic_volume_up, clip.segments[index].volume, 0f..1f, ::percent) { v -> vm.updateSegment(index) { copy(volume = v) } }
         PanelLabel(stringResource(R.string.music))
-        val music = clip.music
-        if (music == null) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onAddMusic).padding(vertical = 8.dp, horizontal = 4.dp),
-            ) {
-                KIcon(R.drawable.ic_add, Modifier.size(22.dp), Ink.accent)
-                Spacer(Modifier.size(8.dp))
-                Text(stringResource(R.string.music_add), color = Ink.accent, fontWeight = FontWeight.SemiBold)
-            }
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                KIcon(R.drawable.ic_music_note, Modifier.size(22.dp), Ink.dim)
-                Spacer(Modifier.size(12.dp))
-                Text(music.name, color = Ink.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Box(Modifier.clip(RoundedCornerShape(8.dp)).clickable { vm.updateClip { copy(music = null) } }.padding(8.dp)) {
-                    KIcon(R.drawable.ic_delete, Modifier.size(22.dp), description = stringResource(R.string.music_remove))
-                }
-            }
-            KSlider(R.drawable.ic_volume_up, music.volume, 0f..1f, ::percent) { v -> vm.updateClip { copy(music = music.copy(volume = v)) } }
-            // Leave at least a second of song, so the looping music item is never empty.
-            KSlider(R.drawable.ic_play_arrow, music.startMs.toFloat(), 0f..maxOf(0f, music.durationMs - 1000f), { formatMs(it.toLong()) }) { v ->
-                vm.updateClip { copy(music = music.copy(startMs = v.toLong())) }
-            }
-            Row {
-                Box(Modifier.weight(1f)) {
-                    KToggle(stringResource(R.string.music_fade_in), null, music.fadeIn) { on -> vm.updateClip { copy(music = music.copy(fadeIn = on)) } }
-                }
-                Box(Modifier.weight(1f)) {
-                    KToggle(stringResource(R.string.music_fade_out), null, music.fadeOut) { on -> vm.updateClip { copy(music = music.copy(fadeOut = on)) } }
-                }
-            }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onAddMusic).padding(vertical = 8.dp, horizontal = 4.dp),
+        ) {
+            KIcon(R.drawable.ic_add, Modifier.size(22.dp), Ink.accent)
+            Spacer(Modifier.size(8.dp))
+            Text(stringResource(R.string.music_add), color = Ink.accent, fontWeight = FontWeight.SemiBold)
         }
         voiceover()
+        if (clip.music.isNotEmpty() || clip.voices.isNotEmpty()) Text(stringResource(R.string.audio_hint), color = Ink.dim, fontSize = 12.sp)
     }
 }
 

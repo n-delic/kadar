@@ -93,10 +93,14 @@ import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.ui.common.Ink
 import com.ndelic.kadar.ui.common.KIcon
 import com.ndelic.kadar.ui.common.PanelLabel
+import com.ndelic.kadar.video.AudioDrag
+import com.ndelic.kadar.video.AudioPart
+import com.ndelic.kadar.video.AudioRef
 import com.ndelic.kadar.video.MIN_CLIP_MS
 import com.ndelic.kadar.video.Segment
 import com.ndelic.kadar.video.TransitionKind
 import com.ndelic.kadar.video.VideoClip
+import com.ndelic.kadar.video.dragged
 import com.ndelic.kadar.video.edgeTrim
 import com.ndelic.kadar.video.outputMs
 import kotlin.math.abs
@@ -186,7 +190,8 @@ fun TrimStrip(clip: Segment, offsetMs: Long, frames: List<Bitmap>, positionMs: L
 }
 
 /**
- * The NLE timeline in output time: one track per layer (top of the stack first) above the clips.
+ * The NLE timeline in output time: one track per layer (top of the stack first) above the clips, one per song and
+ * voiceover under them (tap to select, drag the middle to move, the ends to trim).
  * Drag a track's ends to change when it shows, its middle to move it; long-press it and drag up or down to reorder;
  * the eye and lock at its left hide and lock it; tap a clip to pick it, drag the picked clip's ends to trim it,
  * long-press a clip and drag sideways to move it, + adds one; drag empty space, the ruler or the clips to scrub.
@@ -212,6 +217,9 @@ fun Timeline(
     onAddClip: () -> Unit,
     transitionAt: Int?,
     onTransition: (Int) -> Unit,
+    selectedAudio: AudioRef?,
+    onAudioSelect: (AudioRef) -> Unit,
+    onAudioPart: (AudioRef, AudioPart) -> Unit,
 ) {
     val total = clip.outputDurationMs.coerceAtLeast(1)
     val startDp = if (layers.isEmpty()) TIMELINE_PAD else TRACK_START
@@ -273,6 +281,16 @@ fun Timeline(
                     }
                 }
                 ClipRow(clip, frames, pickedClip, total, view, startDp, onSeek, onClipTap, onClipMove, onClipTrim, onAddClip, transitionAt, onTransition)
+                val voiceLabel = stringResource(R.string.voiceover)
+                clip.music.forEachIndexed { i, m ->
+                    val ref = AudioRef(voice = false, index = i)
+                    // Keyed, so a track's gestures never act on the part that took its place in the list.
+                    key(ref) { AudioTrack(m.part, m.name, R.drawable.ic_music_note, Ink.teal, null, ref == selectedAudio, total, view, start, width, onSeek, { onAudioSelect(ref) }) { onAudioPart(ref, it) } }
+                }
+                clip.voices.forEachIndexed { i, v ->
+                    val ref = AudioRef(voice = true, index = i)
+                    key(ref) { AudioTrack(v.part, voiceLabel, R.drawable.ic_mic, Ink.sky, v.durationMs, ref == selectedAudio, total, view, start, width, onSeek, { onAudioSelect(ref) }) { onAudioPart(ref, it) } }
+                }
             }
             Canvas(Modifier.matchParentSize()) {
                 val x = start + view.x(positionMs, width)
@@ -442,6 +460,100 @@ private fun Track(
         Row(Modifier.width(TRACK_HEADER)) {
             SmallIcon(if (layer.hidden) R.drawable.ic_visibility_off else R.drawable.ic_visibility, stringResource(if (layer.hidden) R.string.show else R.string.hide)) { onFlags(layer.id, !layer.hidden, layer.locked) }
             SmallIcon(if (layer.locked) R.drawable.ic_lock else R.drawable.ic_lock_open, stringResource(if (layer.locked) R.string.unlock else R.string.lock)) { onFlags(layer.id, layer.hidden, !layer.locked) }
+        }
+    }
+}
+
+/**
+ * A song's or voiceover's [part] as an outlined bar, so it reads as sound rather than a layer. Tapping it selects it;
+ * dragging its middle moves it, its ends trim it ([sourceMs] long, or null for a song, which loops). The drag draws in
+ * place and only the drop changes the project (one undo step, one new preview). Elsewhere a drag scrubs.
+ */
+@Composable
+private fun AudioTrack(
+    part: AudioPart,
+    label: String,
+    icon: Int,
+    color: Color,
+    sourceMs: Long?,
+    selected: Boolean,
+    total: Long,
+    view: TimelineViewport,
+    start: Float,
+    width: Float,
+    onSeek: (Long) -> Unit,
+    onSelect: () -> Unit,
+    onChange: (AudioPart) -> Unit,
+) {
+    val current by rememberUpdatedState(part)
+    // Reset by the new part, so the drop doesn't flicker.
+    var moving by remember(part) { mutableStateOf<AudioPart?>(null) }
+    val shown = moving ?: part
+    val density = LocalDensity.current
+    val far = with(density) { 8.dp.toPx() }
+    fun xOf(ms: Long) = (start + view.x(ms.coerceIn(0, total), width)).coerceIn(start - far, start + width + far)
+    val xs = xOf(shown.atMs)
+    val xe = xOf(shown.endMs(total))
+    Box(
+        Modifier.fillMaxWidth().height(AUDIO_TRACK_HEIGHT).pointerInput(total, view, start, width, sourceMs) {
+            awaitEachGesture {
+                val p = current
+                val x0 = start + view.x(p.atMs.coerceIn(0, total), width)
+                val x1 = maxOf(x0, start + view.x(p.endMs(total), width))
+                val grab = 20.dp.toPx()
+                val down = awaitFirstDown()
+                val edge = when (down.position.x) {
+                    in x0 - grab..x0 + grab / 2 -> AudioDrag.Start
+                    in x1 - grab / 2..x1 + grab -> AudioDrag.End
+                    in x0..x1 -> AudioDrag.Move
+                    else -> null
+                }
+                fun timeAt(x: Float) = view.time(x - start, width, total)
+                if (edge == null) {
+                    onSeek(timeAt(down.position.x))
+                    while (true) {
+                        val change = awaitPointerEvent().changes.first()
+                        if (!change.pressed || change.isConsumed) break
+                        onSeek(timeAt(change.position.x))
+                        change.consume()
+                    }
+                    return@awaitEachGesture
+                }
+                onSelect()
+                // Nothing is consumed until it moves sideways, so a vertical swipe scrolls the track list instead.
+                var change: PointerInputChange
+                do {
+                    change = awaitPointerEvent().changes.first()
+                    if (!change.pressed || change.isConsumed) return@awaitEachGesture
+                } while ((change.position - down.position).getDistance() <= viewConfiguration.touchSlop)
+                if (abs(change.position.y - down.position.y) > abs(change.position.x - down.position.x)) return@awaitEachGesture
+                while (change.pressed && !change.isConsumed) {
+                    moving = p.dragged(edge, ((change.position.x - down.position.x) / width * view.spanMs).toLong(), total, sourceMs)
+                    change.consume()
+                    change = awaitPointerEvent().changes.first()
+                }
+                // Consumed: a second finger took over to zoom, which cancels the drag.
+                val result = moving
+                if (result != null && !change.isConsumed && result != p) onChange(result) else moving = null
+            }
+        },
+    ) {
+        Box(
+            Modifier
+                .padding(vertical = 3.dp)
+                .offset { IntOffset(xs.roundToInt(), 0) }
+                .width(with(density) { (xe - xs).coerceAtLeast(1f).toDp() })
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(6.dp))
+                .background(color.copy(alpha = 0.22f))
+                .border(if (selected) 2.dp else 1.dp, if (selected) Color.White else color, RoundedCornerShape(6.dp)),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                KIcon(icon, Modifier.size(14.dp), color)
+                Spacer(Modifier.width(6.dp))
+                Text(label, color = color, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }
@@ -683,6 +795,7 @@ private val HANDLE = 10.dp
 /** Touch width of a cut's transition button; it draws at 70% of that. */
 private val CUT_BUTTON = 34.dp
 private val TRACK_HEIGHT = 40.dp
+private val AUDIO_TRACK_HEIGHT = 32.dp
 private val RULER_HEIGHT = 18.dp
 /** Hide and lock toggles, 40dp each. */
 private val TRACK_HEADER = 80.dp

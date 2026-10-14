@@ -60,19 +60,11 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-data class Music(
-    val uri: Uri,
-    val name: String,
-    val durationMs: Long,
-    val startMs: Long = 0,
-    val volume: Float = 1f,
-    /** Fades over [MUSIC_FADE_MS] at the start and before the end of the output. */
-    val fadeIn: Boolean = false,
-    val fadeOut: Boolean = false,
-)
+/** A song on its own track: [part] says where it plays. It loops from [startMs] into the song to the song's end. */
+data class Music(val uri: Uri, val name: String, val durationMs: Long, val startMs: Long = 0, val part: AudioPart = AudioPart())
 
-/** A voiceover recorded in the editor: an audio [file] in the project folder, playing from [startMs] of the output. */
-data class VoiceClip(val file: File, val startMs: Long, val durationMs: Long, val volume: Float = 1f)
+/** A voiceover recorded in the editor: an audio [file] in the project folder [durationMs] long, played as [part] says. */
+data class VoiceClip(val file: File, val durationMs: Long, val part: AudioPart)
 
 /**
  * One clip of the main track: [startMs]..[endMs] of its source (source time) played at [speed]. A photo ([isImage],
@@ -102,7 +94,8 @@ data class Segment(
 data class VideoClip(
     /** The main track, played end to end; never empty. */
     val segments: List<Segment>,
-    val music: Music? = null,
+    /** Songs, each a part on its own track (a split song is two). */
+    val music: List<Music> = emptyList(),
     /** The first clip's display size, set when the project is made; every clip is fitted into it. */
     val width: Int = 0,
     val height: Int = 0,
@@ -215,9 +208,9 @@ fun VideoClip.composition(layers: List<Layer> = emptyList(), shortSide: Int? = n
     // The clips set the output's frame times only when they are sequence 0; with a frame clock its rate already holds.
     sequences += mainSequence(played, spans, dropFrames && sequences.isEmpty())
     if (blurred) sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItems(played.map { blurredBackground(it) }).build()
-    music?.let { sequences += it.sequences(outputDurationMs) }
     // Audio only, after every video sequence, so the compositor's input numbers above stay as they are.
-    sequences += voices.mapNotNull { it.sequence(outputDurationMs) }
+    sequences += music.flatMap { audioSequences(it.uri, it.startMs, it.durationMs, it.part, outputDurationMs) }
+    sequences += voices.flatMap { audioSequences(Uri.fromFile(it.file), 0, it.durationMs, it.part, outputDurationMs) }
     return Composition.Builder(sequences)
         // Downscale after the overlay: the layers are rendered at full canvas size and must line up first.
         .setEffects(
@@ -337,45 +330,35 @@ private const val BLUR_SIGMA = 16f
 private const val BLANK_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAC0lEQVR4nGNgQAcAABIAAXfx+gAAAAAASUVORK5CYII="
 
 /**
- * The song repeated or cut to [totalMs], one item per repeat. Not a looping sequence: that restarts its item's clock on
- * every repeat, and the fades need to know where in the output each repeat plays.
+ * Audio [part] of a source [durationMs] long that loops from [loopFromMs] to its end, cut at [totalMs]: one sequence per
+ * repeat, a gap until it plays, that stretch of the source, then a gap to [totalMs]. Not a looping sequence: that restarts
+ * its item's clock on every repeat, and the fades need to know where in the output each repeat plays.
  */
-private fun Music.sequences(totalMs: Long): List<EditedMediaItemSequence> {
-    val loopMs = durationMs - startMs
-    return loopSpans(loopMs, totalMs).map { (from, to) ->
-        val gain = DefaultGainProvider.Builder(volume)
-        fadeWindows(from, to, totalMs, fadeIn, fadeOut).forEach { (start, end) ->
+private fun audioSequences(uri: Uri, loopFromMs: Long, durationMs: Long, part: AudioPart, totalMs: Long): List<EditedMediaItemSequence> {
+    val from = part.atMs
+    val to = part.endMs(totalMs)
+    val loopMs = durationMs - loopFromMs
+    return repeats(from, to, part.offsetMs, loopMs).map { r ->
+        val gain = DefaultGainProvider.Builder(part.volume)
+        fadeWindows(r.fromMs, r.toMs, from, to, part.fadeInMs, part.fadeOutMs).forEach { (start, end) ->
             // The provider gets sample counts into the window, and inside it its gain replaces the default, so volume goes in here.
             gain.addFadeAt(start * 1000, (end - start) * 1000) { samples, ofSamples ->
-                volume * fadeGain(from + start + (end - start) * samples / ofSamples, totalMs, fadeIn, fadeOut)
+                part.volume * fadeGain(r.fromMs + start + (end - start) * samples / ofSamples, from, to, part.fadeInMs, part.fadeOutMs)
             }
         }
-        val item = EditedMediaItem.Builder(clipped(uri, startMs, if (to - from < loopMs) startMs + to - from else C.TIME_END_OF_SOURCE))
+        val sourceFrom = loopFromMs + r.loopMs
+        // A repeat to the loop's end runs to the source's own end, which can be a little off its reported length.
+        val sourceTo = if (r.loopMs + r.toMs - r.fromMs < loopMs) sourceFrom + r.toMs - r.fromMs else C.TIME_END_OF_SOURCE
+        val item = EditedMediaItem.Builder(clipped(uri, sourceFrom, sourceTo))
             .setDurationUs(durationMs * 1000)
             .setEffects(Effects(listOf(GainProcessor(gain.build())), emptyList()))
             .build()
         EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO))
-            .apply { if (from > 0) addGap(from * 1000) }
+            .apply { if (r.fromMs > 0) addGap(r.fromMs * 1000) }
             .addItem(item)
-            .apply { if (totalMs > to) addGap((totalMs - to) * 1000) }
+            .apply { if (totalMs > r.toMs) addGap((totalMs - r.toMs) * 1000) }
             .build()
     }
-}
-
-/** Audio only: a gap until the voice starts, the recording (cut at [totalMs]), then a gap to [totalMs]. */
-private fun VoiceClip.sequence(totalMs: Long): EditedMediaItemSequence? {
-    val end = minOf(startMs + durationMs, totalMs)
-    // After a trim or a speed change the output can end before the voice starts.
-    if (end <= startMs) return null
-    val item = EditedMediaItem.Builder(clipped(Uri.fromFile(file), 0, end - startMs))
-        .setDurationUs(durationMs * 1000)
-        .setEffects(Effects(listOf(gain(volume)), emptyList()))
-        .build()
-    return EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO))
-        .apply { if (startMs > 0) addGap(startMs * 1000) }
-        .addItem(item)
-        .apply { if (totalMs > end) addGap((totalMs - end) * 1000) }
-        .build()
 }
 
 /** One overlay's sequence: a gap until it starts, its clip from [VideoLayer.clipStartMs], then a gap to [totalMs]. */

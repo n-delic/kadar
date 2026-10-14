@@ -91,7 +91,7 @@ private fun distanceToSegment(px: Float, py: Float, ax: Float, ay: Float, bx: Fl
 /** This layer's strokes in canvas pixels (moved, scaled, turned and flipped like the layer), the inverse of [withStrokes]. */
 fun DrawLayer.canvasStrokes(): List<PenStroke> = strokes.map { s ->
     val p = s.points
-    val fx = if (t.flipX) -t.scale else t.scale
+    val fx = if (t.flipX) -t.scaleX else t.scaleX
     val fy = if (t.flipY) -t.scale else t.scale
     PenStroke(s.color, s.width * t.scale, FloatArray(p.size).also { out ->
         for (i in 0 until p.size / 2) {
@@ -118,7 +118,7 @@ fun DrawLayer.withStrokes(strokes: List<PenStroke>): DrawLayer {
         PenStroke(stroke.color, stroke.width / t.scale, FloatArray(p.size) { i ->
             val dx = p[i - i % 2] - t.x
             val dy = p[i - i % 2 + 1] - t.y
-            (if (i % 2 == 0) (dx * c - dy * s) * fx else (dx * s + dy * c) * fy) / t.scale
+            if (i % 2 == 0) (dx * c - dy * s) * fx / t.scaleX else (dx * s + dy * c) * fy / t.scale
         })
     }
     val all = this.strokes + local

@@ -140,7 +140,7 @@ fun Canvas.drawLayer(layer: Layer, m: Motion, canvasHeight: Int) {
     val y = layer.t.y + m.dy * canvasHeight
     // A fade goes through one offscreen layer, so an outline doesn't show through its fill. Its bounds cover any
     // rotation, with room for a text shadow.
-    val r = layer.reach * layer.t.scale * m.scale * 1.2f
+    val r = layer.reach * maxOf(layer.t.scale, layer.t.scaleX) * m.scale * 1.2f
     val count = if (m.alpha < 1f) saveLayerAlpha(x - r, y - r, x + r, y + r, (m.alpha * 255).roundToInt()) else save()
     translate(x, y)
     rotate(m.rotation)

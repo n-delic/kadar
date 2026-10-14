@@ -78,6 +78,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.keepScreenOn
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -141,6 +142,7 @@ import com.ndelic.kadar.model.backdrop
 import com.ndelic.kadar.model.blurBase
 import com.ndelic.kadar.model.defaultTextSize
 import com.ndelic.kadar.model.drawLayer
+import com.ndelic.kadar.model.hasSideHandles
 import com.ndelic.kadar.model.motionAt
 import com.ndelic.kadar.ui.common.CircleButton
 import com.ndelic.kadar.ui.common.ColorRow
@@ -704,7 +706,10 @@ private fun ToolDivider() {
     Box(Modifier.padding(horizontal = 4.dp).size(width = 1.dp, height = 32.dp).background(Ink.line))
 }
 
-private enum class Handle { Delete, Scale, Tail, WrapLeft, WrapRight }
+/** [side] (-1 or 1) and [vertical] place the side handles: left, right, top and bottom. */
+private enum class Handle(val side: Float = 0f, val vertical: Boolean = false) {
+    Delete, Scale, Tail, Left(-1f), Right(1f), Top(-1f, vertical = true), Bottom(1f, vertical = true),
+}
 
 /** Which snaps are active during a drag: drives the guide lines and a tick of haptic feedback when one engages. */
 private class Snaps(private val haptics: HapticFeedback) {
@@ -930,14 +935,14 @@ private fun Stage(
                                         first = false
                                         change.consume()
                                     }
-                                } else if (sel is TextLayer && (handle == Handle.WrapLeft || handle == Handle.WrapRight)) {
-                                    val side = if (handle == Handle.WrapRight) 1f else -1f
-                                    fun localX(at: Offset) = sel.t.toLocal(at.x / scale, at.y / scale).first
+                                } else if (handle.side != 0f) {
+                                    // Along the layer's own axis, so a turned layer stretches the way its box points.
+                                    fun local(at: Offset) = sel.t.toLocal(at.x / scale, at.y / scale).let { if (handle.vertical) it.second else it.first }
                                     var first = true
                                     while (true) {
                                         val change = awaitPointerEvent().changes.first()
                                         if (!change.pressed) break
-                                        vm.dragWrap(sel, side, localX(change.position) - localX(down.position), first)
+                                        vm.dragSide(sel, handle.vertical, handle.side, local(change.position) - local(down.position), first)
                                         first = false
                                         change.consume()
                                     }
@@ -1029,7 +1034,7 @@ private fun Stage(
                 HandleDot(R.drawable.ic_close, cornerOf(l, -1f, scale), Color(0xFFFF3B5C))
                 HandleDot(R.drawable.ic_open_in_full, cornerOf(l, 1f, scale), Ink.accent)
                 tailOf(l, scale)?.let { HandleDot(R.drawable.ic_chat_bubble, it, Color.White) }
-                if (l is TextLayer) for (side in listOf(-1f, 1f)) HandleDot(R.drawable.ic_arrow_range, sideOf(l, side, scale), Color.White)
+                for (h in SIDES) if (l.hasSideHandles(h.vertical)) HandleDot(R.drawable.ic_arrow_range, sideOf(l, h, scale), Color.White, turned = h.vertical)
             }
         }
         if (picking != null) {
@@ -1074,23 +1079,28 @@ private fun tailOf(layer: Layer, scale: Float): Offset? = (layer as? TextLayer)?
     Offset(t.x * scale, t.y * scale)
 }
 
-/** Screen position of the middle of the layer's left ([side] = -1) or right (+1) edge. */
-private fun sideOf(layer: Layer, side: Float, scale: Float): Offset {
-    val t = layer.t.shiftedLocal(side * layer.width / 2, 0f)
+private val SIDES = listOf(Handle.Left, Handle.Right, Handle.Top, Handle.Bottom)
+
+/** Screen position of the middle of the layer's edge that side handle [h] sits on. */
+private fun sideOf(layer: Layer, h: Handle, scale: Float): Offset {
+    val t = layer.t.shiftedLocal(if (h.vertical) 0f else h.side * layer.width / 2, if (h.vertical) h.side * layer.height / 2 else 0f)
     return Offset(t.x * scale, t.y * scale)
 }
 
 /** The handle nearest to [point] within [radius]: on a one-line caption the side handles sit close to the corners. */
-private fun handleAt(layer: Layer, point: Offset, scale: Float, radius: Float): Handle? = listOfNotNull(
-    tailOf(layer, scale)?.let { Handle.Tail to it },
-    Handle.Delete to cornerOf(layer, -1f, scale),
-    Handle.Scale to cornerOf(layer, 1f, scale),
-    (Handle.WrapLeft to sideOf(layer, -1f, scale)).takeIf { layer is TextLayer },
-    (Handle.WrapRight to sideOf(layer, 1f, scale)).takeIf { layer is TextLayer },
-).map { (h, at) -> h to (point - at).getDistance() }.filter { it.second < radius }.minByOrNull { it.second }?.first
+private fun handleAt(layer: Layer, point: Offset, scale: Float, radius: Float): Handle? {
+    val sides = SIDES.filter { layer.hasSideHandles(it.vertical) }.map { it to sideOf(layer, it, scale) }
+    return (
+        listOfNotNull(
+            tailOf(layer, scale)?.let { Handle.Tail to it },
+            Handle.Delete to cornerOf(layer, -1f, scale),
+            Handle.Scale to cornerOf(layer, 1f, scale),
+        ) + sides
+    ).map { (h, at) -> h to (point - at).getDistance() }.filter { it.second < radius }.minByOrNull { it.second }?.first
+}
 
 @Composable
-private fun HandleDot(icon: Int, at: Offset, background: Color) {
+private fun HandleDot(icon: Int, at: Offset, background: Color, turned: Boolean = false) {
     val half = with(LocalDensity.current) { 14.dp.roundToPx() }
     Box(
         Modifier
@@ -1104,7 +1114,7 @@ private fun HandleDot(icon: Int, at: Offset, background: Color) {
             .border(1.5.dp, Color.Black.copy(alpha = 0.35f), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        KIcon(icon, Modifier.size(16.dp), if (background == Ink.accent || background == Color.White) Ink.onAccent else Color.White)
+        KIcon(icon, Modifier.size(16.dp).rotate(if (turned) 90f else 0f), if (background == Ink.accent || background == Color.White) Ink.onAccent else Color.White)
     }
 }
 
@@ -1139,12 +1149,13 @@ private fun android.graphics.Canvas.drawSelection(layer: Layer, viewScale: Float
     save()
     translate(layer.t.x, layer.t.y)
     rotate(layer.t.rotation)
-    scale(layer.t.scale, layer.t.scale)
-    val px = 1f / (viewScale * layer.t.scale)
-    selectionShadow.strokeWidth = 5 * px
-    selectionLine.strokeWidth = 2 * px
-    drawRect(-layer.width / 2, -layer.height / 2, layer.width / 2, layer.height / 2, selectionShadow)
-    drawRect(-layer.width / 2, -layer.height / 2, layer.width / 2, layer.height / 2, selectionLine)
+    // Unscaled, so a stretched layer's line is as thick on every side.
+    val w = layer.width * layer.t.scaleX / 2
+    val h = layer.height * layer.t.scale / 2
+    selectionShadow.strokeWidth = 5 / viewScale
+    selectionLine.strokeWidth = 2 / viewScale
+    drawRect(-w, -h, w, h, selectionShadow)
+    drawRect(-w, -h, w, h, selectionLine)
     restore()
 }
 

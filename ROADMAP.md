@@ -119,7 +119,7 @@ Feature parity with the big phone editors, built from how their features behave,
 - [x] Video layers: filter and adjust, like the main clips
 - [x] Adjust: warmth, tint, hue and fade (color matrices, so video still matches photos)
 - [ ] Adjust: vignette and grain (need shaders)
-- [ ] Export: frame rate (24 to 60), GIF, and the estimated file size shown before export; JPG or PNG chosen at save time for photos
+- [x] Export: frame rate (24 to 60), GIF, and the estimated file size shown before export; JPG or PNG chosen at save time for photos
 - [x] Hold to compare with the original while adjusting
 
 ### Video

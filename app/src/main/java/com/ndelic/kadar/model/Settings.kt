@@ -28,11 +28,18 @@ enum class ExportQuality(@StringRes val label: Int) {
     High(R.string.quality_high),
 }
 
+/** A photo export's file type, picked when saving and remembered; a transparent canvas is always PNG. */
+enum class PhotoFormat(@StringRes val label: Int, val mime: String) {
+    Jpg(R.string.format_jpg, "image/jpeg"),
+    Png(R.string.format_png, "image/png"),
+}
+
 data class AppSettings(
     val search: SearchEngine = SearchEngine.Google,
     val exportSize: ExportSize = ExportSize.Original,
     val exportQuality: ExportQuality = ExportQuality.Standard,
     val projectSort: ProjectSort = ProjectSort.Recent,
+    val photoFormat: PhotoFormat = PhotoFormat.Jpg,
 )
 
 /** App-wide preferences in SharedPreferences; a handful of values read once at start. */
@@ -44,6 +51,7 @@ class SettingsStore(context: Context) {
         exportSize = enumOr(prefs.getString(EXPORT_SIZE, null), ExportSize.Original),
         exportQuality = enumOr(prefs.getString(EXPORT_QUALITY, null), ExportQuality.Standard),
         projectSort = enumOr(prefs.getString(PROJECT_SORT, null), ProjectSort.Recent),
+        photoFormat = enumOr(prefs.getString(PHOTO_FORMAT, null), PhotoFormat.Jpg),
     )
 
     fun save(s: AppSettings) = prefs.edit()
@@ -51,6 +59,7 @@ class SettingsStore(context: Context) {
         .putString(EXPORT_SIZE, s.exportSize.name)
         .putString(EXPORT_QUALITY, s.exportQuality.name)
         .putString(PROJECT_SORT, s.projectSort.name)
+        .putString(PHOTO_FORMAT, s.photoFormat.name)
         .apply()
 
     private companion object {
@@ -58,6 +67,7 @@ class SettingsStore(context: Context) {
         const val EXPORT_SIZE = "exportSize"
         const val EXPORT_QUALITY = "exportQuality"
         const val PROJECT_SORT = "projectSort"
+        const val PHOTO_FORMAT = "photoFormat"
     }
 }
 

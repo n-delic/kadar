@@ -42,6 +42,7 @@ import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
 import com.ndelic.kadar.media.await
 import com.ndelic.kadar.model.Adjust
+import com.ndelic.kadar.model.ExportQuality
 import com.ndelic.kadar.model.Layer
 import com.ndelic.kadar.model.Loop
 import com.ndelic.kadar.model.Steady
@@ -143,6 +144,9 @@ data class VideoClip(
 
     /** Whether the composition gets the blurred copy as a second sequence (the export only; the preview draws it with BlurBackgroundPreview). */
     val blurred get() = blur && canvas != null
+
+    /** Whether the output has sound: from a clip, the music or a voiceover. */
+    val hasSound get() = hasSound(segments) || music != null || voices.isNotEmpty()
 }
 
 /**
@@ -174,9 +178,16 @@ private const val BLUR_LONG_SIDE = 320
  * timestamps (after trim and speed) like the layers, and those under a video layer are drawn into a sequence of their
  * own. [incoming] adds the heads of overlapping transitions as a sequence over the clips (the preview leaves it out and
  * draws them itself, with IncomingClipPreview). [dropFrames] keeps sped-up clips at the clip's frame rate when they set
- * the output's frame times (the preview turns it off). Call it on the main thread, like [timedOverlay].
+ * the output's frame times (the preview turns it off). [frameClock] times the output by the frame clock at [VideoClip.frameRate]
+ * even without video layers or transitions, for an export at a chosen frame rate. Call it on the main thread, like [timedOverlay].
  */
-fun VideoClip.composition(layers: List<Layer> = emptyList(), shortSide: Int? = null, incoming: Boolean = true, dropFrames: Boolean = true): Composition {
+fun VideoClip.composition(
+    layers: List<Layer> = emptyList(),
+    shortSide: Int? = null,
+    incoming: Boolean = true,
+    dropFrames: Boolean = true,
+    frameClock: Boolean = false,
+): Composition {
     // Media3's compositor takes every output frame time from sequence 0 and draws it on top, then the others in order.
     // So sequence 0 is an invisible frame clock at the clip's rate, then the overlays (topmost layer first), each padded
     // with gaps to the output's full length and followed by the layers drawn right under it, then the heads of
@@ -192,7 +203,8 @@ fun VideoClip.composition(layers: List<Layer> = emptyList(), shortSide: Int? = n
     // Compositor inputs after sequence 0, topmost first: how each is placed at an output time (us).
     val inputs = mutableListOf<(Long) -> OverlaySettings>()
     val sequences = mutableListOf<EditedMediaItemSequence>()
-    if (videos.isNotEmpty() || overlapping != null) sequences += blankStill()
+    val clocked = frameClock || videos.isNotEmpty() || overlapping != null
+    if (clocked) sequences += blankStill()
     videos.indices.reversed().forEach { i ->
         val span = videos[i].span()!!
         inputs += layerSettings(videos[i], span)
@@ -231,7 +243,7 @@ fun VideoClip.composition(layers: List<Layer> = emptyList(), shortSide: Int? = n
         )
         // HDR phone footage turns washed out on most apps once posted; memes go out as plain SDR.
         .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
-        .apply { if (videos.isNotEmpty() || overlapping != null) setVideoCompositorSettings(overlaySettings(inputs)) }
+        .apply { if (clocked) setVideoCompositorSettings(overlaySettings(inputs)) }
         .build()
 }
 
@@ -562,14 +574,35 @@ suspend fun exportVideo(context: Context, composition: Composition, out: File, b
  * per pixel per frame, twice Media3's default and about what a phone camera records 1080p at, capped at 50 Mbps.
  * The encoder clamps it further to what it supports.
  */
-fun highBitrate(width: Int, height: Int, shortSide: Int?, frameRate: Float): Int {
+fun highBitrate(width: Int, height: Int, shortSide: Int?, frameRate: Float) =
+    minOf(bitrate(width, height, shortSide, frameRate, HIGH_BITS_PER_PIXEL), MAX_BITRATE).toInt()
+
+/** Media3's own bitrate for a Standard export (DefaultEncoderFactory's suggestion), sized like [highBitrate]. */
+fun standardBitrate(width: Int, height: Int, shortSide: Int?, frameRate: Float) =
+    bitrate(width, height, shortSide, frameRate, STANDARD_BITS_PER_PIXEL).toInt()
+
+private fun bitrate(width: Int, height: Int, shortSide: Int?, frameRate: Float, bitsPerPixel: Float): Float {
     val scale = shortSide?.let { minOf(1f, it / minOf(width, height).toFloat()) } ?: 1f
-    val bits = width * scale * height * scale * outputFrameRate(frameRate) * HIGH_BITS_PER_PIXEL
-    return minOf(bits, MAX_BITRATE).toInt()
+    return width * scale * height * scale * outputFrameRate(frameRate) * bitsPerPixel
 }
 
+/**
+ * Roughly how many bytes a [durationMs] long MP4 at [videoBitrate] (bits per second) takes, with Media3's AAC sound
+ * if [sound]. Encoders undershoot on still or simple pictures, so it's an upper estimate.
+ */
+fun estimatedBytes(durationMs: Long, videoBitrate: Int, sound: Boolean) = durationMs * (videoBitrate + if (sound) AAC_BITRATE else 0) / 8000
+
+/** [estimatedBytes] of this video exported at [fps] and [quality], downscaled to [shortSide] (null keeps it). */
+fun VideoClip.estimatedSize(shortSide: Int?, fps: Int, quality: ExportQuality): Long {
+    val (w, h) = outputSize
+    val bitrate = if (quality == ExportQuality.High) highBitrate(w, h, shortSide, fps.toFloat()) else standardBitrate(w, h, shortSide, fps.toFloat())
+    return estimatedBytes(outputDurationMs, bitrate, hasSound)
+}
+
+private const val STANDARD_BITS_PER_PIXEL = 0.14f
 private const val HIGH_BITS_PER_PIXEL = 0.28f
 private const val MAX_BITRATE = 50_000_000f
+private const val AAC_BITRATE = 131_072
 
 /** Clip [s]'s look, then [transition] effects, then its fit into the canvas. */
 private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyList()): List<Effect> = buildList {

@@ -2,6 +2,7 @@ package com.ndelic.kadar.model
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import kotlin.math.max
@@ -37,6 +38,9 @@ fun Project.backdrop(): Bitmap? {
 
 /** The picture a blurred photo canvas blurs: its bottom visible image layer; null when there's no blur to draw. */
 fun Project.blurBase(): ImageLayer? = if (!blur || video != null) null else layers.firstOrNull { it is ImageLayer && !it.hidden } as? ImageLayer
+
+/** Whether a photo exports with see-through parts (a transparent background, no blurred canvas), so only as a PNG. */
+val Project.transparent get() = background == Color.TRANSPARENT && blurBase() == null
 
 /**
  * Blurs ARGB [pixels] in place: three box passes each way, about a Gaussian of sigma 1.1 × [radius]. Colors are weighted

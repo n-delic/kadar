@@ -755,7 +755,7 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
                 if (transparent) Checkerboard()
                 // Rebuilt only when its picture or the canvas changes, not on every drag.
                 val base = project.blurBase()
-                val backdrop = remember(base?.bitmap, base?.adjust, project.width, project.height) { project.backdrop()?.asImageBitmap() }
+                val backdrop = remember(base?.bitmap, base?.adjust, base?.t?.flipX, base?.t?.flipY, project.width, project.height) { project.backdrop()?.asImageBitmap() }
                 backdrop?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds) }
                 project.video?.takeIf { it.blurred }?.let { BlurBackgroundPreview(it, stills, project.width, project.height, scale, player) }
                 player?.let { p ->

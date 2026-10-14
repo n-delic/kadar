@@ -24,7 +24,8 @@ fun Project.backdrop(): Bitmap? {
     Canvas(out).apply {
         val cover = max(w / base.bitmap.width.toFloat(), h / base.bitmap.height.toFloat())
         translate(w / 2f, h / 2f)
-        scale(cover, cover)
+        // Mirrored like the picture on the canvas.
+        scale(if (base.t.flipX) -cover else cover, if (base.t.flipY) -cover else cover)
         drawBitmap(base.bitmap, -base.bitmap.width / 2f, -base.bitmap.height / 2f, Paint(Paint.FILTER_BITMAP_FLAG).apply { colorFilter = ColorMatrixColorFilter(m) })
     }
     val pixels = IntArray(w * h)

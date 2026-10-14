@@ -45,7 +45,9 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.ndelic.kadar.model.filterMatrix
+import com.ndelic.kadar.video.PREVIEW_TAIL_MS
 import com.ndelic.kadar.video.TransitionSpan
+import com.ndelic.kadar.video.headTailsMs
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.incomingAlpha
 import com.ndelic.kadar.video.incomingOffset
@@ -65,6 +67,9 @@ import kotlinx.coroutines.delay
 fun IncomingClipPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canvasWidth: Int, canvasHeight: Int, scale: Float, main: Player?, clock: LongState) {
     val context = LocalContext.current
     val spans = remember(clip) { clip.transitionSpans.filter { it.kind.overlaps } }
+    // Each head stays on top, at its final look, a little past its cut, until the main preview shows the next clip.
+    val tails = remember(spans) { headTailsMs(spans, PREVIEW_TAIL_MS) }
+    fun TransitionSpan.shownAt(ms: Long) = ms >= startMs && ms < endMs + tails[spans.indexOf(this)]
     // One playlist item per video clip, whole rather than trimmed, so positions are source time like the trims.
     val sources = clip.segments.filter { !it.isImage }.map { it.uri }
     val player = remember(sources) {
@@ -79,6 +84,7 @@ fun IncomingClipPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canvasW
     var span by remember { mutableStateOf<TransitionSpan?>(null) }
     val current by rememberUpdatedState(clip)
     val currentSpans by rememberUpdatedState(spans)
+    val currentTails by rememberUpdatedState(tails)
     LaunchedEffect(player, main) {
         if (main == null) return@LaunchedEffect
         var lastSeek = 0L
@@ -86,14 +92,15 @@ fun IncomingClipPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canvasW
             val c = current
             val t = main.currentPosition
             // Waiting at the next one's start, so it plays in step as soon as it comes up.
-            val next = currentSpans.firstOrNull { t < it.endMs }
+            val next = currentSpans.withIndex().firstOrNull { (k, it) -> t < it.endMs + currentTails[k] }?.value
             span = next
             if (next != null) {
                 val s = c.segments[next.clip]
                 val inside = t >= next.startMs
                 val play = inside && main.isPlaying && !s.isImage
                 player.playWhenReady = play
-                player.volume = if (inside) s.volume else 0f
+                // Muted on its tail past the cut, where the main preview plays the same clip's sound, like the export's head.
+                player.volume = if (t in next) s.volume else 0f
                 if (!s.isImage) {
                     val params = PlaybackParameters(s.speed, if (s.keepPitch) 1f else s.speed)
                     if (player.playbackParameters != params) player.playbackParameters = params
@@ -128,7 +135,7 @@ fun IncomingClipPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canvasW
             val t = clock.longValue
             val p = shown.progress(t)
             val (x, y) = shown.kind.incomingOffset(p)
-            alpha = if (t in shown) shown.kind.incomingAlpha(p) else 0f
+            alpha = if (shown.shownAt(t)) shown.kind.incomingAlpha(p) else 0f
             translationX = x * size.width
             translationY = y * size.height
             shape = shown.kind.wipeRect(p)?.let(::FractionShape) ?: RectangleShape

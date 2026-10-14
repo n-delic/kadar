@@ -77,12 +77,13 @@ fun transitionSpans(lengthsMs: List<Long>, transitions: List<Transition>): List<
 }
 
 /**
- * How long each head of the overlapping [spans] plays on past its cut, at its final place: [HEAD_TAIL_MS], or until
- * the next one starts. Media3's compositor pairs every output frame with the nearest frame of each input, which for
- * the frame just before a cut can be the first of the gap after a head, and that frame is hidden.
+ * How long each head of the overlapping [spans] plays on past its cut, at its final place: [tailMs], or until the next
+ * one starts. Media3's compositor pairs every output frame with the nearest frame of each input, which for the frame
+ * just before a cut can be the first of the gap after a head, and that frame is hidden. The preview's tail is longer
+ * ([PREVIEW_TAIL_MS]): its main player shows the clip before for a frame or two after switching clips.
  */
-fun headTailsMs(spans: List<TransitionSpan>) =
-    spans.mapIndexed { k, s -> minOf(HEAD_TAIL_MS, (spans.getOrNull(k + 1)?.startMs ?: Long.MAX_VALUE) - s.endMs) }
+fun headTailsMs(spans: List<TransitionSpan>, tailMs: Long = HEAD_TAIL_MS) =
+    spans.mapIndexed { k, s -> minOf(tailMs, (spans.getOrNull(k + 1)?.startMs ?: Long.MAX_VALUE) - s.endMs) }
 
 /** How far into the cut a centered transition is at [p] (0 to 1 through it): 0 at its ends, 1 at the cut. */
 fun dipAt(p: Float) = 1 - abs(1 - 2 * p)
@@ -114,3 +115,4 @@ const val DEFAULT_TRANSITION_MS = 500L
 const val MIN_TRANSITION_MS = 100L
 /** At least one frame of a clip down to 20 fps. */
 const val HEAD_TAIL_MS = 50L
+const val PREVIEW_TAIL_MS = 250L

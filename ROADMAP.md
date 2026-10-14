@@ -126,6 +126,7 @@ Feature parity with the big phone editors, built from how their features behave,
 ### Urgent
 
 - [ ] Effects show instantly: changing a filter, an adjust slider, speed, volume or a transition shows in the video preview right away, without the second-long reload. Today every change rebuilds the preview's composition and reloads its player. Idea: show looks and adjustments on the preview view itself while changing them (as video layers already do with their view's color filter) and rebuild only when the change is done; measure which other edits need a reload at all
+- [ ] Cropping the photo a project was opened with makes the canvas the cropped size (and shape), so there are no empty bars around it; other layers keep their place on the picture. Only that first photo does this: cropping any other image layer leaves the canvas alone. Undo brings the old canvas back
 
 ### Existing tools that do less than the big editors
 

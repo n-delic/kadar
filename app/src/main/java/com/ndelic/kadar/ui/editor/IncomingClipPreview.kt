@@ -47,6 +47,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.ndelic.kadar.model.filterMatrix
 import com.ndelic.kadar.video.PREVIEW_TAIL_MS
 import com.ndelic.kadar.video.TransitionSpan
+import com.ndelic.kadar.video.crossfadeGain
 import com.ndelic.kadar.video.headTailsMs
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.incomingAlpha
@@ -99,8 +100,9 @@ fun IncomingClipPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canvasW
                 val inside = t >= next.startMs
                 val play = inside && main.isPlaying && !s.isImage
                 player.playWhenReady = play
-                // Muted on its tail past the cut, where the main preview plays the same clip's sound, like the export's head.
-                player.volume = if (t in next) s.volume else 0f
+                // Crossfaded in (the main preview's composition fades the clip before out), then muted on its tail past the
+                // cut, where the main preview plays the same clip's sound, like the export's head.
+                player.volume = if (t in next) s.volume * crossfadeGain(next.progress(t)) else 0f
                 if (!s.isImage) {
                     val params = PlaybackParameters(s.speed, if (s.keepPitch) 1f else s.speed)
                     if (player.playbackParameters != params) player.playbackParameters = params

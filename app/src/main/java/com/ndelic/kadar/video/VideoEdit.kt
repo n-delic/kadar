@@ -272,7 +272,10 @@ private fun VideoClip.mainSequence(played: List<Segment>, spans: List<Transition
         val effects = drop + dipEffects(dips.filter { it.clip == i || it.clip == i + 1 }, s.width, s.height)
         // A preview copy is smaller than its source, so it is always fitted into the frame.
         val copy = copies[s.uri]
-        segmentItem(s.copy(uri = copy ?: s.uri), Effects(audioEffects(s, sound), videoEffects(s, effects, fit = copy != null)), removeAudio = !sound)
+        // Fades out under the head of an overlapping transition into the next clip, which fades in (incomingSequence).
+        val out = spans.firstOrNull { it.kind.overlaps && it.clip == i + 1 }?.let { it.endMs - it.startMs } ?: 0
+        val audio = audioEffects(s, sound, fadeOutUs = out * 1000)
+        segmentItem(s.copy(uri = copy ?: s.uri), Effects(audio, videoEffects(s, effects, fit = copy != null)), removeAudio = !sound)
     }
     return EditedMediaItemSequence.Builder(tracks(sound)).addItems(items).build()
 }
@@ -292,7 +295,8 @@ private fun VideoClip.incomingSequence(spans: List<TransitionSpan>, tails: List<
         if (span.startMs > at) builder.addGap((span.startMs - at) * 1000)
         at = maxOf(at, span.startMs) + s.outputDurationMs
         val wipe = listOfNotNull(WipeMask(span, fps).takeIf { span.kind.wipes })
-        builder.addItem(segmentItem(s, Effects(audioEffects(s, sound, mutedFromUs = (span.endMs - span.startMs) * 1000), videoEffects(s) + wipe), removeAudio = !sound))
+        val spanUs = (span.endMs - span.startMs) * 1000
+        builder.addItem(segmentItem(s, Effects(audioEffects(s, sound, mutedFromUs = spanUs, fadeInUs = spanUs), videoEffects(s) + wipe), removeAudio = !sound))
     }
     if (outputDurationMs > at) builder.addGap((outputDurationMs - at) * 1000)
     return builder.build()
@@ -302,9 +306,13 @@ private fun hasSound(clips: List<Segment>) = clips.any { !it.isImage && it.volum
 
 private fun tracks(sound: Boolean) = if (sound) setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO) else setOf(C.TRACK_TYPE_VIDEO)
 
-/** Clip [s]'s volume and pitch fix; silent from [mutedFromUs] into it, if given. */
-private fun audioEffects(s: Segment, sound: Boolean, mutedFromUs: Long? = null) =
-    if (sound && !s.isImage) listOfNotNull(gain(s.volume, mutedFromUs), pitchFix(s.speed).takeIf { s.keepPitch && s.speed != 1f }) else emptyList()
+/** Clip [s]'s volume and pitch fix; crossfaded in over its first [fadeInUs] and out over its last [fadeOutUs], silent from [mutedFromUs] into it, if given. */
+private fun audioEffects(s: Segment, sound: Boolean, mutedFromUs: Long? = null, fadeInUs: Long = 0, fadeOutUs: Long = 0) =
+    if (sound && !s.isImage) {
+        listOfNotNull(gain(s.volume, mutedFromUs, fadeInUs, fadeOutUs, s.outputDurationMs * 1000), pitchFix(s.speed).takeIf { s.keepPitch && s.speed != 1f })
+    } else {
+        emptyList()
+    }
 
 /** Clip [s] as a sequence item: its trimmed source at its speed, or a photo shown for its length at the clip's frame rate. */
 private fun VideoClip.segmentItem(s: Segment, effects: Effects, removeAudio: Boolean): EditedMediaItem {
@@ -636,9 +644,16 @@ private fun clipped(uri: Uri, startMs: Long, endMs: Long) = MediaItem.Builder()
     .setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setStartPositionMs(startMs).setEndPositionMs(endMs).build())
     .build()
 
-private fun gain(volume: Float, mutedFromUs: Long? = null) =
-    // A minute is past the end of anything muted this way (a head's tail).
-    GainProcessor(DefaultGainProvider.Builder(volume).apply { mutedFromUs?.let { addFadeAt(it, 60_000_000) { _, _ -> 0f } } }.build())
+private fun gain(volume: Float, mutedFromUs: Long? = null, fadeInUs: Long = 0, fadeOutUs: Long = 0, lengthUs: Long = 0) =
+    GainProcessor(
+        DefaultGainProvider.Builder(volume).apply {
+            // Inside a fade its gain replaces the default, so volume goes in here.
+            if (fadeInUs > 0) addFadeAt(0, fadeInUs) { n, of -> volume * crossfadeGain(n.toFloat() / of) }
+            if (fadeOutUs > 0) addFadeAt(lengthUs - fadeOutUs, fadeOutUs) { n, of -> volume * crossfadeGain(1 - n.toFloat() / of) }
+            // A minute is past the end of anything muted this way (a head's tail).
+            mutedFromUs?.let { addFadeAt(it, 60_000_000) { _, _ -> 0f } }
+        }.build(),
+    )
 
 /** The speed change scales every frequency by [speed]; shifting pitch by 1/[speed] cancels it without touching the length. */
 private fun pitchFix(speed: Float) = SonicAudioProcessor().apply { setPitch(1 / speed) }

@@ -2,7 +2,9 @@ package com.ndelic.kadar.video
 
 import androidx.annotation.StringRes
 import com.ndelic.kadar.R
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.sin
 
 /**
  * How one clip turns into the next. Kinds that [overlaps] show both clips at once: the incoming clip's head plays over
@@ -87,6 +89,12 @@ fun headTailsMs(spans: List<TransitionSpan>, tailMs: Long = HEAD_TAIL_MS) =
 
 /** How far into the cut a centered transition is at [p] (0 to 1 through it): 0 at its ends, 1 at the cut. */
 fun dipAt(p: Float) = 1 - abs(1 - 2 * p)
+
+/**
+ * The incoming clip's sound at [p] (0 to 1 through an overlapping transition), the outgoing one's at 1 - [p]: an
+ * equal-power crossfade, so the two together stay as loud as either alone instead of dipping in the middle.
+ */
+fun crossfadeGain(p: Float) = sin(p * PI / 2).toFloat()
 
 /** The incoming clip's alpha at [p]: a dissolve fades it in, the others show it whole (moved or wiped in). */
 fun TransitionKind.incomingAlpha(p: Float) = if (this == TransitionKind.Dissolve) p else 1f

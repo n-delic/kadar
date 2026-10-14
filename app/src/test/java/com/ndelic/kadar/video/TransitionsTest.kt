@@ -89,6 +89,17 @@ class TransitionsTest {
     }
 
     @Test
+    fun crossfadeKeepsTheSameLoudnessThroughout() {
+        assertEquals(0f, crossfadeGain(0f), 1e-6f)
+        assertEquals(1f, crossfadeGain(1f), 1e-6f)
+        for (p in listOf(0.1f, 0.5f, 0.9f)) {
+            val incoming = crossfadeGain(p)
+            val outgoing = crossfadeGain(1 - p)
+            assertEquals(1f, incoming * incoming + outgoing * outgoing, 1e-5f)
+        }
+    }
+
+    @Test
     fun wipesRevealFromTheSideTheyMoveAwayFrom() {
         assertArrayEquals(floatArrayOf(1f, 0f, 1f, 1f), WipeLeft.wipeRect(0f), 0f)
         assertArrayEquals(floatArrayOf(0.5f, 0f, 1f, 1f), WipeLeft.wipeRect(0.5f), 0f)

@@ -225,18 +225,21 @@ fun EraseScreen(layer: ImageLayer, source: Bitmap?, onDone: (Bitmap) -> Unit, on
 /** A mutable copy that keeps transparency: a copy of a JPEG photo says it has no alpha, and erased pixels would come out black. */
 private fun editable(bitmap: Bitmap) = bitmap.copy(Bitmap.Config.ARGB_8888, true).apply { setHasAlpha(true) }
 
-/** One eraser or restore stroke in bitmap pixels; [hardness] 1 is a hard edge, lower blurs the edge over more of the brush. */
+/** One eraser or restore stroke in bitmap pixels; [hardness] 1 is a hard edge, lower fades the edge over more of the brush. */
 private class BrushStroke(val mode: Brush, val width: Float, hardness: Float) {
     val path = Path()
-    private val blur = (1 - hardness) * width / 2
+    // Sigma of the edge's fade: at hardness 0 the fade takes the outer half of the brush, and the core (two sigmas in
+    // from the edge's middle) still erases fully.
+    private val sigma = (1 - hardness) * width / 8
 
     fun paint(restore: Shader?) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
-        // The blur spreads the edge outward, so the solid core shrinks to keep about the brush's size.
-        strokeWidth = max(1f, width - blur)
-        if (blur >= 0.5f) maskFilter = BlurMaskFilter(blur, BlurMaskFilter.Blur.NORMAL)
+        strokeWidth = max(1f, width - 4 * sigma)
+        // Android turns a blur radius into sigma = 0.57735 * radius + 0.5.
+        val radius = (sigma - 0.5f) / 0.57735f
+        if (radius >= 0.5f) maskFilter = BlurMaskFilter(radius, BlurMaskFilter.Blur.NORMAL)
         if (mode == Brush.Restore && restore != null) {
             shader = restore
             xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC)
@@ -248,7 +251,7 @@ private class BrushStroke(val mode: Brush, val width: Float, hardness: Float) {
     /** The pixels this stroke can touch, soft edge included, inside [bitmap]. */
     fun bounds(bitmap: Bitmap): android.graphics.Rect {
         val r = RectF().also { path.computeBounds(it, false) }
-        val pad = width / 2 + blur * 2 + 2
+        val pad = width / 2 + sigma * 2 + 2
         return android.graphics.Rect(
             (r.left - pad).toInt().coerceIn(0, bitmap.width), (r.top - pad).toInt().coerceIn(0, bitmap.height),
             (r.right + pad).toInt().coerceIn(0, bitmap.width), (r.bottom + pad).toInt().coerceIn(0, bitmap.height),

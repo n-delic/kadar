@@ -211,7 +211,8 @@ fun AdjustPanel(adjust: Adjust, onApplyAll: (() -> Unit)? = null, onCompare: (Bo
             }
             CompareButton(onCompare)
         }
-        TextTabs(AdjustSlider.entries, slider, label = { stringResource(it.label) }) { slider = it }
+        // A dot marks the sliders that are moved, since only one shows at a time.
+        TextTabs(AdjustSlider.entries, slider, label = { stringResource(it.label) + if (it.value(adjust) != 0f) " •" else "" }) { slider = it }
         key(slider) { KSlider(null, slider.value(adjust), slider.range, { "${(it * 100).roundToInt()}" }) { onChange(adjust.(slider.set)(it)) } }
     }
 }

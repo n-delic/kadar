@@ -98,10 +98,12 @@ fun BlurBackgroundPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canva
     val s = clip.segments.getOrElse(index) { clip.segments.first() }
     // Cover: the clip scaled until it fills the canvas both ways, centered, the overflow clipped by the stage.
     val cover = maxOf(canvasWidth / s.width.toFloat(), canvasHeight / s.height.toFloat()) * scale
-    val size = with(LocalDensity.current) { DpSize((s.width * cover).toDp(), (s.height * cover).toDp()) }
+    // Drawn and blurred at 1/BLUR_DOWNSCALE of its size, then scaled up: a blur costs its pixels times its radius, and a
+    // blurred picture loses nothing by being small.
+    val size = with(LocalDensity.current) { DpSize((s.width * cover / BLUR_DOWNSCALE).toDp(), (s.height * cover / BLUR_DOWNSCALE).toDp()) }
     // The export blurs at 320 px on the long side with sigma 16; the same share of the stage here. Android turns a
     // blur radius into sigma = 0.57735 * radius + 0.5, so the radius is scaled up to match.
-    val radius = BLUR_SHARE * maxOf(canvasWidth, canvasHeight) * scale / 0.57735f
+    val radius = BLUR_SHARE * maxOf(canvasWidth, canvasHeight) * scale / 0.57735f / BLUR_DOWNSCALE
     val effect = remember(s.adjust, radius) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return@remember null
         val m = s.adjust.filterMatrix().copyOf()
@@ -119,12 +121,19 @@ fun BlurBackgroundPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canva
             modifier = placed.graphicsLayer {
                 renderEffect = effect
                 alpha = if (s.isImage) 0f else 1f
+                scaleX = BLUR_DOWNSCALE
+                scaleY = BLUR_DOWNSCALE
             },
         )
     }
     val still = remember(s.isImage, stills[s.uri]) { stills[s.uri]?.firstOrNull()?.takeIf { s.isImage }?.asImageBitmap() }
-    still?.let { Image(it, null, placed.graphicsLayer { renderEffect = effect }, contentScale = ContentScale.FillBounds) }
+    still?.let { Image(it, null, placed.graphicsLayer {
+        renderEffect = effect
+        scaleX = BLUR_DOWNSCALE
+        scaleY = BLUR_DOWNSCALE
+    }, contentScale = ContentScale.FillBounds) }
 }
 
 private const val BLUR_SHARE = 16f / 320
 private const val POLL_MS = 32L
+private const val BLUR_DOWNSCALE = 8f

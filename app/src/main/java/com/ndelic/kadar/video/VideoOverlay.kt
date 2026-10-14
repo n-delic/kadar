@@ -41,6 +41,9 @@ fun overlayAlpha(opacity: Float, span: Pair<Long, Long>, timeUs: Long) = if (tim
  */
 fun outputFrameRate(clipFrameRate: Float) = if (clipFrameRate > 0) clipFrameRate.roundToInt().coerceIn(1, 60) else 30
 
+/** The start of the output frame (at [fps]) that [positionMs] falls in, so the stage redraws once per video frame, not per screen refresh. */
+fun frameStartMs(positionMs: Long, fps: Int) = positionMs * fps / 1000 * 1000 / fps
+
 /**
  * The output frame (at [fps], from 0) that a compositor input's frame at [timeUs] is drawn into: Media3's compositor
  * pairs every output frame with the nearest frame of each other input.

@@ -9,6 +9,8 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.SystemClock
 import android.view.Surface
+import android.view.SurfaceHolder
+import android.view.SurfaceView
 import android.view.TextureView
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -148,7 +150,9 @@ import com.ndelic.kadar.ui.common.fullWidthPanel
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.composition
 import com.ndelic.kadar.video.drawnGroups
+import com.ndelic.kadar.video.frameStartMs
 import com.ndelic.kadar.video.outgoingOffset
+import com.ndelic.kadar.video.outputFrameRate
 import kotlin.math.atan2
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -701,16 +705,18 @@ private fun Stage(
         val size = with(density) { DpSize((project.width * scale).toDp(), (project.height * scale).toDp()) }
         val handleRadius = with(density) { 24.dp.toPx() }
         val layers by rememberUpdatedState(shown)
-        // Entrances and exits follow the player on every frame while it plays; [timeMs] only updates every 50 ms.
+        // Entrances and exits follow the player on every video frame while it plays; [timeMs] only updates every 50 ms.
         val videoEnd = project.video?.outputDurationMs
         val animated = player != null && videoEnd != null && project.layers.any { it.animIn != Anim.None || it.animOut != Anim.None || it.animLoop != Loop.None }
         val clock = remember { mutableLongStateOf(0L) }
         // So do the overlapping transitions the stage draws over the main preview.
         val overlapping = project.video?.transitionSpans.orEmpty().filter { it.kind.overlaps }
         if ((animated || overlapping.isNotEmpty()) && player != null) {
-            LaunchedEffect(player) {
+            val fps = outputFrameRate(project.video?.frameRate ?: 0f)
+            LaunchedEffect(player, fps) {
                 while (true) {
-                    clock.longValue = player.currentPosition
+                    // Only a new video frame changes the clock, so a 120 Hz screen doesn't redraw the layers 4 times a frame.
+                    clock.longValue = frameStartMs(player.currentPosition, fps)
                     if (player.isPlaying) withFrameMillis {} else delay(50)
                 }
             }
@@ -802,6 +808,7 @@ private fun Stage(
                         p,
                         project.width,
                         project.height,
+                        translucent = project.video?.blurred == true,
                         Modifier.fillMaxSize().graphicsLayer {
                             // Pushed out by the incoming clip, like the export's outgoingSettings.
                             val push = overlapping.firstOrNull { it.kind.pushes && clock.longValue in it } ?: return@graphicsLayer
@@ -1082,11 +1089,14 @@ private fun android.graphics.Canvas.drawSelection(layer: Layer, viewScale: Float
 
 /**
  * CompositionPlayer sizes its output once and doesn't follow later surface resizes (panels, keyboard), which left
- * the frame small or cropped in a corner. So the video renders into a fixed-size buffer and a TextureView scales it
- * to the stage like any other view. The buffer has the canvas's aspect ratio, so the scaling never distorts.
+ * the frame small or cropped in a corner. So the video renders into a fixed-size buffer the view scales to the stage.
+ * The buffer has the canvas's aspect ratio, so the scaling never distorts. A SurfaceView shows each frame at its time
+ * without the UI thread, so playback is even; a TextureView lets its 30 fps land on whichever screen refresh the UI
+ * draws next (17 or 50 ms apart) and drops frames when the UI is busy. Only with [translucent] (the blurred canvas,
+ * which must show through the letterbox bars) is it a TextureView: a SurfaceView sits behind the window.
  */
 @Composable
-private fun VideoSurface(player: CompositionPlayer, canvasWidth: Int, canvasHeight: Int, modifier: Modifier) {
+private fun VideoSurface(player: CompositionPlayer, canvasWidth: Int, canvasHeight: Int, translucent: Boolean, modifier: Modifier) {
     val f = PREVIEW_LONG_SIDE / maxOf(canvasWidth, canvasHeight).toFloat()
     val bw = (canvasWidth * f).roundToInt()
     val bh = (canvasHeight * f).roundToInt()
@@ -1094,7 +1104,33 @@ private fun VideoSurface(player: CompositionPlayer, canvasWidth: Int, canvasHeig
     // is torn down, and clearing a surface the player isn't using throws.
     val attached = remember { arrayOfNulls<Surface>(1) }
     // A new canvas shape needs a new buffer, so a new view; so does a new player.
-    key(bw, bh, player) {
+    if (!translucent) key(bw, bh, player) {
+        AndroidView(
+            factory = { context ->
+                SurfaceView(context).apply {
+                    holder.setFixedSize(bw, bh)
+                    holder.addCallback(object : SurfaceHolder.Callback {
+                        override fun surfaceCreated(holder: SurfaceHolder) {
+                            player.setVideoSurface(holder.surface, androidx.media3.common.util.Size(bw, bh))
+                            attached[0] = holder.surface
+                            // A paused player only draws on a seek.
+                            if (player.playbackState != Player.STATE_IDLE && !player.isPlaying) player.seekTo(player.currentPosition)
+                        }
+
+                        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = Unit
+
+                        override fun surfaceDestroyed(holder: SurfaceHolder) {
+                            if (attached[0] === holder.surface) {
+                                player.clearVideoSurface(holder.surface)
+                                attached[0] = null
+                            }
+                        }
+                    })
+                }
+            },
+            modifier = modifier,
+        )
+    } else key(bw, bh, player) {
         AndroidView(
             factory = { context ->
                 TextureView(context).apply {

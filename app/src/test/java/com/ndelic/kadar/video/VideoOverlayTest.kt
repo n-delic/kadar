@@ -66,6 +66,14 @@ class VideoOverlayTest {
     }
 
     @Test
+    fun frameStartIsTheFrameThePositionFallsIn() {
+        assertEquals(0, frameStartMs(33, 30))
+        assertEquals(33, frameStartMs(34, 30))
+        assertEquals(66, frameStartMs(99, 30))
+        assertEquals(1000, frameStartMs(1010, 30))
+    }
+
+    @Test
     fun drawnGroupsCutAtEveryVideoLayer() {
         fun groups(vararg layers: String) = drawnGroups(layers.toList()) { it.startsWith("v") }
         assertEquals(listOf(listOf("a", "b")), groups("a", "b"))

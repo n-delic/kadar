@@ -49,10 +49,11 @@ import com.ndelic.kadar.ui.common.KSlider
 
 /**
  * One tile per [Look], previewed on [source] (the image layer or a video frame) with the current sliders, plus its
- * strength; [onApplyAll] (clips) gives every clip this look and adjustment, [onCompare] is held to see the original.
+ * strength ([onDrag] while it moves); [onApplyAll] (clips) gives every clip this look and adjustment, [onCompare] is held
+ * to see the original.
  */
 @Composable
-fun FiltersPanel(source: Bitmap?, adjust: Adjust, onApplyAll: (() -> Unit)? = null, onCompare: (Boolean) -> Unit, onChange: (Adjust) -> Unit) {
+fun FiltersPanel(source: Bitmap?, adjust: Adjust, onApplyAll: (() -> Unit)? = null, onCompare: (Boolean) -> Unit, onDrag: (Adjust) -> Unit, onChange: (Adjust) -> Unit) {
     val thumb = remember(source) { source?.let { scaleDown(it, 160).asImageBitmap() } }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -83,7 +84,7 @@ fun FiltersPanel(source: Bitmap?, adjust: Adjust, onApplyAll: (() -> Unit)? = nu
         }
         // On the strength slider's row, so the panel doesn't get taller.
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) { if (adjust.look != Look.None) KSlider(null, adjust.amount, 0f..1f, ::percent) { onChange(adjust.copy(amount = it)) } }
+            Box(Modifier.weight(1f)) { if (adjust.look != Look.None) KSlider(null, adjust.amount, 0f..1f, ::percent, onDrag = { onDrag(adjust.copy(amount = it)) }) { onChange(adjust.copy(amount = it)) } }
             onApplyAll?.let { ApplyAll(it) }
             CompareButton(onCompare)
         }

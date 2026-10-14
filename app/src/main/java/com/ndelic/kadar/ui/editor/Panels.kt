@@ -196,10 +196,11 @@ private enum class AdjustSlider(@StringRes val label: Int, val value: (Adjust) -
 
 /**
  * Brightness, contrast, saturation, warmth, tint, hue and fade, one slider at a time; [onChange] gets the whole new
- * value, [onApplyAll] (clips) copies it to every clip, [onCompare] is held to see the picture without any of it.
+ * value, [onDrag] the value while a slider moves, [onApplyAll] (clips) copies it to every clip, [onCompare] is held to
+ * see the picture without any of it.
  */
 @Composable
-fun AdjustPanel(adjust: Adjust, onApplyAll: (() -> Unit)? = null, onCompare: (Boolean) -> Unit, onChange: (Adjust) -> Unit) {
+fun AdjustPanel(adjust: Adjust, onApplyAll: (() -> Unit)? = null, onCompare: (Boolean) -> Unit, onDrag: (Adjust) -> Unit, onChange: (Adjust) -> Unit) {
     var slider by rememberSaveable { mutableStateOf(AdjustSlider.Brightness) }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -215,7 +216,9 @@ fun AdjustPanel(adjust: Adjust, onApplyAll: (() -> Unit)? = null, onCompare: (Bo
         }
         // A dot marks the sliders that are moved, since only one shows at a time.
         TextTabs(AdjustSlider.entries, slider, label = { stringResource(it.label) + if (it.value(adjust) != 0f) " •" else "" }) { slider = it }
-        key(slider) { KSlider(null, slider.value(adjust), slider.range, { "${(it * 100).roundToInt()}" }) { onChange(adjust.(slider.set)(it)) } }
+        key(slider) {
+            KSlider(null, slider.value(adjust), slider.range, { "${(it * 100).roundToInt()}" }, onDrag = { onDrag(adjust.(slider.set)(it)) }) { onChange(adjust.(slider.set)(it)) }
+        }
     }
 }
 
@@ -229,7 +232,7 @@ fun LabeledSlider(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, color = Ink.dim, fontSize = 12.sp, modifier = Modifier.width(76.dp))
-        Box(Modifier.weight(1f)) { KSlider(null, value, range, valueLabel, onCommit) }
+        Box(Modifier.weight(1f)) { KSlider(null, value, range, valueLabel, onCommit = onCommit) }
     }
 }
 

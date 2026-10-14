@@ -153,6 +153,7 @@ import com.ndelic.kadar.ui.common.KSlider
 import com.ndelic.kadar.ui.common.LocalEyedropper
 import com.ndelic.kadar.ui.common.blockTouches
 import com.ndelic.kadar.ui.common.fullWidthPanel
+import com.ndelic.kadar.video.LiveLooks
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.audioPart
 import com.ndelic.kadar.video.composition
@@ -214,7 +215,11 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     LaunchedEffect(panel, state.selectedId) { dropper = null }
     // Held in Filters or Adjust: the stage and the preview show the picture without any look or color adjustment.
     var comparing by remember { mutableStateOf(false) }
-    val staged = remember(project, comparing) { if (comparing) project.withoutAdjust() else project }
+    // A Filters or Adjust slider's value while it's dragged, on the selected layer or the clip; the release commits it.
+    var dragged by remember(project, state.selectedId, clipIndex, panel) { mutableStateOf<Adjust?>(null) }
+    val staged = remember(project, comparing, dragged) {
+        if (comparing) project.withoutAdjust() else dragged?.let { project.withAdjust(state.selectedId, clipIndex, it) } ?: project
+    }
 
     LaunchedEffect(state.selectedId) {
         // Selecting from the Layers list keeps the list open; anything else starts from the layer's tools.
@@ -245,14 +250,20 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         // preview fails mid-playback ("frame for an ended input") on devices; the export still composites everything.
         val previewed = staged.video ?: video
         val copies = state.previewCopies
-        LaunchedEffect(player, previewed, copies) {
+        // The clips' looks change on the preview's frames, so a look or slider shows without a new composition.
+        val looks = remember(player) { LiveLooks() }
+        val adjusts = previewed.segments.map { it.adjust }
+        LaunchedEffect(player, adjusts) {
+            looks.show(adjusts)
+            // A paused player keeps its frame; its replayable cache draws it again through the new look.
+            if (!player.isPlaying) player.experimentalRedrawLastFrame()
+        }
+        val structure = remember(previewed) { previewed.withoutAdjust() }
+        LaunchedEffect(player, structure, copies) {
             // After an edit (a split, a trim) the playhead stays where it was.
             val start = resumeAt[0].also { resumeAt[0] = 0 }.takeIf { it > 0 } ?: positionMs.coerceAtMost(previewed.outputDurationMs)
-            player.setComposition(previewed.copy(blur = false).composition(incoming = false, dropFrames = false, previewCopies = copies), start)
+            player.setComposition(structure.copy(blur = false).composition(incoming = false, dropFrames = false, previewCopies = copies, looks = looks), start)
             player.prepare()
-            // A paused player keeps showing the old frame after a new composition; seek once it's loaded to repaint.
-            delay(300)
-            if (!player.isPlaying) player.seekTo(maxOf(start, player.currentPosition))
         }
         DisposableEffect(player) {
             // A failed player stays idle whatever play is pressed; rebuild it once, and stop if the new one fails too.
@@ -359,6 +370,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             scope.launch { vm.stagePicture(positionMs)?.let { dropper = it to onColor } }
         }
         val compare: (Boolean) -> Unit = { comparing = it }
+        val drag: (Adjust) -> Unit = { dragged = it }
         CompositionLocalProvider(LocalEyedropper provides eyedropper) {
             AnimatedContent(
                 targetState = panel,
@@ -393,19 +405,19 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         Panel.Opacity -> (selected as? ImageLayer)?.let { l -> KSlider(R.drawable.ic_opacity, l.opacity, 0.05f..1f, ::percent) { v -> vm.editImage { copy(opacity = v) } } }
                         Panel.Transition -> video?.let { v -> transitionAt?.takeIf { it in 1 until v.segments.size }?.let { TransitionPanel(v, it, vm) } }
                         Panel.Adjust -> when (val l = selected) {
-                            is ImageLayer -> AdjustPanel(l.adjust, onCompare = compare) { a -> vm.editImage { copy(adjust = a) } }
-                            is VideoLayer -> AdjustPanel(l.adjust, onCompare = compare) { a -> vm.editVideo { copy(adjust = a) } }
-                            null -> video?.let { v -> AdjustPanel(v.segments[clipIndex].adjust, applyAdjustToAll(v), compare) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } }
+                            is ImageLayer -> AdjustPanel(l.adjust, onCompare = compare, onDrag = drag) { a -> vm.editImage { copy(adjust = a) } }
+                            is VideoLayer -> AdjustPanel(l.adjust, onCompare = compare, onDrag = drag) { a -> vm.editVideo { copy(adjust = a) } }
+                            null -> video?.let { v -> AdjustPanel(v.segments[clipIndex].adjust, applyAdjustToAll(v), compare, drag) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } }
                             else -> {}
                         }
                         Panel.Filters -> when (val l = selected) {
-                            is ImageLayer -> FiltersPanel(l.bitmap, l.adjust, onCompare = compare) { a -> vm.editImage { copy(adjust = a) } }
+                            is ImageLayer -> FiltersPanel(l.bitmap, l.adjust, onCompare = compare, onDrag = drag) { a -> vm.editImage { copy(adjust = a) } }
                             is VideoLayer -> {
                                 // The tiles show the layer's frame at its in-point.
                                 val frame by produceState<Bitmap?>(null, l.uri, l.clipStartMs) { value = vm.layerFrame(l, l.startMs) }
-                                FiltersPanel(frame, l.adjust, onCompare = compare) { a -> vm.editVideo { copy(adjust = a) } }
+                                FiltersPanel(frame, l.adjust, onCompare = compare, onDrag = drag) { a -> vm.editVideo { copy(adjust = a) } }
                             }
-                            null -> video?.let { v -> v.segments[clipIndex].let { s -> FiltersPanel(state.filmstrip[s.uri]?.firstOrNull(), s.adjust, applyAdjustToAll(v), compare) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } } }
+                            null -> video?.let { v -> v.segments[clipIndex].let { s -> FiltersPanel(state.filmstrip[s.uri]?.firstOrNull(), s.adjust, applyAdjustToAll(v), compare, drag) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } } }
                             else -> {}
                         }
                     }
@@ -1253,7 +1265,8 @@ private fun rememberCompositionPlayer(generation: Int): CompositionPlayer? {
     // Made in the effect rather than in remember: on a new key the old player is released (onDispose) before the next
     // one is built, so two never fight over decoders and the GPU.
     DisposableEffect(generation) {
-        val p = CompositionPlayer.Builder(context).build().apply { repeatMode = Player.REPEAT_MODE_ALL }
+        // The replayable cache keeps the last frame from before the effects, so a paused preview redraws it with a new look.
+        val p = CompositionPlayer.Builder(context).experimentalSetEnableReplayableCache(true).build().apply { repeatMode = Player.REPEAT_MODE_ALL }
         player = p
         onDispose {
             player = null

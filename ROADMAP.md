@@ -104,9 +104,9 @@ Feature parity with the big phone editors, built from how their features behave,
 - [ ] Text, sticker and shape animations: slide in from all four sides, zoom out, and an adjustable length (300 ms today)
 - [ ] Flip (horizontal and vertical) and opacity for image and sticker layers
 - [ ] Layer tracks: Split at the playhead and Move here (to the playhead)
-- [ ] Trim a clip by dragging its edges on the main strip, without opening trim mode
-- [ ] Speed as a continuous slider from 0.2x to 10x (8 fixed steps from 0.25x to 4x today)
-- [ ] Apply to all clips for speed, filter, adjust and the canvas background
+- [x] Trim a clip by dragging its edges on the main strip, without opening trim mode
+- [x] Speed as a continuous slider from 0.2x to 10x (8 fixed steps from 0.25x to 4x today)
+- [x] Apply to all clips for speed, filter, adjust and the canvas background (the canvas background is one per project)
 - [ ] Music and voiceovers as timeline tracks: start anywhere, move, trim and split (music always starts at 0 today); fade in and out lengths (fixed 1.5 s today)
 - [ ] Video layers: filter and adjust, like the main clips
 - [ ] Adjust: warmth, tint, hue and fade (color matrices, so video still matches photos); vignette and grain need shaders
@@ -122,7 +122,7 @@ Feature parity with the big phone editors, built from how their features behave,
 - [ ] Replace a clip with another video or photo, keeping its place and settings
 - [ ] Clip tools: freeze frame, reverse, rotate and flip, crop the main clip, capture the frame as a photo, a blank color clip
 - [ ] Canvas: more ratios (3:4, 4:3, 2:3, 3:2, 2:1, 1:2, 2.35:1); zoom and move the clip inside the canvas; background color, blur strength or an image
-- [ ] Speed up to 10x and speed ramps (presets that slow down or speed up within a clip)
+- [ ] Speed ramps (presets that slow down or speed up within a clip)
 - [ ] Timed video effects on their own track: slow zoom, jump zoom, shake, glitch, blur, flash, fade to black, film grain
 - [ ] Audio: a bundled CC0 sound-effect pack (meme sounds), several music tracks, extract the sound of a video, voice effects (higher, deeper, robot), text-to-speech with the phone's offline voices
 - [ ] Clip in/out animations (zoom, slide, spin) and keyframes for layers and clips (position, scale, rotation, opacity over time)
@@ -132,6 +132,7 @@ Feature parity with the big phone editors, built from how their features behave,
 - [ ] More transitions: spin, flip, glitch, color split
 - [ ] Precut: cut out the middle of a clip, and step one frame back or forward while trimming
 - [ ] Mute a clip in one tap
+- [ ] The preview stalls at the start when the first clip is faster than 5x (seen on the emulator; the same clip later in the video previews fine, and the export is right). Check on a phone, then find the cause in CompositionPlayer
 - [ ] Overlay clips with long frame gaps (screen recordings that only emit frames when the screen changes) make Media3's compositor draw a stretched copy of the overlay over the main clip during the gap. Constant-frame-rate clips (phone camera) are fine. Fix idea: re-time such overlays to a constant rate before compositing
 
 ### Photo

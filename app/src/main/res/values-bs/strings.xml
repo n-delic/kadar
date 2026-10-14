@@ -145,6 +145,7 @@
     <string name="export_size">Veličina izvoza</string>
     <string name="export_size_default">Zadano (%1$s)</string>
     <string name="speed_length">Trajanje nakon brzine: %1$s</string>
+    <string name="speed_value">%1$sx</string>
     <string name="keep_pitch">Zadrži visinu glasa</string>
     <string name="keep_pitch_hint">Isključeno daje glas vjeverice / usporeni glas</string>
     <string name="video_sound">Zvuk videa</string>
@@ -246,7 +247,7 @@
     <string name="transition_push_up">Guraj gore</string>
     <string name="transition_length">Trajanje</string>
     <string name="transition_seconds">%1$.1f s</string>
-    <string name="transition_apply_all">Primijeni na sve</string>
+    <string name="apply_all">Primijeni na sve</string>
     <string name="transition_too_short">Ovi klipovi su prekratki za prijelaz</string>
     <string name="busy_adding_music">Dodajem muziku</string>
     <string name="busy_removing_bg">Uklanjam pozadinu</string>

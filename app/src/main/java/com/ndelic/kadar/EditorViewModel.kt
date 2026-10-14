@@ -619,6 +619,9 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     fun updateSegment(index: Int, change: Segment.() -> Segment) =
         updateClip { copy(segments = segments.mapIndexed { i, s -> if (i == index) s.change() else s }) }
 
+    /** Changes every clip of the main track at once, as one undo step (Apply to all). */
+    fun updateAllSegments(change: Segment.() -> Segment) = updateClip { copy(segments = segments.map { it.change() }) }
+
     /** Picks clip [index] on the clip strip, or none; a picked clip and a selected layer exclude each other. */
     fun selectClip(index: Int?) = _uiState.update { it.copy(selectedClip = index, selectedId = null) }
 

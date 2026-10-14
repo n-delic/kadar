@@ -1,26 +1,17 @@
 package com.ndelic.kadar.ui.editor
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ndelic.kadar.EditorViewModel
 import com.ndelic.kadar.R
 import com.ndelic.kadar.ui.common.Ink
-import com.ndelic.kadar.ui.common.KIcon
 import com.ndelic.kadar.ui.common.KSlider
 import com.ndelic.kadar.ui.common.PanelLabel
 import com.ndelic.kadar.ui.common.TextTabs
@@ -47,16 +38,7 @@ fun TransitionPanel(clip: VideoClip, index: Int, vm: EditorViewModel) {
                 Text(stringResource(R.string.transition_too_short), color = Ink.dim, fontSize = 12.sp, modifier = Modifier.padding(start = 12.dp))
             }
         }
-        if (clip.segments.size > 2) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable { vm.setTransition(index, t, all = true) }.padding(vertical = 8.dp, horizontal = 4.dp),
-            ) {
-                KIcon(R.drawable.ic_select_all, Modifier.size(22.dp), Ink.accent)
-                Spacer(Modifier.size(8.dp))
-                Text(stringResource(R.string.transition_apply_all), color = Ink.accent, fontWeight = FontWeight.SemiBold)
-            }
-        }
+        if (clip.segments.size > 2) ApplyAll { vm.setTransition(index, t, all = true) }
     }
 }
 

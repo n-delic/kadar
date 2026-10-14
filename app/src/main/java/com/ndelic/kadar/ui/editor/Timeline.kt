@@ -97,6 +97,7 @@ import com.ndelic.kadar.video.MIN_CLIP_MS
 import com.ndelic.kadar.video.Segment
 import com.ndelic.kadar.video.TransitionKind
 import com.ndelic.kadar.video.VideoClip
+import com.ndelic.kadar.video.edgeTrim
 import com.ndelic.kadar.video.outputMs
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -187,8 +188,8 @@ fun TrimStrip(clip: Segment, offsetMs: Long, frames: List<Bitmap>, positionMs: L
 /**
  * The NLE timeline in output time: one track per layer (top of the stack first) above the clips.
  * Drag a track's ends to change when it shows, its middle to move it; long-press it and drag up or down to reorder;
- * the eye and lock at its left hide and lock it; tap a clip to pick it, long-press it and drag sideways to move it, +
- * adds one; drag empty space, the ruler or the clips to scrub.
+ * the eye and lock at its left hide and lock it; tap a clip to pick it, drag the picked clip's ends to trim it,
+ * long-press a clip and drag sideways to move it, + adds one; drag empty space, the ruler or the clips to scrub.
  * Two fingers are for the view only: pinch to zoom the time axis, slide to scroll it. One finger edits and scrubs the
  * same way at any zoom, and while playing the view pages along with the playhead.
  */
@@ -207,6 +208,7 @@ fun Timeline(
     onMove: (Long, Int) -> Unit,
     onClipTap: (Int) -> Unit,
     onClipMove: (Int, Int) -> Unit,
+    onClipTrim: (Int, Long, Long) -> Unit,
     onAddClip: () -> Unit,
     transitionAt: Int?,
     onTransition: (Int) -> Unit,
@@ -270,7 +272,7 @@ fun Timeline(
                         )
                     }
                 }
-                ClipRow(clip, frames, pickedClip, total, view, startDp, onSeek, onClipTap, onClipMove, onAddClip, transitionAt, onTransition)
+                ClipRow(clip, frames, pickedClip, total, view, startDp, onSeek, onClipTap, onClipMove, onClipTrim, onAddClip, transitionAt, onTransition)
             }
             Canvas(Modifier.matchParentSize()) {
                 val x = start + view.x(positionMs, width)
@@ -482,8 +484,9 @@ private fun Ruler(view: TimelineViewport, total: Long, start: Float, width: Floa
 }
 
 /**
- * The kept part of each clip, end to end under the layer tracks. Tap a clip to pick it ([picked] is outlined), drag to
- * scrub, long-press and drag sideways to move it; the + after the strip adds a clip. Frames are tiled at their own
+ * The kept part of each clip, end to end under the layer tracks. Tap a clip to pick it ([picked] is outlined, with
+ * handles), drag its handles to trim it ([onTrim] once, at the end, with the new source start and end), drag elsewhere
+ * to scrub, long-press and drag sideways to move it; the + after the strip adds a clip. Frames are tiled at their own
  * aspect and anchored in time, so they scroll with the tracks and repeat when zoomed in.
  */
 @Composable
@@ -497,6 +500,7 @@ private fun ClipRow(
     onSeek: (Long) -> Unit,
     onTap: (Int) -> Unit,
     onMove: (Int, Int) -> Unit,
+    onTrim: (Int, Long, Long) -> Unit,
     onAdd: () -> Unit,
     transitionAt: Int?,
     onTransition: (Int) -> Unit,
@@ -508,6 +512,10 @@ private fun ClipRow(
     val haptics = LocalHapticFeedback.current
     // The clip being moved and how far it's been dragged (px). Reset by the new order, so the drop doesn't flicker.
     var lift by remember(clip.segments) { mutableStateOf<Pair<Int, Float>?>(null) }
+    // The picked clip while its edge is dragged, drawn in place of it; only the drop changes the project (one undo
+    // step, one new preview). Reset by the new clips, like [lift].
+    var trim by remember(clip.segments) { mutableStateOf<EdgeTrim?>(null) }
+    val currentPicked by rememberUpdatedState(picked)
     Row(Modifier.fillMaxWidth().height(52.dp).padding(start = start, top = 3.dp, bottom = 3.dp)) {
         Canvas(
             Modifier
@@ -525,6 +533,14 @@ private fun ClipRow(
                         // A tap on a cut's button opens its transition.
                         val cuts = c.played.runningFold(0L) { t, s -> t + s.outputDurationMs }
                         val cut = (1 until c.segments.size).firstOrNull { abs(view.x(cuts[it], size.width.toFloat()) - down.position.x) < CUT_BUTTON.toPx() / 2 }
+                        // On an end of the picked clip: dragging trims it (a tap still opens the cut's transition).
+                        val p = currentPicked?.takeIf { it in c.segments.indices }
+                        val left = p?.let {
+                            val toStart = abs(view.x(cuts[it], size.width.toFloat()) - down.position.x)
+                            val toEnd = abs(view.x(cuts[it + 1], size.width.toFloat()) - down.position.x)
+                            val grab = EDGE_GRAB.toPx()
+                            if (toStart < grab && toStart <= toEnd) true else if (toEnd < grab) false else null
+                        }
                         // Like a track: moving first scrubs, holding still lifts the clip to move it, letting go taps it.
                         var moved: PointerInputChange? = null
                         var tapped = false
@@ -565,6 +581,20 @@ private fun ClipRow(
                         var change = moved ?: return@awaitEachGesture
                         // A vertical swipe scrolls the track list.
                         if (abs(change.position.y - down.position.y) > abs(change.position.x - down.position.x)) return@awaitEachGesture
+                        if (p != null && left != null) {
+                            val s = c.segments[p]
+                            while (change.pressed && !change.isConsumed) {
+                                val d = ((change.position.x - down.position.x) / size.width * view.spanMs).toLong()
+                                val (from, to) = edgeTrim(s.startMs, s.endMs, s.durationMs, s.speed, left, d)
+                                trim = EdgeTrim(p, left, s.copy(startMs = from, endMs = to))
+                                change.consume()
+                                change = awaitPointerEvent().changes.first()
+                            }
+                            // Consumed: a second finger took over to zoom, which cancels the trim.
+                            val t = trim
+                            if (t != null && !change.isConsumed && t.segment != s) onTrim(p, t.segment.startMs, t.segment.endMs) else trim = null
+                            return@awaitEachGesture
+                        }
                         while (change.pressed && !change.isConsumed) {
                             onSeek(timeAt(change.position.x))
                             change.consume()
@@ -574,8 +604,15 @@ private fun ClipRow(
                 },
         ) {
             // As the main track plays them: the head an overlapping transition plays over the clip before is left out.
-            val played = clip.played
-            val starts = played.runningFold(0L) { t, s -> t + s.outputDurationMs }
+            val edge = trim
+            val shown = edge?.let { e -> clip.copy(segments = clip.segments.mapIndexed { i, s -> if (i == e.index) e.segment else s }) } ?: clip
+            val played = shown.played
+            val starts = played.runningFold(0L) { t, s -> t + s.outputDurationMs }.toMutableList()
+            // A start being dragged moves its clip's start, not the clips after it, until the drop closes the gap.
+            if (edge?.left == true) {
+                val shift = clip.played.take(edge.index + 1).sumOf { it.outputDurationMs } - starts[edge.index + 1]
+                for (k in edge.index until starts.size) starts[k] += shift
+            }
             fun drawClip(i: Int, dx: Float) {
                 val s = played[i]
                 val x0 = view.x(starts[i], size.width) + dx
@@ -597,18 +634,29 @@ private fun ClipRow(
                     }
                 }
                 if (i == picked || dx != 0f) {
-                    val edge = 2.dp.toPx()
-                    drawRoundRect(Color.White, Offset(x0 + edge / 2, edge / 2), Size(x1 - x0 - edge, size.height - edge), CornerRadius(6.dp.toPx()), style = Stroke(edge))
+                    val line = 2.dp.toPx()
+                    drawRoundRect(Color.White, Offset(x0 + line / 2, line / 2), Size(x1 - x0 - line, size.height - line), CornerRadius(6.dp.toPx()), style = Stroke(line))
                 } else if (i > 0) {
                     drawLine(Ink.bg, Offset(x0, 0f), Offset(x0, size.height), 2.dp.toPx())
                 }
             }
             val lifted = lift
-            clip.segments.indices.forEach { if (it != lifted?.first) drawClip(it, 0f) }
+            val top = lifted?.first ?: edge?.index
+            clip.segments.indices.forEach { if (it != top) drawClip(it, 0f) }
             // On top of the others, so it shows where it's being dragged.
-            lifted?.let { (i, dx) -> if (i in clip.segments.indices) drawClip(i, dx) }
+            top?.let { i -> if (i in clip.segments.indices) drawClip(i, lifted?.second ?: 0f) }
+            // The picked clip's trim handles, inside its outline.
+            if (lifted == null) picked?.takeIf { it in clip.segments.indices }?.let { i ->
+                val tab = HANDLE.toPx()
+                val radius = CornerRadius(4.dp.toPx())
+                val grip = Color(0xFF555555)
+                listOf(view.x(starts[i], size.width), view.x(starts[i + 1], size.width) - tab).forEach { x ->
+                    drawRoundRect(Color.White, Offset(x, 0f), Size(tab, size.height), radius)
+                    drawLine(grip, Offset(x + tab / 2, size.height * 0.3f), Offset(x + tab / 2, size.height * 0.7f), 2.dp.toPx())
+                }
+            }
             // A button on every cut for its transition, lime when it has one or is open.
-            if (lifted == null) (1 until clip.segments.size).forEach { i ->
+            if (lifted == null && edge == null) (1 until clip.segments.size).forEach { i ->
                 val on = i == transitionAt || clip.segments[i].transition.kind != TransitionKind.None
                 val box = CUT_BUTTON.toPx() * 0.7f
                 val topLeft = Offset(view.x(starts[i], size.width) - box / 2, (size.height - box) / 2)
@@ -625,7 +673,13 @@ private fun ClipRow(
     }
 }
 
+/** The picked clip's end being dragged on the clip strip: which clip, which end, and the clip as trimmed so far. */
+private class EdgeTrim(val index: Int, val left: Boolean, val segment: Segment)
+
 private val TIMELINE_PAD = 28.dp
+/** How near an end of the picked clip a drag trims it; its handle draws [HANDLE] wide inside the clip. */
+private val EDGE_GRAB = 22.dp
+private val HANDLE = 10.dp
 /** Touch width of a cut's transition button; it draws at 70% of that. */
 private val CUT_BUTTON = 34.dp
 private val TRACK_HEIGHT = 40.dp

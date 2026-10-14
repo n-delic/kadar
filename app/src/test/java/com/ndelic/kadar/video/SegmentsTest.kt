@@ -42,4 +42,41 @@ class SegmentsTest {
         assertEquals(listOf("c", "a", "b"), listOf("a", "b", "c").moved(2, 0))
         assertEquals(listOf("a", "b", "c"), listOf("a", "b", "c").moved(1, 1))
     }
+
+    @Test
+    fun edgeTrimMovesOneEdgeInSourceTimeWithinLimits() {
+        // 1 s of output at 2x is 2 s of source.
+        assertEquals(3000L to 9000L, edgeTrim(1000, 9000, 10_000, 2f, left = true, dMs = 1000))
+        assertEquals(1000L to 7000L, edgeTrim(1000, 9000, 10_000, 2f, left = false, dMs = -1000))
+        // Not past the source's ends, a photo's longest showing included.
+        assertEquals(0L to 9000L, edgeTrim(1000, 9000, 10_000, 1f, left = true, dMs = -5000))
+        assertEquals(1000L to 30_000L, edgeTrim(1000, 3000, 30_000, 1f, left = false, dMs = 60_000))
+        // Never shorter than MIN_CLIP_MS, from either side.
+        assertEquals(9000L - MIN_CLIP_MS to 9000L, edgeTrim(1000, 9000, 10_000, 1f, left = true, dMs = 20_000))
+        assertEquals(1000L to 1000L + MIN_CLIP_MS, edgeTrim(1000, 9000, 10_000, 1f, left = false, dMs = -20_000))
+        // A source shorter than that doesn't throw.
+        assertEquals(0L to 200L, edgeTrim(0, 200, 200, 1f, left = true, dMs = 100))
+        assertEquals(0L to 200L, edgeTrim(0, 200, 200, 1f, left = false, dMs = -100))
+    }
+
+    @Test
+    fun aTransitionIsCappedByAClipTrimmedShorterUnderIt() {
+        val t = listOf(Transition(), Transition(TransitionKind.Dissolve, 1500))
+        val (start, end) = edgeTrim(0, 10_000, 10_000, 1f, left = false, dMs = -9000)
+        val lengths = listOf(10_000L, outputMs(start, end, 1f))
+        assertEquals(500L, transitionSpans(lengths, t).single().let { it.endMs - it.startMs })
+    }
+
+    @Test
+    fun speedSliderRunsFromMinToMaxAndSnaps() {
+        assertEquals(MIN_SPEED, speedAt(0f))
+        assertEquals(MAX_SPEED, speedAt(1f))
+        listOf(0.5f, 1f, 2f).forEach { assertEquals(it, speedAt(speedPosition(it))) }
+        // Near a snap point lands on it; away from them, the value is rounded.
+        assertEquals(1f, speedAt(speedPosition(1.06f)))
+        assertEquals(3.5f, speedAt(speedPosition(3.52f)))
+        assertEquals(0.3f, speedAt(speedPosition(0.301f)))
+        // Old projects' fixed steps keep their place.
+        listOf(0.25f, 0.75f, 1.5f, 3f, 4f).forEach { assertEquals(it, speedAt(speedPosition(it)), 0.001f) }
+    }
 }

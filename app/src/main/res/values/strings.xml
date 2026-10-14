@@ -147,6 +147,7 @@
     <string name="export_1080p" translatable="false">1080p</string>
     <string name="export_720p" translatable="false">720p</string>
     <string name="speed_length">Length after speed: %1$s</string>
+    <string name="speed_value">%1$sx</string>
     <string name="keep_pitch">Keep voice pitch</string>
     <string name="keep_pitch_hint">Off gives the chipmunk / slow-mo voice</string>
     <string name="video_sound">Video sound</string>
@@ -247,7 +248,7 @@
     <string name="transition_push_up">Push up</string>
     <string name="transition_length">Length</string>
     <string name="transition_seconds">%1$.1f s</string>
-    <string name="transition_apply_all">Apply to all</string>
+    <string name="apply_all">Apply to all</string>
     <string name="transition_too_short">These clips are too short for a transition</string>
     <string name="busy_adding_music">Adding music</string>
     <string name="busy_removing_bg">Removing background</string>

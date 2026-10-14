@@ -348,8 +348,15 @@ fun AudioPanel(clip: VideoClip, index: Int, audio: AudioRef?, vm: EditorViewMode
             PanelLabel(stringResource(R.string.audio_fades))
             val seconds = stringResource(R.string.transition_seconds)
             fun fadeMs(v: Float) = (v / 100).roundToInt() * 100L
-            KSlider(R.drawable.ic_trending_up, part.fadeInMs.toFloat(), 0f..MAX_FADE_MS.toFloat(), { seconds.format(fadeMs(it) / 1000f) }) { v -> vm.editAudio { copy(fadeInMs = fadeMs(v)) } }
-            KSlider(R.drawable.ic_trending_down, part.fadeOutMs.toFloat(), 0f..MAX_FADE_MS.toFloat(), { seconds.format(fadeMs(it) / 1000f) }) { v -> vm.editAudio { copy(fadeOutMs = fadeMs(v)) } }
+            // Side by side, so the panel stays as tall as the others.
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.weight(1f)) {
+                    KSlider(R.drawable.ic_trending_up, part.fadeInMs.toFloat(), 0f..MAX_FADE_MS.toFloat(), { seconds.format(fadeMs(it) / 1000f) }) { v -> vm.editAudio { copy(fadeInMs = fadeMs(v)) } }
+                }
+                Box(Modifier.weight(1f)) {
+                    KSlider(R.drawable.ic_trending_down, part.fadeOutMs.toFloat(), 0f..MAX_FADE_MS.toFloat(), { seconds.format(fadeMs(it) / 1000f) }) { v -> vm.editAudio { copy(fadeOutMs = fadeMs(v)) } }
+                }
+            }
             return@Column
         }
         PanelLabel(stringResource(R.string.video_sound))

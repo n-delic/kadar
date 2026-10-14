@@ -497,11 +497,12 @@ private fun AudioTrack(
     Box(
         Modifier.fillMaxWidth().height(AUDIO_TRACK_HEIGHT).pointerInput(total, view, start, width, sourceMs) {
             awaitEachGesture {
+                val down = awaitFirstDown()
+                // Read after the touch: a gesture starts waiting as soon as the last one ends, before its drop is in.
                 val p = current
                 val x0 = start + view.x(p.atMs.coerceIn(0, total), width)
                 val x1 = maxOf(x0, start + view.x(p.endMs(total), width))
                 val grab = 20.dp.toPx()
-                val down = awaitFirstDown()
                 val edge = when (down.position.x) {
                     in x0 - grab..x0 + grab / 2 -> AudioDrag.Start
                     in x1 - grab / 2..x1 + grab -> AudioDrag.End

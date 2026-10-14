@@ -92,29 +92,29 @@
 
 - Transitions between clips: tap the button on a cut in the clip strip for None, Dissolve, Black, White, Zoom, Blur, Wipe, Slide or Push (left or up), a length from 0.2 to 1.5 s, and Apply to all. Dissolve, wipes, slides and pushes overlap the two clips, so the video gets shorter by their length; the others pass through black, white, a zoom or a blur at the cut
 
+## v0.7.0: done
+
+- Text: outline width, shadow color, blur and distance, box opacity, bold, italic, underline, all caps (only the drawing changes, not what you typed) and a size slider
+- Custom colors everywhere there's a color row: a picker with hue, saturation/brightness and a hex field, recent custom colors, and an eyedropper that takes a color from the picture
+- Images and stickers: mirror, flip and opacity
+- Video layer tracks: Split at the playhead and Move here (starts the layer at the playhead)
+- Animations: slide in or out from any side, Zoom out, and an In/Out length from 0.1 to 3 s
+- Clips: drag a picked clip's ends on the strip to trim it; speed is a slider from 0.2x to 10x (catches at 0.5x, 1x and 2x); Apply to all for speed, filter and adjust
+- Eraser and restore brush: a soft edge (hardness) and undo/redo inside the tool
+- Crop: 3:4, 2:3, 4:3 and 3:2, straighten (±45°) and 90° turns for image layers
+- Draw: an eraser that cuts strokes, pen opacity and redo; erase strokes of a drawing you already placed
+- Canvas: 3:4, 4:3, 2:3, 3:2, 2:1 and 2.35:1 for photos and videos, a blurred background for photos, and Blank canvas asks for its shape first
+
 ## Next
 
 Feature parity with the big phone editors, built from how their features behave, never from their code, assets or look (AGENTS.md rules 14 and 15). Offline only: no cloud AI.
 
 ### Existing tools that do less than the big editors
 
-- [x] Text outline width (fixed at 0.16 of the size today) and shadow color, blur and distance (on/off today); box opacity
-- [x] Custom colors for text, shapes and boxes: a color wheel with hex, and an eyedropper from the picture
-- [x] Text format: bold, italic, underline, all caps toggles and a size slider
-- [x] Text, sticker and shape animations: slide in from all four sides, zoom out, and an adjustable length (300 ms today)
-- [x] Flip (horizontal and vertical) and opacity for image and sticker layers
-- [x] Layer tracks: Split at the playhead and Move here (to the playhead)
-- [x] Trim a clip by dragging its edges on the main strip, without opening trim mode
-- [x] Speed as a continuous slider from 0.2x to 10x (8 fixed steps from 0.25x to 4x today)
-- [x] Apply to all clips for speed, filter, adjust and the canvas background (the canvas background is one per project)
 - [ ] Music and voiceovers as timeline tracks: start anywhere, move, trim and split (music always starts at 0 today); fade in and out lengths (fixed 1.5 s today)
 - [ ] Video layers: filter and adjust, like the main clips
 - [ ] Adjust: warmth, tint, hue and fade (color matrices, so video still matches photos); vignette and grain need shaders
 - [ ] Export: frame rate (24 to 60), GIF, and the estimated file size shown before export; JPG or PNG chosen at save time for photos
-- [x] Eraser and restore brush: a soft edge (hardness) and undo/redo inside the tool
-- [x] Crop: 3:4 and 3:2 ratios, straighten (angle dial) and 90° rotate
-- [x] Draw: an eraser, pen opacity and redo
-- [x] Photo canvas: more ratios (as for video) and a blurred background (video has it); blank canvas starts with a chosen ratio (always 1080×1080 today)
 - [ ] Hold to compare with the original while adjusting
 
 ### Video

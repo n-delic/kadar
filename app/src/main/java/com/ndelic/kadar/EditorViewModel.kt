@@ -225,7 +225,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val dir = store.create()
         val file = withContext(Dispatchers.IO) { store.writeImage(dir, bitmap) }
         val layer = ImageLayer(1, Transform(bitmap.width / 2f, bitmap.height / 2f), bitmap, file)
-        open(dir, Project(bitmap.width, bitmap.height, layers = listOf(layer)))
+        open(dir, Project(bitmap.width, bitmap.height, layers = listOf(layer), photoId = layer.id))
     }
 
     /** A blank canvas of [ratio] (width / height), 1080 px on its short side. */
@@ -641,9 +641,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             val cut = Bitmap.createBitmap(layer.bitmap, left, top, right - left, bottom - top)
             val file = withContext(Dispatchers.IO) { store.writeImage(dir, cut) }
             val t = layer.t.shiftedContent((left + right) / 2f - layer.width / 2, (top + bottom) / 2f - layer.height / 2)
-            updateLayer(id) {
-                layer.copy(t = t, bitmap = cut, file = file, source = layer.source ?: layer.file, sourceX = layer.sourceX + left, sourceY = layer.sourceY + top)
-            }
+            putCropped(layer.copy(t = t, bitmap = cut, file = file, source = layer.source ?: layer.file, sourceX = layer.sourceX + left, sourceY = layer.sourceY + top))
             return@work
         }
         val (fw, fh) = if (turns % 2 == 0) layer.width to layer.height else layer.height to layer.width
@@ -665,7 +663,13 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         // The frame is the picture as shown in the layer's box, so the shift is in box pixels, and the new bitmap is unflipped.
         val (lx, ly) = turned(dx, dy, -degrees)
         val t = layer.t.shiftedLocal(lx, ly).copy(flipX = false, flipY = false)
-        updateLayer(id) { layer.copy(t = t, bitmap = cut, file = file, source = source, sourceX = sx.roundToInt(), sourceY = sy.roundToInt()) }
+        putCropped(layer.copy(t = t, bitmap = cut, file = file, source = source, sourceX = sx.roundToInt(), sourceY = sy.roundToInt()))
+    }
+
+    /** One undo step: the cropped [layer], and for the photo the project was opened with, the canvas cut to it. */
+    private fun putCropped(layer: ImageLayer) = updateProject { p ->
+        val cropped = p.copy(layers = p.layers.map { if (it.id == layer.id) layer else it })
+        if (layer.id == p.photoId && p.video == null) cropped.fittedTo(layer) else cropped
     }
 
     /** A frame of video layer [layer] at the playhead ([positionMs]), else its nearest end, to crop on; null (with a message) if unreadable. */

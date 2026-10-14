@@ -34,7 +34,15 @@ data class Project(
     val name: String? = null,
     /** Photos only: the canvas shows the bottom picture blurred behind everything ([backdrop]) instead of [background]. */
     val blur: Boolean = false,
+    /** The layer id of the photo the project was opened with, whose crop is the canvas's ([fittedTo]); null for blank canvases and videos. */
+    val photoId: Long? = null,
 ) {
+    /** The canvas cut to [photo]'s picture as placed, every layer kept at its spot on it (the "Original" aspect too). */
+    fun fittedTo(photo: ImageLayer): Project {
+        val (w, h) = fittedCanvas(photo.width, photo.height, photo.t)
+        return copy(width = w, height = h, originalHeight = h, layers = layers.map { it.withTransform(it.t.onFittedCanvas(photo.t, w, h)) })
+    }
+
     /** Every look and color adjustment left out (image layers, clips, video layers): what Hold to compare shows. */
     fun withoutAdjust() = copy(
         layers = layers.map {
@@ -139,6 +147,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
             exportSize = j.optString("exportSize").ifEmpty { null }?.let { enumOr<ExportSize>(it, ExportSize.Original) },
             name = j.optString("name").ifEmpty { null },
             blur = j.optBoolean("blur"),
+            photoId = if (j.has("photoId")) j.getLong("photoId") else null,
         )
     }
 
@@ -344,7 +353,8 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
 private fun Project.toJson() = JSONObject().apply {
     // 2: the video's clips are a list ("clips"); version 1 had the one clip's fields on the video.
     // 3: music is a list of parts ("music" an array), music and voices have offsets, lengths and fade lengths.
-    put("version", 3)
+    // 4: "photoId", the photo the project was opened with (absent before: no layer crops the canvas).
+    put("version", 4)
     put("width", width)
     put("height", height)
     put("originalHeight", originalHeight)
@@ -354,6 +364,7 @@ private fun Project.toJson() = JSONObject().apply {
     exportSize?.let { put("exportSize", it.name) }
     name?.let { put("name", it) }
     if (blur) put("blur", true)
+    photoId?.let { put("photoId", it) }
 }
 
 private fun Layer.toJson() = JSONObject().apply {

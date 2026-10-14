@@ -73,4 +73,24 @@ class CropTest {
         assertEquals(100f, x, 0.01f)
         assertEquals(0f, y, 0.01f)
     }
+
+    @Test
+    fun fittedCanvasIsTheCroppedPictureAndLayersStayOnIt() {
+        // A 400×300 crop placed at (600, 500) on a bigger canvas, as the crop leaves it.
+        val photo = Transform(600f, 500f)
+        assertEquals(400 to 300, fittedCanvas(400f, 300f, photo))
+        assertEquals(Transform(200f, 150f), photo.onFittedCanvas(photo, 400, 300))
+        // A caption 50 px left of and 100 px above the picture's center keeps that place, its turn and its size.
+        assertEquals(Transform(150f, 50f, 2f, 30f), Transform(550f, 400f, 2f, 30f).onFittedCanvas(photo, 400, 300))
+    }
+
+    @Test
+    fun fittedCanvasKeepsAScaledOrTurnedPhotosResolution() {
+        // Shown at half size: the canvas gets the picture's own pixels, so every layer scales up with it.
+        val half = Transform(300f, 200f, 0.5f)
+        assertEquals(400 to 300, fittedCanvas(400f, 300f, half))
+        assertEquals(Transform(300f, 150f, 1f), Transform(350f, 200f, 0.5f).onFittedCanvas(half, 400, 300))
+        // Turned a quarter on the canvas: the canvas takes the turned shape.
+        assertEquals(300 to 400, fittedCanvas(400f, 300f, Transform(0f, 0f, 1f, 90f)))
+    }
 }

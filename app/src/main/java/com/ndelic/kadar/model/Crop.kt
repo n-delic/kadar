@@ -2,7 +2,9 @@ package com.ndelic.kadar.model
 
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /** Width and height of the box around a [w]×[h] picture turned by [degrees] about its center. */
@@ -50,3 +52,14 @@ fun turnedSourceOffset(
     val (ux, uy) = turned(if (flipX) -cx else cx, if (flipY) -cy else cy, degrees)
     return turnedW / 2f + ux + left to turnedH / 2f + uy + top
 }
+
+/**
+ * The canvas fitted to a [w]×[h] picture placed by [photo]: the picture's box (turned with it) in the picture's own
+ * pixels, so a scaled photo keeps its resolution.
+ */
+fun fittedCanvas(w: Float, h: Float, photo: Transform): Pair<Int, Int> =
+    turnedBounds(w, h, photo.rotation).let { (bw, bh) -> max(1, bw.roundToInt()) to max(1, bh.roundToInt()) }
+
+/** Where this layer goes on a [width]×[height] canvas fitted to the picture placed by [photo], to stay on the same spot of it. */
+fun Transform.onFittedCanvas(photo: Transform, width: Int, height: Int) =
+    copy(x = (x - photo.x) / photo.scale + width / 2f, y = (y - photo.y) / photo.scale + height / 2f, scale = scale / photo.scale)

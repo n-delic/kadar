@@ -123,6 +123,10 @@
 
 Feature parity with the big phone editors, built from how their features behave, never from their code, assets or look (AGENTS.md rules 14 and 15). Offline only: no cloud AI.
 
+### Urgent
+
+- [ ] Effects show instantly: changing a filter, an adjust slider, speed, volume or a transition shows in the video preview right away, without the second-long reload. Today every change rebuilds the preview's composition and reloads its player. Idea: show looks and adjustments on the preview view itself while changing them (as video layers already do with their view's color filter) and rebuild only when the change is done; measure which other edits need a reload at all
+
 ### Existing tools that do less than the big editors
 
 - [ ] Adjust: vignette and grain (need shaders)

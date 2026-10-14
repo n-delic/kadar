@@ -89,6 +89,7 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, 
     var selected by rememberSaveable { mutableStateOf(listOf<String>()) }
     var confirmDelete by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<SavedProject?>(null) }
+    var blank by remember { mutableStateOf(false) }
     var query by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
     // A few projects fit on screen; search only earns its space beyond that.
     val searchable = state.projects.size > 6
@@ -141,7 +142,7 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, 
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    QuickAction(R.drawable.ic_crop_square, stringResource(R.string.home_blank), Modifier.weight(1f), vm::newBlank)
+                    QuickAction(R.drawable.ic_crop_square, stringResource(R.string.home_blank), Modifier.weight(1f)) { blank = true }
                     QuickAction(R.drawable.ic_language, stringResource(R.string.home_web), Modifier.weight(1f), onBrowse)
                 }
                 Spacer(Modifier.height(30.dp))
@@ -287,6 +288,16 @@ fun HomeScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit, 
                 renaming = null
             },
             onDismiss = { renaming = null },
+        )
+    }
+
+    if (blank) {
+        BlankDialog(
+            onCreate = { ratio ->
+                blank = false
+                vm.newBlank(ratio)
+            },
+            onDismiss = { blank = false },
         )
     }
 

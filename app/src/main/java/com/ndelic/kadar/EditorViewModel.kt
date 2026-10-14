@@ -50,6 +50,7 @@ import com.ndelic.kadar.model.Transform
 import com.ndelic.kadar.model.UiText
 import com.ndelic.kadar.model.UserError
 import com.ndelic.kadar.model.VideoLayer
+import com.ndelic.kadar.model.backdrop
 import com.ndelic.kadar.model.newShape
 import com.ndelic.kadar.model.renderLayers
 import com.ndelic.kadar.model.styled
@@ -201,7 +202,11 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         open(dir, Project(bitmap.width, bitmap.height, layers = listOf(layer)))
     }
 
-    fun newBlank() = open(store.create(), Project(1080, 1080))
+    /** A blank canvas of [ratio] (width / height), 1080 px on its short side. */
+    fun newBlank(ratio: Float) {
+        val (w, h) = if (ratio >= 1) (BLANK_SIDE * ratio).roundToInt() to BLANK_SIDE else BLANK_SIDE to (BLANK_SIDE / ratio).roundToInt()
+        open(store.create(), Project(w, h))
+    }
 
     fun newVideo(uri: Uri) = work(R.string.busy_opening_video) { newVideoNow(uri) }
 
@@ -322,7 +327,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** True when the project is on disk. */
     private suspend fun save(dir: File, project: Project): Boolean {
-        val thumb = renderLayers(project.width, project.height, project.background, project.layers, THUMB_SIZE / max(project.width, project.height), videoFrame)
+        val thumb = renderLayers(project.width, project.height, project.background, project.layers, THUMB_SIZE / max(project.width, project.height), videoFrame, project.backdrop())
         try {
             saveLock.withLock { withContext(Dispatchers.IO) { store.save(dir, project, thumb) } }
             lastSaved = project
@@ -647,7 +652,10 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         p.copy(height = h, layers = p.layers.map { it.withTransform(it.t.copy(y = it.t.y + dy)) })
     }
 
-    fun setBackground(color: Int) = updateProject { it.copy(background = color) }
+    fun setBackground(color: Int) = updateProject { it.copy(background = color, blur = false) }
+
+    /** Photos: the canvas shows the bottom picture blurred behind everything, until a color is picked. */
+    fun setBlur() = updateProject { it.copy(blur = true) }
 
     // Video
 
@@ -791,8 +799,9 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val shortSide = (p.exportSize ?: _uiState.value.settings.exportSize).shortSide
         if (video == null) {
             val scale = shortSide?.let { min(1f, it / min(p.width, p.height).toFloat()) } ?: 1f
-            val bitmap = renderLayers(p.width, p.height, p.background, p.layers, scale)
-            val transparent = p.background == Color.TRANSPARENT
+            val backdrop = p.backdrop()
+            val bitmap = renderLayers(p.width, p.height, p.background, p.layers, scale, backdrop = backdrop)
+            val transparent = p.background == Color.TRANSPARENT && backdrop == null
             val mime = if (transparent) "image/png" else "image/jpeg"
             val uri = withContext(Dispatchers.IO) {
                 saveToGallery(app, mime) { bitmap.compress(if (transparent) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG, 95, it) }
@@ -880,6 +889,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     private companion object {
         const val MAX_PHOTO = 2160
+        const val BLANK_SIDE = 1080
         const val MAX_LAYER = 1440
         const val THUMB_SIZE = 360f
         const val MAX_UNDO = 50

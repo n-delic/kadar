@@ -575,14 +575,16 @@ fun Canvas.drawLayer(layer: Layer, reveal: Reveal? = null) {
 }
 
 /**
- * Renders the layers, [scale] times the canvas size, over [under] stretched to the canvas (a video frame for thumbnails).
+ * Renders the layers, [scale] times the canvas size, over [under] fitted into the canvas (a video frame for thumbnails),
+ * over [backdrop] stretched to fill it (a blurred photo canvas, [Project.backdrop]).
  * The same drawing code backs the on-screen editor, so exports match it.
  */
-fun renderLayers(width: Int, height: Int, background: Int, layers: List<Layer>, scale: Float = 1f, under: Bitmap? = null): Bitmap =
+fun renderLayers(width: Int, height: Int, background: Int, layers: List<Layer>, scale: Float = 1f, under: Bitmap? = null, backdrop: Bitmap? = null): Bitmap =
     Bitmap.createBitmap((width * scale).roundToInt().coerceAtLeast(1), (height * scale).roundToInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888).also { bitmap ->
         Canvas(bitmap).apply {
             drawColor(background)
             scale(scale, scale)
+            backdrop?.let { drawBitmap(it, null, RectF(0f, 0f, width.toFloat(), height.toFloat()), bitmapPaint) }
             under?.let { drawBitmap(it, null, fitRect(it.width, it.height, width, height), bitmapPaint) }
             layers.forEach { if (!it.hidden) drawLayer(it) }
         }

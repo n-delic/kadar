@@ -80,6 +80,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -88,6 +89,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -128,6 +130,8 @@ import com.ndelic.kadar.model.TextLayer
 import com.ndelic.kadar.model.Transform
 import com.ndelic.kadar.model.UiText
 import com.ndelic.kadar.model.VideoLayer
+import com.ndelic.kadar.model.backdrop
+import com.ndelic.kadar.model.blurBase
 import com.ndelic.kadar.model.drawLayer
 import com.ndelic.kadar.model.motionAt
 import com.ndelic.kadar.ui.common.CircleButton
@@ -720,6 +724,10 @@ private fun Stage(project: Project, selected: Layer?, player: CompositionPlayer?
         ) {
             Box(Modifier.fillMaxSize().clipToBounds().background(if (transparent) Color(0xFF3A3A3A) else Color(project.background))) {
                 if (transparent) Checkerboard()
+                // Rebuilt only when its picture or the canvas changes, not on every drag.
+                val base = project.blurBase()
+                val backdrop = remember(base?.bitmap, base?.adjust, project.width, project.height) { project.backdrop()?.asImageBitmap() }
+                backdrop?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds) }
                 project.video?.takeIf { it.blurred }?.let { BlurBackgroundPreview(it, stills, project.width, project.height, scale, player) }
                 player?.let { p ->
                     VideoSurface(

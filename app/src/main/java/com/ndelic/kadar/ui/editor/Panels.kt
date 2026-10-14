@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -63,6 +64,7 @@ import com.ndelic.kadar.model.TextAlign
 import com.ndelic.kadar.model.TextLayer
 import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.ui.common.AspectTile
+import com.ndelic.kadar.ui.common.CANVAS_RATIOS
 import com.ndelic.kadar.ui.common.ColorRow
 import com.ndelic.kadar.ui.common.Ink
 import com.ndelic.kadar.ui.common.KDialog
@@ -83,7 +85,7 @@ private val EMOJIS = listOf(
 )
 
 // A null label is the localized "Original".
-private val ASPECTS = listOf(null to null, "1:1" to 1f, "4:5" to 0.8f, "9:16" to 9f / 16, "16:9" to 16f / 9)
+private val ASPECTS = listOf<Pair<String?, Float?>>(null to null) + CANVAS_RATIOS
 
 private val SPEEDS = listOf(0.25f, 0.5f, 0.75f, 1f, 1.5f, 2f, 3f, 4f)
 
@@ -134,8 +136,30 @@ fun CanvasPanel(project: Project, defaultExport: ExportSize, vm: EditorViewModel
             }
         }
         PanelLabel(stringResource(R.string.background))
-        ColorRow(project.background.takeIf { it != android.graphics.Color.TRANSPARENT }, allowNone = true) { vm.setBackground(it ?: android.graphics.Color.TRANSPARENT) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (project.layers.any { it is ImageLayer }) {
+                BlurDot(project.blur, vm::setBlur)
+                Spacer(Modifier.width(10.dp))
+            }
+            Box(Modifier.weight(1f)) {
+                // Transparent matches no dot (the crossed-out one is null), so with the blur on only its dot shows picked.
+                val picked = if (project.blur) android.graphics.Color.TRANSPARENT else project.background.takeIf { it != android.graphics.Color.TRANSPARENT }
+                ColorRow(picked, allowNone = true) { vm.setBackground(it ?: android.graphics.Color.TRANSPARENT) }
+            }
+        }
         ExportSizeRow(project, defaultExport, vm)
+    }
+}
+
+/** The blurred-photo background, picked like a color dot. */
+@Composable
+private fun BlurDot(active: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.size(40.dp).border(2.dp, if (active) Ink.accent else Color.Transparent, CircleShape).padding(4.dp)
+            .clip(CircleShape).background(Ink.raised).border(1.dp, Ink.line, CircleShape).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        KIcon(R.drawable.ic_blur_on, Modifier.size(20.dp), if (active) Ink.accent else Ink.text, stringResource(R.string.canvas_blur))
     }
 }
 

@@ -35,6 +35,8 @@ import com.ndelic.kadar.model.CropRect
 import com.ndelic.kadar.model.DrawLayer
 import com.ndelic.kadar.model.ExportQuality
 import com.ndelic.kadar.model.ExportSize
+import com.ndelic.kadar.model.PhotoFormat
+import com.ndelic.kadar.model.transparent
 import com.ndelic.kadar.model.Font
 import com.ndelic.kadar.model.ImageLayer
 import com.ndelic.kadar.model.Layer
@@ -62,6 +64,8 @@ import com.ndelic.kadar.model.turnedSourceOffset
 import com.ndelic.kadar.model.withStrokes
 import com.ndelic.kadar.ui.editor.Timeline
 import com.ndelic.kadar.ui.editor.label
+import com.ndelic.kadar.video.GIF_FPS
+import com.ndelic.kadar.video.GIF_MAX_MS
 import com.ndelic.kadar.video.Music
 import com.ndelic.kadar.video.Segment
 import com.ndelic.kadar.video.Transition
@@ -69,10 +73,13 @@ import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.VoiceClip
 import com.ndelic.kadar.video.composition
 import com.ndelic.kadar.video.exportVideo
+import com.ndelic.kadar.video.gifShortSide
 import com.ndelic.kadar.video.highBitrate
 import com.ndelic.kadar.video.layerMovedTo
 import com.ndelic.kadar.video.layerSplitPoint
 import com.ndelic.kadar.video.moved
+import com.ndelic.kadar.video.mp4ToGif
+import com.ndelic.kadar.video.outputFrameRate
 import com.ndelic.kadar.video.sourceMs
 import com.ndelic.kadar.video.splitPoint
 import java.io.File
@@ -835,34 +842,80 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     // Export
 
-    fun export(share: Boolean) = work(R.string.busy_saving) {
+    /** The project's export size by the short side, or null for the canvas size. */
+    val exportShortSide get() = _uiState.value.project?.let { (it.exportSize ?: _uiState.value.settings.exportSize).shortSide }
+
+    /** Saves the photo as [format] (remembered for next time); a transparent canvas is always a PNG. */
+    fun exportPhoto(share: Boolean, format: PhotoFormat) = work(R.string.busy_saving) {
         val p = _uiState.value.project ?: return@work
-        val video = p.video
-        val shortSide = (p.exportSize ?: _uiState.value.settings.exportSize).shortSide
-        if (video == null) {
-            val scale = shortSide?.let { min(1f, it / min(p.width, p.height).toFloat()) } ?: 1f
-            val backdrop = p.backdrop()
-            val bitmap = renderLayers(p.width, p.height, p.background, p.layers, scale, backdrop = backdrop)
-            val transparent = p.background == Color.TRANSPARENT && backdrop == null
-            val mime = if (transparent) "image/png" else "image/jpeg"
-            val uri = withContext(Dispatchers.IO) {
-                saveToGallery(app, mime) { bitmap.compress(if (transparent) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG, 95, it) }
-            }
-            _effects.send(EditorEffect.Saved(uri, mime, share))
+        val shortSide = exportShortSide
+        val scale = shortSide?.let { min(1f, it / min(p.width, p.height).toFloat()) } ?: 1f
+        val backdrop = p.backdrop()
+        val bitmap = renderLayers(p.width, p.height, p.background, p.layers, scale, backdrop = backdrop)
+        if (p.transparent) {
+            save(PhotoFormat.Png, bitmap, share)
         } else {
-            val out = File(app.cacheDir, "export.mp4")
-            val (w, h) = video.outputSize
-            val bitrate = if (_uiState.value.settings.exportQuality == ExportQuality.High) highBitrate(w, h, shortSide, video.frameRate) else null
-            try {
-                _uiState.update { it.copy(busy = UiText.Res(R.string.busy_saving_video), progress = 0, cancellable = true) }
-                exportVideo(app, video.composition(p.layers, shortSide), out, bitrate) { pct -> _uiState.update { it.copy(progress = pct) } }
-                // A cancel during the gallery copy would leave a half-written file there; the copy takes a moment at most.
-                _uiState.update { it.copy(cancellable = false) }
-                val uri = withContext(Dispatchers.IO) { saveToGallery(app, "video/mp4") { o -> out.inputStream().use { it.copyTo(o) } } }
-                _effects.send(EditorEffect.Saved(uri, "video/mp4", share))
-            } finally {
-                out.delete()
+            updateSettings { copy(photoFormat = format) }
+            save(format, bitmap, share)
+        }
+    }
+
+    private suspend fun save(format: PhotoFormat, bitmap: Bitmap, share: Boolean) {
+        val compress = if (format == PhotoFormat.Png) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
+        val uri = withContext(Dispatchers.IO) { saveToGallery(app, format.mime) { bitmap.compress(compress, 95, it) } }
+        _effects.send(EditorEffect.Saved(uri, format.mime, share))
+    }
+
+    /** Saves the video as an MP4 at [fps]: the clip's own rate keeps its frames as they are, any other goes through the frame clock. */
+    fun exportVideo(share: Boolean, fps: Int, quality: ExportQuality) = work(R.string.busy_saving) {
+        val p = _uiState.value.project ?: return@work
+        val video = p.video ?: return@work
+        val shortSide = exportShortSide
+        val forced = fps != outputFrameRate(video.frameRate)
+        val clip = if (forced) video.copy(frameRate = fps.toFloat()) else video
+        val (w, h) = video.outputSize
+        val bitrate = if (quality == ExportQuality.High) highBitrate(w, h, shortSide, clip.frameRate) else null
+        saveRendered("mp4", "video/mp4", R.string.busy_saving_video, share) { out ->
+            exportVideo(app, clip.composition(p.layers, shortSide, frameClock = forced), out, bitrate) { pct -> _uiState.update { it.copy(progress = pct) } }
+        }
+    }
+
+    /** Saves the video as a looping GIF, small ([gifShortSide]), at [GIF_FPS] fps, no sound, at most [GIF_MAX_MS] long. */
+    fun exportGif(share: Boolean) = work(R.string.busy_saving) {
+        val p = _uiState.value.project ?: return@work
+        val video = p.video ?: return@work
+        if (video.outputDurationMs > GIF_MAX_MS) throw UserError(R.string.gif_too_long, GIF_MAX_MS / 1000)
+        val (w, h) = video.outputSize
+        val shortSide = gifShortSide(w, h)
+        val clip = video.copy(frameRate = GIF_FPS.toFloat())
+        val mp4 = File(app.cacheDir, "gif.mp4")
+        try {
+            saveRendered("gif", "image/gif", R.string.busy_saving_gif, share) { out ->
+                // Rendered small by Media3 first, so the GIF shows exactly what the MP4 export would; half the ring each.
+                exportVideo(app, clip.composition(p.layers, shortSide, frameClock = true), mp4, highBitrate(w, h, shortSide, clip.frameRate)) { pct ->
+                    _uiState.update { it.copy(progress = pct / 2) }
+                }
+                out.outputStream().buffered().use { o -> mp4ToGif(mp4, o) { f -> _uiState.update { it.copy(progress = 50 + (f * 50).toInt()) } } }
             }
+        } finally {
+            mp4.delete()
+        }
+    }
+
+    /**
+     * Makes a file with [render] behind a cancellable progress ring, then copies it to the gallery as [mime]. A cancel
+     * during the gallery copy would leave a half-written file there; the copy takes a moment at most.
+     */
+    private suspend fun saveRendered(extension: String, mime: String, @StringRes label: Int, share: Boolean, render: suspend (File) -> Unit) {
+        val out = File(app.cacheDir, "export.$extension")
+        try {
+            _uiState.update { it.copy(busy = UiText.Res(label), progress = 0, cancellable = true) }
+            render(out)
+            _uiState.update { it.copy(cancellable = false) }
+            val uri = withContext(Dispatchers.IO) { saveToGallery(app, mime) { o -> out.inputStream().use { it.copyTo(o) } } }
+            _effects.send(EditorEffect.Saved(uri, mime, share))
+        } finally {
+            out.delete()
         }
     }
 

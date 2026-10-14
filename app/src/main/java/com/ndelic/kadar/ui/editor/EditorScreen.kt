@@ -169,6 +169,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     var panel by rememberSaveable { mutableStateOf<Panel?>(null) }
     // null: closed; otherwise the text being typed (for a new layer, or the selected text layer).
     var typing by rememberSaveable { mutableStateOf<String?>(null) }
+    // null: closed; otherwise whether the export dialog shares (true) or saves.
+    var exporting by rememberSaveable { mutableStateOf<Boolean?>(null) }
     val image = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::addImage) }
     val music = rememberLauncherForActivityResult(OpenDocument()) { it?.let(vm::setMusic) }
     // Bumped to swap in a fresh preview player after it failed, resuming at [resumeAt].
@@ -277,9 +279,9 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                 }
                 Spacer(Modifier.width(10.dp))
             }
-            CircleButton(R.drawable.ic_download, stringResource(R.string.save_to_gallery)) { vm.export(share = false) }
+            CircleButton(R.drawable.ic_download, stringResource(R.string.save_to_gallery)) { exporting = false }
             Spacer(Modifier.width(10.dp))
-            CircleButton(R.drawable.ic_share, stringResource(R.string.share)) { vm.export(share = true) }
+            CircleButton(R.drawable.ic_share, stringResource(R.string.share)) { exporting = true }
         }
 
         Stage(
@@ -615,6 +617,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             onCancel = { drawing = null },
         )
     }
+
+    exporting?.let { share -> ExportDialog(project, state.settings, share, vm) { exporting = null } }
 
     typing?.let { initial ->
         val layer = selected as? TextLayer

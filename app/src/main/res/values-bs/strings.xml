@@ -269,6 +269,13 @@
     <string name="busy_saving">Spremam</string>
     <string name="busy_saving_sticker">Spremam stiker</string>
     <string name="busy_saving_video">Spremam video</string>
+    <string name="busy_saving_gif">Spremam GIF</string>
+    <string name="export_format">Format</string>
+    <string name="export_frame_rate">Sličice u sekundi</string>
+    <string name="export_estimate">Oko %1$s</string>
+    <string name="export_png_only">Pozadina je providna, pa se sprema kao PNG.</string>
+    <string name="gif_hint">Do %1$d s, %2$d px, %3$d fps, bez zvuka</string>
+    <string name="gif_too_long">GIF može trajati najviše %1$d s. Skrati video ili spremi MP4.</string>
     <string name="export_cancelled">Izvoz otkazan</string>
     <string name="busy_cropping">Izrezujem</string>
     <string name="busy_importing_font">Dodajem font</string>

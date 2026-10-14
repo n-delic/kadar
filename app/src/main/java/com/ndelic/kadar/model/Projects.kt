@@ -39,7 +39,8 @@ data class Project(
 ) {
     /** The canvas cut to [photo]'s picture as placed, every layer kept at its spot on it (the "Original" aspect too). */
     fun fittedTo(photo: ImageLayer): Project {
-        val (w, h) = fittedCanvas(photo.width, photo.height, photo.t)
+        // A stretched photo keeps its stretch at scale 1, so the canvas is its stretched size.
+        val (w, h) = fittedCanvas(photo.width * photo.t.stretch, photo.height, photo.t)
         return copy(width = w, height = h, originalHeight = h, layers = layers.map { it.withTransform(it.t.onFittedCanvas(photo.t, w, h)) })
     }
 
@@ -154,7 +155,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
     private fun layerFromJson(dir: File, j: JSONObject): Layer? {
         val t = Transform(
             j.getDouble("x").toFloat(), j.getDouble("y").toFloat(), j.getDouble("scale").toFloat(), j.getDouble("rotation").toFloat(),
-            flipX = j.optBoolean("flipX"), flipY = j.optBoolean("flipY"),
+            flipX = j.optBoolean("flipX"), flipY = j.optBoolean("flipY"), stretch = j.optDouble("stretch", 1.0).toFloat(),
         )
         val id = j.getLong("id")
         // Absent in projects saved before layers had timing: they show for the whole video.
@@ -375,6 +376,7 @@ private fun Layer.toJson() = JSONObject().apply {
     put("rotation", t.rotation.toDouble())
     if (t.flipX) put("flipX", true)
     if (t.flipY) put("flipY", true)
+    if (t.stretch != 1f) put("stretch", t.stretch.toDouble())
     put("startMs", startMs)
     put("endMs", endMs)
     put("hidden", hidden)

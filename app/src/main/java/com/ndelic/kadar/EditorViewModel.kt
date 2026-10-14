@@ -58,6 +58,7 @@ import com.ndelic.kadar.model.backdrop
 import com.ndelic.kadar.model.defaultTextSize
 import com.ndelic.kadar.model.newShape
 import com.ndelic.kadar.model.renderLayers
+import com.ndelic.kadar.model.sideDragged
 import com.ndelic.kadar.model.styled
 import com.ndelic.kadar.model.turned
 import com.ndelic.kadar.model.turnedBounds
@@ -497,8 +498,9 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     /** Tail drags on the stage; like gestures, only the first update of a drag ([first]) becomes an undo step. */
     fun setTail(x: Float, y: Float, first: Boolean) = updateSelected(record = first) { if (it is TextLayer) it.copy(tail = x to y) else it }
 
-    /** Wrap-handle drags of text [from] as the drag started; only the first update of a drag ([first]) is an undo step. */
-    fun dragWrap(from: TextLayer, side: Float, dx: Float, first: Boolean) = updateSelected(record = first) { if (it.id == from.id) from.wrapDragged(side, dx) else it }
+    /** Side-handle drags of [from] as the drag started ([sideDragged]); only the first update of a drag ([first]) is an undo step. */
+    fun dragSide(from: Layer, vertical: Boolean, side: Float, d: Float, first: Boolean) =
+        updateSelected(record = first) { if (it.id == from.id) from.sideDragged(vertical, side, d) else it }
 
     fun applyPreset(preset: TextPreset) = editText { styled(preset, _uiState.value.fonts) }
 

@@ -25,8 +25,19 @@ import kotlin.math.sin
 /**
  * Where a layer's center sits on the canvas, in canvas pixels. Rotation is in degrees, clockwise. [flipX] mirrors the
  * content left to right and [flipY] top to bottom inside its box; the box itself (handles, hit test) doesn't flip.
+ * [stretch] scales the width on top of [scale]: a picture or drawing pulled wider (above 1) or narrower by a side handle.
  */
-data class Transform(val x: Float, val y: Float, val scale: Float = 1f, val rotation: Float = 0f, val flipX: Boolean = false, val flipY: Boolean = false) {
+data class Transform(
+    val x: Float,
+    val y: Float,
+    val scale: Float = 1f,
+    val rotation: Float = 0f,
+    val flipX: Boolean = false,
+    val flipY: Boolean = false,
+    val stretch: Float = 1f,
+) {
+    /** How many canvas pixels one of the layer's own pixels is across. */
+    val scaleX get() = scale * stretch
 
     /** True if canvas point ([px], [py]) falls inside a [width]×[height] box placed by this transform. */
     fun contains(width: Float, height: Float, px: Float, py: Float): Boolean {
@@ -39,7 +50,7 @@ data class Transform(val x: Float, val y: Float, val scale: Float = 1f, val rota
         val r = Math.toRadians(-rotation.toDouble())
         val dx = px - x
         val dy = py - y
-        return ((dx * cos(r) - dy * sin(r)) / scale).toFloat() to ((dx * sin(r) + dy * cos(r)) / scale).toFloat()
+        return ((dx * cos(r) - dy * sin(r)) / scaleX).toFloat() to ((dx * sin(r) + dy * cos(r)) / scale).toFloat()
     }
 
     /** Pulls the center onto the canvas center lines ([cx], [cy]) and the angle onto a multiple of 90° when they're close. */
@@ -57,14 +68,29 @@ data class Transform(val x: Float, val y: Float, val scale: Float = 1f, val rota
     fun shiftedLocal(dx: Float, dy: Float): Transform {
         val r = Math.toRadians(rotation.toDouble())
         return copy(
-            x = x + ((dx * cos(r) - dy * sin(r)) * scale).toFloat(),
-            y = y + ((dx * sin(r) + dy * cos(r)) * scale).toFloat(),
+            x = x + (dx * scaleX * cos(r) - dy * scale * sin(r)).toFloat(),
+            y = y + (dx * scaleX * sin(r) + dy * scale * cos(r)).toFloat(),
         )
     }
 
     /** [shiftedLocal] by ([dx], [dy]) in the content's own pixels, which a flip mirrors. */
     fun shiftedContent(dx: Float, dy: Float) = shiftedLocal(if (flipX) -dx else dx, if (flipY) -dy else dy)
+
+    /**
+     * A [width]×[height] box (own pixels) with its [side] edge (-1 left or top, 1 right or bottom) across ([vertical] false)
+     * or up and down dragged by [d] own pixels: stretched that way only, the opposite edge staying put on the canvas.
+     */
+    fun sideDragged(width: Float, height: Float, vertical: Boolean, side: Float, d: Float): Transform {
+        val size = if (vertical) height else width
+        val k = (size + side * d).coerceAtLeast(MIN_SIDE / if (vertical) scale else scaleX) / size
+        val shift = side * size * (k - 1) / 2
+        return if (vertical) shiftedLocal(0f, shift).copy(scale = scale * k, stretch = stretch / k)
+        else shiftedLocal(shift, 0f).copy(stretch = stretch * k)
+    }
 }
+
+/** The narrowest a side handle squeezes a layer, in canvas pixels. */
+private const val MIN_SIDE = 16f
 
 /** [name] is what projects store, so fonts can change without breaking saved files. */
 class Font(val name: String, val typeface: Typeface)
@@ -616,6 +642,30 @@ data class ShapeLayer(
     override fun withTransform(t: Transform) = copy(t = t)
     override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = endMs)
     override fun withFlags(hidden: Boolean, locked: Boolean) = copy(hidden = hidden, locked = locked)
+
+    /** [Transform.sideDragged] for a shape: it changes [w] or [h] instead of stretching, so its outline and corners keep their size. */
+    fun sideDragged(vertical: Boolean, side: Float, d: Float): ShapeLayer {
+        val size = if (vertical) h else w
+        val next = (size + side * d).coerceAtLeast(MIN_SIDE / if (vertical) t.scale else t.scaleX)
+        val shift = side * (next - size) / 2
+        return if (vertical) copy(h = next, t = t.shiftedLocal(0f, shift)) else copy(w = next, t = t.shiftedLocal(shift, 0f))
+    }
+}
+
+/** Whether the stage shows handles on the left and right ([vertical] false) or top and bottom sides; a line has no height. */
+fun Layer.hasSideHandles(vertical: Boolean) = when (this) {
+    is TextLayer -> !vertical
+    is VideoLayer -> false
+    is ShapeLayer -> !vertical || kind != ShapeKind.Line
+    is ImageLayer, is DrawLayer -> true
+}
+
+/** A side handle dragged by [d] own pixels: text wraps, a shape resizes, a picture or drawing stretches. */
+fun Layer.sideDragged(vertical: Boolean, side: Float, d: Float): Layer = when {
+    !hasSideHandles(vertical) -> this
+    this is TextLayer -> wrapDragged(side, d)
+    this is ShapeLayer -> sideDragged(vertical, side, d)
+    else -> withTransform(t.sideDragged(width, height, vertical, side, d))
 }
 
 /** A new [kind] of shape about [size] canvas pixels big: outlined in red, or filled red for an arrow or a star. */
@@ -641,7 +691,7 @@ fun Canvas.drawLayer(layer: Layer, reveal: Reveal? = null) {
     save()
     translate(layer.t.x, layer.t.y)
     rotate(layer.t.rotation)
-    scale(if (layer.t.flipX) -layer.t.scale else layer.t.scale, if (layer.t.flipY) -layer.t.scale else layer.t.scale)
+    scale(if (layer.t.flipX) -layer.t.scaleX else layer.t.scaleX, if (layer.t.flipY) -layer.t.scale else layer.t.scale)
     if (layer is TextLayer) layer.drawContent(this, reveal) else layer.drawContent(this)
     restore()
 }

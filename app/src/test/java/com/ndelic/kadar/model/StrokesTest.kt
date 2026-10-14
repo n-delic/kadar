@@ -81,6 +81,18 @@ class StrokesTest {
     }
 
     @Test
+    fun canvasStrokesUndoWithStrokesOnAStretchedDrawing() {
+        val layer = DrawLayer(1, Transform(500f, 400f, scale = 2f, rotation = 30f, flipX = true, stretch = 1.5f), listOf(PenStroke(0, 3f, floatArrayOf(-10f, 5f, 20f, -5f))))
+        // Unturned and unflipped, local (-10, 5) is 30 px left (2 × 1.5 wide) and 10 px down of the center.
+        val plain = DrawLayer(1, Transform(500f, 400f, scale = 2f, stretch = 1.5f), layer.strokes).canvasStrokes().single().points
+        assertArrayEquals(floatArrayOf(470f, 410f), plain.copyOfRange(0, 2), 0.001f)
+        val canvas = layer.canvasStrokes()
+        val back = layer.copy(strokes = emptyList()).withStrokes(canvas)
+        assertEquals(1.5f, back.t.stretch, 0.001f)
+        assertArrayEquals(canvas.single().points, back.canvasStrokes().single().points, 0.01f)
+    }
+
+    @Test
     fun canvasStrokesUndoWithStrokesOnAFlippedDrawing() {
         val layer = DrawLayer(1, Transform(500f, 400f, scale = 2f, rotation = 30f, flipX = true, flipY = true), listOf(PenStroke(0, 3f, floatArrayOf(-10f, 5f, 20f, -5f))))
         // Flipped both ways and unturned, local (-10, 5) would be 20 px right and 10 px up of the center.

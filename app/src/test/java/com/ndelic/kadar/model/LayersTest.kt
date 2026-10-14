@@ -28,6 +28,53 @@ class LayersTest {
     }
 
     @Test
+    fun sideDragStretchesOneWayAndKeepsTheOppositeEdge() {
+        // A 100×50 picture, doubled, turned and mirrored: the drag is along its own axes, the flip doesn't matter.
+        val t = Transform(300f, 200f, scale = 2f, rotation = 30f, flipX = true, flipY = true)
+        fun edge(t: Transform, x: Float, y: Float) = t.shiftedLocal(x, y).let { it.x to it.y }
+        // Right edge 20 own pixels out: 20% wider, the left edge stays where it was, the height doesn't change.
+        val wide = t.sideDragged(100f, 50f, vertical = false, side = 1f, d = 20f)
+        assertEquals(2.4f, wide.scaleX, 0.001f)
+        assertEquals(2f, wide.scale, 0.001f)
+        assertEquals(edge(t, -50f, 0f).first, edge(wide, -50f, 0f).first, 0.01f)
+        assertEquals(edge(t, -50f, 0f).second, edge(wide, -50f, 0f).second, 0.01f)
+        // Top edge 25 own pixels down: half as tall, the bottom edge stays, the width doesn't change.
+        val flat = wide.sideDragged(100f, 50f, vertical = true, side = -1f, d = 25f)
+        assertEquals(1f, flat.scale, 0.001f)
+        assertEquals(2.4f, flat.scaleX, 0.001f)
+        assertEquals(edge(wide, 0f, 25f).first, edge(flat, 0f, 25f).first, 0.01f)
+        assertEquals(edge(wide, 0f, 25f).second, edge(flat, 0f, 25f).second, 0.01f)
+        // Past the opposite edge it stops at a sliver instead of turning inside out.
+        assertEquals(16f, t.sideDragged(100f, 50f, vertical = false, side = -1f, d = 500f).scaleX * 100f, 0.01f)
+    }
+
+    @Test
+    fun stretchedToLocalUndoesShiftedLocal() {
+        val t = Transform(10f, 20f, scale = 2f, rotation = 45f, stretch = 1.5f)
+        val moved = t.shiftedLocal(30f, -12f)
+        val (x, y) = t.toLocal(moved.x, moved.y)
+        assertEquals(30f, x, 0.001f)
+        assertEquals(-12f, y, 0.001f)
+        assertTrue(t.contains(100f, 20f, t.shiftedLocal(49f, 0f).x, t.shiftedLocal(49f, 0f).y))
+    }
+
+    @Test
+    fun shapeSideDragResizesInsteadOfStretching() {
+        val shape = newShape(1, ShapeKind.Rect, Transform(500f, 500f, scale = 2f, rotation = 90f), 100f)
+        val taller = shape.sideDragged(vertical = true, side = 1f, d = 10f)
+        assertEquals(shape.h + 10f, taller.h, 0.001f)
+        assertEquals(shape.w, taller.w, 0.001f)
+        assertEquals(1f, taller.t.stretch, 0.001f)
+        // Turned 90°, its bottom points left on the canvas: the center moves half the growth that way, the top stays.
+        assertEquals(490f, taller.t.x, 0.001f)
+        assertEquals(500f, taller.t.y, 0.001f)
+        // A line has no height to drag.
+        val line = newShape(2, ShapeKind.Line, Transform(0f, 0f), 100f)
+        assertFalse(line.hasSideHandles(vertical = true))
+        assertEquals(line, (line as Layer).sideDragged(vertical = true, side = 1f, d = 10f))
+    }
+
+    @Test
     fun opaqueBoundsFindsVisiblePixels() {
         val px = IntArray(5 * 4)
         px[1 * 5 + 2] = 0xFF000000.toInt()

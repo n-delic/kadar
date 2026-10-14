@@ -79,4 +79,26 @@ class StrokesTest {
         // Re-centering moves the origin, but every point lands where it was on the canvas.
         assertArrayEquals(canvas.single().points, back.canvasStrokes().single().points, 0.01f)
     }
+
+    @Test
+    fun canvasStrokesUndoWithStrokesOnAFlippedDrawing() {
+        val layer = DrawLayer(1, Transform(500f, 400f, scale = 2f, rotation = 30f, flipX = true, flipY = true), listOf(PenStroke(0, 3f, floatArrayOf(-10f, 5f, 20f, -5f))))
+        // Flipped both ways and unturned, local (-10, 5) would be 20 px right and 10 px up of the center.
+        val plain = DrawLayer(1, Transform(500f, 400f, scale = 2f, flipX = true, flipY = true), layer.strokes).canvasStrokes().single().points
+        assertArrayEquals(floatArrayOf(520f, 390f), plain.copyOfRange(0, 2), 0.001f)
+        val canvas = layer.canvasStrokes()
+        val back = layer.copy(strokes = emptyList()).withStrokes(canvas)
+        assertArrayEquals(canvas.single().points, back.canvasStrokes().single().points, 0.01f)
+    }
+
+    @Test
+    fun addedStrokesLandWhereTheyShowOnAMirroredDrawing() {
+        val layer = DrawLayer(1, Transform(500f, 500f, flipX = true), listOf(PenStroke(0, 2f, floatArrayOf(-10f, 0f))))
+        // 30 px right on the canvas is 30 px left in a mirrored drawing's own space.
+        val more = layer.withStrokes(listOf(PenStroke(0, 2f, floatArrayOf(530f, 500f))))
+        assertArrayEquals(floatArrayOf(10f, 0f), more.strokes[0].points, 0.001f)
+        assertArrayEquals(floatArrayOf(-10f, 0f), more.strokes[1].points, 0.001f)
+        // Re-centered on local -20, which is 20 px right on the canvas.
+        assertEquals(520f, more.t.x, 0.001f)
+    }
 }

@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
@@ -140,9 +141,12 @@ fun EraseScreen(layer: ImageLayer, source: Bitmap?, onDone: (Bitmap) -> Unit, on
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
             val fit = min(constraints.maxWidth / work.width.toFloat(), constraints.maxHeight / work.height.toFloat()) * 0.92f
             val center = Offset(constraints.maxWidth / 2f, constraints.maxHeight / 2f)
+            // Shown flipped like on the canvas, so the brush lands where it looks like it does.
+            val fx = if (layer.t.flipX) -1f else 1f
+            val fy = if (layer.t.flipY) -1f else 1f
             fun toBitmap(p: Offset): Offset {
                 val s = fit * zoom
-                return Offset((p.x - center.x - pan.x) / s + work.width / 2f, (p.y - center.y - pan.y) / s + work.height / 2f)
+                return Offset((p.x - center.x - pan.x) / (s * fx) + work.width / 2f, (p.y - center.y - pan.y) / (s * fy) + work.height / 2f)
             }
             Canvas(
                 // Strokes near the screen edge must paint, not trigger the system back gesture.
@@ -205,7 +209,7 @@ fun EraseScreen(layer: ImageLayer, source: Bitmap?, onDone: (Bitmap) -> Unit, on
                 frame // read so each stroke segment redraws
                 withTransform({
                     translate(center.x + pan.x, center.y + pan.y)
-                    scale(fit * zoom, fit * zoom, Offset.Zero)
+                    scale(fit * zoom * fx, fit * zoom * fy, Offset.Zero)
                     translate(-work.width / 2f, -work.height / 2f)
                 }) {
                     checker(Size(work.width.toFloat(), work.height.toFloat()), 24f)
@@ -287,12 +291,17 @@ private val CROP_RATIOS = listOf(
 
 /**
  * Crop [bitmap] (an image layer's, or a video layer's frame), starting from [initial] or the whole of it: drag the
- * corners or the middle; ratios lock the shape. With [turnable], the picture also turns in quarter turns and
- * straightens by up to 45° either way. [onDone] gets `[left, top, right, bottom)` in the frame (the bitmap's box after
- * the quarter turns, same center), the quarter turns and the straightening angle.
+ * corners or the middle; ratios lock the shape. A layer flipped on the canvas ([flipX], [flipY]) shows flipped here too.
+ * With [turnable], the picture also turns in quarter turns and straightens by up to 45° either way. [onDone] gets
+ * `[left, top, right, bottom)`, the quarter turns and the straightening angle. Unturned, the rectangle is in [bitmap]'s
+ * pixels (a flipped view mirrored back); turned, it's in the frame as shown (the flipped picture's box after the
+ * quarter turns, same center).
  */
 @Composable
-fun CropScreen(bitmap: Bitmap, onDone: (IntArray, Int, Float) -> Unit, onCancel: () -> Unit, initial: Rect? = null, turnable: Boolean = false) {
+fun CropScreen(
+    bitmap: Bitmap, onDone: (IntArray, Int, Float) -> Unit, onCancel: () -> Unit, initial: Rect? = null,
+    flipX: Boolean = false, flipY: Boolean = false, turnable: Boolean = false,
+) {
     var turns by remember { mutableIntStateOf(0) }
     var angle by remember { mutableFloatStateOf(0f) }
     val bw = (if (turns % 2 == 0) bitmap.width else bitmap.height).toFloat()
@@ -303,7 +312,11 @@ fun CropScreen(bitmap: Bitmap, onDone: (IntArray, Int, Float) -> Unit, onCancel:
 
     Column(Modifier.fillMaxSize().background(Ink.bg).blockTouches()) {
         ToolTopBar(onCancel = onCancel, doneEnabled = true, onDone = {
-            onDone(intArrayOf(rect.left.roundToInt(), rect.top.roundToInt(), rect.right.roundToInt(), rect.bottom.roundToInt()), turns, angle)
+            val r = if (turns != 0 || angle != 0f) rect else {
+                // [rect] is in the picture as shown; mirror it back onto the bitmap.
+                Rect(if (flipX) bw - rect.right else rect.left, if (flipY) bh - rect.bottom else rect.top, if (flipX) bw - rect.left else rect.right, if (flipY) bh - rect.top else rect.bottom)
+            }
+            onDone(intArrayOf(r.left.roundToInt(), r.top.roundToInt(), r.right.roundToInt(), r.bottom.roundToInt()), turns, angle)
         })
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(24.dp)) {
             val fit = min(constraints.maxWidth / bw, constraints.maxHeight / bh)
@@ -341,7 +354,7 @@ fun CropScreen(bitmap: Bitmap, onDone: (IntArray, Int, Float) -> Unit, onCancel:
                     withTransform({
                         translate(full.center.x, full.center.y)
                         rotate(turns * 90 + angle, Offset.Zero)
-                        scale(fit, fit, Offset.Zero)
+                        scale(if (flipX) -fit else fit, if (flipY) -fit else fit, Offset.Zero)
                         translate(-bitmap.width / 2f, -bitmap.height / 2f)
                     }) { drawImage(bitmap.asImageBitmap()) }
                 }

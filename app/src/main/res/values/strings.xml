@@ -97,6 +97,10 @@
     <string name="tool_trim">Trim</string>
     <string name="tool_speed">Speed</string>
     <string name="tool_split">Split</string>
+    <string name="tool_move_here">Move here</string>
+    <string name="tool_mirror">Mirror</string>
+    <string name="tool_flip">Flip</string>
+    <string name="tool_opacity">Opacity</string>
     <string name="tool_canvas">Canvas</string>
     <string name="tool_adjust">Adjust</string>
     <string name="tool_filters">Filters</string>
@@ -147,6 +151,7 @@
     <string name="export_1080p" translatable="false">1080p</string>
     <string name="export_720p" translatable="false">720p</string>
     <string name="speed_length">Length after speed: %1$s</string>
+    <string name="speed_value">%1$sx</string>
     <string name="keep_pitch">Keep voice pitch</string>
     <string name="keep_pitch_hint">Off gives the chipmunk / slow-mo voice</string>
     <string name="video_sound">Video sound</string>
@@ -167,6 +172,10 @@
     <string name="anim_fade">Fade</string>
     <string name="anim_pop">Pop</string>
     <string name="anim_slide_up">Slide up</string>
+    <string name="anim_slide_down">Slide down</string>
+    <string name="anim_slide_left">Slide left</string>
+    <string name="anim_slide_right">Slide right</string>
+    <string name="anim_zoom_out">Zoom out</string>
     <string name="anim_typewriter">Typewriter</string>
     <string name="anim_letters_pop">Letters pop</string>
     <string name="anim_loop">Loop</string>
@@ -237,6 +246,7 @@
     <string name="busy_adding_video">Adding video</string>
     <string name="busy_adding_clip">Adding clip</string>
     <string name="split_too_close">Move the playhead further from the clip\'s ends to split it</string>
+    <string name="split_layer_outside">Move the playhead inside the layer, away from its ends, to split it</string>
     <string name="add_clip">Add a video or photo at the end</string>
     <string name="transition">Transition into clip %1$d</string>
     <string name="transition_none">None</string>
@@ -253,7 +263,7 @@
     <string name="transition_push_up">Push up</string>
     <string name="transition_length">Length</string>
     <string name="transition_seconds">%1$.1f s</string>
-    <string name="transition_apply_all">Apply to all</string>
+    <string name="apply_all">Apply to all</string>
     <string name="transition_too_short">These clips are too short for a transition</string>
     <string name="busy_adding_music">Adding music</string>
     <string name="busy_removing_bg">Removing background</string>

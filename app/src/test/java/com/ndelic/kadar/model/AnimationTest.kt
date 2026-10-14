@@ -58,6 +58,30 @@ class AnimationTest {
     }
 
     @Test
+    fun slidesComeInFromTheOtherSideAndLeaveTheirWay() {
+        assertEquals(-0.08f, motionAt(Anim.SlideRight, Anim.SlideRight, 0, 2000, 0).dx, 0.001f)
+        assertTrue(motionAt(Anim.SlideRight, Anim.SlideRight, 0, 2000, 1999).dx > 0.07f)
+        assertEquals(0.08f, motionAt(Anim.SlideLeft, Anim.None, 0, 2000, 0).dx, 0.001f)
+        assertEquals(-0.08f, motionAt(Anim.SlideDown, Anim.None, 0, 2000, 0).dy, 0.001f)
+        assertEquals(0f, motionAt(Anim.SlideDown, Anim.None, 0, 2000, 0).dx, 0.001f)
+    }
+
+    @Test
+    fun zoomOutStartsBigAndSettles() {
+        assertEquals(1.5f, motionAt(Anim.ZoomOut, Anim.None, 0, 2000, 0).scale, 0.001f)
+        assertEquals(Steady, motionAt(Anim.ZoomOut, Anim.None, 0, 2000, 300))
+    }
+
+    @Test
+    fun aSetLengthIsStillAtMostHalfTheLayer() {
+        assertEquals(0.875f, motionAt(Anim.Fade, Anim.None, 0, 4000, 500, inMs = 1000).alpha, 0.001f)
+        assertEquals(listOf(0L to 1000L, 3800L to 4000L), animationSpans(Anim.Fade, Anim.Fade, 0, 4000, inMs = 1000, outMs = 200))
+        assertEquals(listOf(0L to 500L), animationSpans(Anim.Fade, Anim.None, 0, 1000, inMs = 3000))
+        // Unset, a kind keeps its own length.
+        assertEquals(300L, animMs(Anim.Fade, 0, 4000, null))
+    }
+
+    @Test
     fun spansCoverOnlyTheAnimatedEnds() {
         assertEquals(listOf(1000L to 1300L, 2700L to 3000L), animationSpans(Anim.Fade, Anim.Pop, 1000, 3000))
         assertEquals(listOf(2700L to 3000L), animationSpans(Anim.None, Anim.Pop, 1000, 3000))

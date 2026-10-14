@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -37,9 +38,12 @@ import com.ndelic.kadar.model.filterMatrix
 import com.ndelic.kadar.ui.common.Ink
 import com.ndelic.kadar.ui.common.KSlider
 
-/** One tile per [Look], previewed on [source] (the image layer or a video frame) with the current sliders, plus its strength. */
+/**
+ * One tile per [Look], previewed on [source] (the image layer or a video frame) with the current sliders, plus its
+ * strength; [onApplyAll] (clips) gives every clip this look and adjustment.
+ */
 @Composable
-fun FiltersPanel(source: Bitmap?, adjust: Adjust, onChange: (Adjust) -> Unit) {
+fun FiltersPanel(source: Bitmap?, adjust: Adjust, onApplyAll: (() -> Unit)? = null, onChange: (Adjust) -> Unit) {
     val thumb = remember(source) { source?.let { scaleDown(it, 160).asImageBitmap() } }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -68,6 +72,10 @@ fun FiltersPanel(source: Bitmap?, adjust: Adjust, onChange: (Adjust) -> Unit) {
                 }
             }
         }
-        if (adjust.look != Look.None) KSlider(null, adjust.amount, 0f..1f, ::percent) { onChange(adjust.copy(amount = it)) }
+        // On the strength slider's row, so the panel doesn't get taller.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) { if (adjust.look != Look.None) KSlider(null, adjust.amount, 0f..1f, ::percent) { onChange(adjust.copy(amount = it)) } }
+            onApplyAll?.let { ApplyAll(it) }
+        }
     }
 }

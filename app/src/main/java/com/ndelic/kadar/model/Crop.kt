@@ -36,14 +36,17 @@ fun turned(x: Float, y: Float, degrees: Float): Pair<Float, Float> {
 
 /**
  * Where a crop of a turned layer starts in its turned source, the new `sourceX`, `sourceY`. The layer's [w]×[h] bitmap sat
- * at ([sourceX], [sourceY]) in a [sourceW]×[sourceH] source; both are turned by [degrees] about their centers, the source
- * into a box of [turnedW]×[turnedH]. The crop's top left is ([left], [top]) from the turned layer's center.
+ * at ([sourceX], [sourceY]) in a [sourceW]×[sourceH] source; both are mirrored ([flipX], [flipY]) and turned by [degrees]
+ * about their centers, the source into a box of [turnedW]×[turnedH]. The crop's top left is ([left], [top]) from the
+ * turned layer's center.
  */
 fun turnedSourceOffset(
     w: Int, h: Int, sourceX: Int, sourceY: Int, sourceW: Int, sourceH: Int,
-    degrees: Float, turnedW: Int, turnedH: Int, left: Float, top: Float,
+    degrees: Float, turnedW: Int, turnedH: Int, left: Float, top: Float, flipX: Boolean = false, flipY: Boolean = false,
 ): Pair<Float, Float> {
-    // The layer's center, from the source's center, turned with it.
-    val (ux, uy) = turned(sourceX + w / 2f - sourceW / 2f, sourceY + h / 2f - sourceH / 2f, degrees)
+    // The layer's center, from the source's center, mirrored and turned with it.
+    val cx = sourceX + w / 2f - sourceW / 2f
+    val cy = sourceY + h / 2f - sourceH / 2f
+    val (ux, uy) = turned(if (flipX) -cx else cx, if (flipY) -cy else cy, degrees)
     return turnedW / 2f + ux + left to turnedH / 2f + uy + top
 }

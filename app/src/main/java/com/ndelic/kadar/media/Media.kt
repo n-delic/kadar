@@ -122,14 +122,15 @@ fun scaleDown(bitmap: Bitmap, maxSide: Int): Bitmap {
 }
 
 /**
- * [bitmap] turned by [degrees] about its center into a new [outW]×[outH] bitmap whose center is ([dx], [dy]) from the
- * turned picture's center; what the picture doesn't cover is transparent.
+ * [bitmap] mirrored ([flipX], [flipY]) and turned by [degrees] about its center into a new [outW]×[outH] bitmap whose
+ * center is ([dx], [dy]) from the turned picture's center; what the picture doesn't cover is transparent.
  */
-fun turnBitmap(bitmap: Bitmap, degrees: Float, outW: Int, outH: Int, dx: Float = 0f, dy: Float = 0f): Bitmap =
+fun turnBitmap(bitmap: Bitmap, degrees: Float, outW: Int, outH: Int, dx: Float = 0f, dy: Float = 0f, flipX: Boolean = false, flipY: Boolean = false): Bitmap =
     Bitmap.createBitmap(outW.coerceAtLeast(1), outH.coerceAtLeast(1), Bitmap.Config.ARGB_8888).also {
         Canvas(it).apply {
             translate(outW / 2f - dx, outH / 2f - dy)
             rotate(degrees)
+            scale(if (flipX) -1f else 1f, if (flipY) -1f else 1f)
             drawBitmap(bitmap, -bitmap.width / 2f, -bitmap.height / 2f, Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG))
         }
         // Quarter turns of an opaque photo leave no empty corners: keep it a JPEG in the project.

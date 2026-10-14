@@ -139,8 +139,10 @@ import com.ndelic.kadar.ui.common.ColorRow
 import com.ndelic.kadar.ui.common.IconTool
 import com.ndelic.kadar.ui.common.Ink
 import com.ndelic.kadar.ui.common.KIcon
+import com.ndelic.kadar.ui.common.KSlider
 import com.ndelic.kadar.ui.common.blockTouches
 import com.ndelic.kadar.ui.common.fullWidthPanel
+import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.composition
 import com.ndelic.kadar.video.drawnGroups
 import com.ndelic.kadar.video.outgoingOffset
@@ -150,7 +152,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Presets, Font, Color, Stroke, Glow, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Shape, ShapeFill, ShapeOutline, Transition }
+enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Presets, Font, Color, Stroke, Glow, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Opacity, Shape, ShapeFill, ShapeOutline, Transition }
 
 @Composable
 fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
@@ -181,6 +183,9 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     fun pickClip() {
         if (video != null && video.segments.size > 1 && picked == null) vm.selectClip(clipIndex)
     }
+    // Filters and Adjust share one Adjust per clip, so Apply to all copies the look and the sliders together.
+    fun applyAdjustToAll(v: VideoClip): (() -> Unit)? =
+        if (v.segments.size > 1) v.segments[clipIndex].adjust.let { a -> { vm.updateAllSegments { copy(adjust = a) } } } else null
     var erasing by remember { mutableStateOf<Pair<ImageLayer, Bitmap?>?>(null) }
     var cropping by remember { mutableStateOf<ImageLayer?>(null) }
     var croppingVideo by remember { mutableStateOf<Pair<VideoLayer, Bitmap>?>(null) }
@@ -211,7 +216,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         LaunchedEffect(player, video) {
             // After an edit (a split, a trim) the playhead stays where it was.
             val start = resumeAt[0].also { resumeAt[0] = 0 }.takeIf { it > 0 } ?: positionMs.coerceAtMost(video.outputDurationMs)
-            player.setComposition(video.copy(blur = false).composition(incoming = false), start)
+            player.setComposition(video.copy(blur = false).composition(incoming = false, dropFrames = false), start)
             player.prepare()
             // A paused player keeps showing the old frame after a new composition; seek once it's loaded to repaint.
             delay(300)
@@ -298,7 +303,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                 when (p) {
                     Panel.Sticker -> StickerPanel(state.stickers, vm)
                     Panel.Canvas -> CanvasPanel(project, state.settings.exportSize, vm)
-                    Panel.Speed -> video?.let { SpeedPanel(it.segments[clipIndex], clipIndex, vm) }
+                    Panel.Speed -> video?.let { SpeedPanel(it, clipIndex, vm) }
                     Panel.Audio -> video?.let { v ->
                         AudioPanel(v, clipIndex, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }) {
                             VoiceoverSection(v, state.recordingFromMs, positionMs, playing, player, vm, onPlay = { playing = it })
@@ -318,15 +323,16 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     Panel.Style -> (selected as? TextLayer)?.let { TextStylePanel(it, vm) }
                     Panel.Overlay -> (selected as? VideoLayer)?.let { VideoLayerPanel(it, vm) }
                     Panel.Animate -> selected?.let { AnimationPanel(it, vm) }
+                    Panel.Opacity -> (selected as? ImageLayer)?.let { l -> KSlider(R.drawable.ic_opacity, l.opacity, 0.05f..1f, ::percent) { v -> vm.editImage { copy(opacity = v) } } }
                     Panel.Transition -> video?.let { v -> transitionAt?.takeIf { it in 1 until v.segments.size }?.let { TransitionPanel(v, it, vm) } }
                     Panel.Adjust -> when (val l = selected) {
                         is ImageLayer -> AdjustPanel(l.adjust) { a -> vm.editImage { copy(adjust = a) } }
-                        null -> video?.let { v -> AdjustPanel(v.segments[clipIndex].adjust) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } }
+                        null -> video?.let { v -> AdjustPanel(v.segments[clipIndex].adjust, applyAdjustToAll(v)) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } }
                         else -> {}
                     }
                     Panel.Filters -> when (val l = selected) {
                         is ImageLayer -> FiltersPanel(l.bitmap, l.adjust) { a -> vm.editImage { copy(adjust = a) } }
-                        null -> video?.segments?.get(clipIndex)?.let { s -> FiltersPanel(state.filmstrip[s.uri]?.firstOrNull(), s.adjust) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } }
+                        null -> video?.let { v -> v.segments[clipIndex].let { s -> FiltersPanel(state.filmstrip[s.uri]?.firstOrNull(), s.adjust, applyAdjustToAll(v)) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } } }
                         else -> {}
                     }
                 }
@@ -362,6 +368,18 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     val target = (state.selected as? DrawLayer)?.id
                     scope.launch { drawing = target to vm.frameAt(positionMs) }
                 }
+                // A selected layer's place on the timeline: cut it, or move its start to the playhead.
+                @Composable
+                fun timeTools() {
+                    if (video == null) return
+                    IconTool(R.drawable.ic_split_scene, stringResource(R.string.tool_split)) { vm.splitSelected(positionMs) }
+                    IconTool(R.drawable.ic_start, stringResource(R.string.tool_move_here)) { vm.moveSelectedTo(positionMs) }
+                }
+                @Composable
+                fun flipTools() {
+                    IconTool(R.drawable.ic_flip, stringResource(R.string.tool_mirror)) { vm.flipSelected(horizontal = true) }
+                    IconTool(R.drawable.ic_flip_vertical, stringResource(R.string.tool_flip)) { vm.flipSelected(horizontal = false) }
+                }
                 when (tools) {
                     0 -> {
                         IconTool(R.drawable.ic_title, stringResource(R.string.tool_text)) { typing = "" }
@@ -395,6 +413,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_chat_bubble, stringResource(R.string.tool_box), panel == Panel.Box) { toggle(Panel.Box) }
                         IconTool(R.drawable.ic_text_fields, stringResource(R.string.tool_style), panel == Panel.Style) { toggle(Panel.Style) }
                         if (video != null) IconTool(R.drawable.ic_animation, stringResource(R.string.tool_animate), panel == Panel.Animate) { toggle(Panel.Animate) }
+                        timeTools()
                         IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, stringResource(R.string.tool_front), onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, stringResource(R.string.tool_back), onClick = vm::sendToBack)
@@ -404,6 +423,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_check, stringResource(R.string.done)) { vm.select(null) }
                         ToolDivider()
                         IconTool(R.drawable.ic_draw, stringResource(R.string.tool_draw), onClick = ::draw)
+                        flipTools()
+                        timeTools()
                         IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, stringResource(R.string.tool_front), onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, stringResource(R.string.tool_back), onClick = vm::sendToBack)
@@ -418,6 +439,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         }
                         IconTool(R.drawable.ic_border_color, stringResource(R.string.tool_outline), panel == Panel.ShapeOutline) { toggle(Panel.ShapeOutline) }
                         if (video != null) IconTool(R.drawable.ic_animation, stringResource(R.string.tool_animate), panel == Panel.Animate) { toggle(Panel.Animate) }
+                        timeTools()
                         IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, stringResource(R.string.tool_front), onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, stringResource(R.string.tool_back), onClick = vm::sendToBack)
@@ -443,6 +465,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                             playing = false
                             (state.selected as? VideoLayer)?.let { l -> scope.launch { vm.layerFrame(l, positionMs)?.let { croppingVideo = l to it } } }
                         }
+                        timeTools()
                         IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, stringResource(R.string.tool_front), onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, stringResource(R.string.tool_back), onClick = vm::sendToBack)
@@ -456,9 +479,12 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                             (state.selected as? ImageLayer)?.let { l -> scope.launch { erasing = l to vm.loadSource(l) } }
                         }
                         IconTool(R.drawable.ic_crop, stringResource(R.string.tool_crop)) { cropping = state.selected as? ImageLayer }
+                        flipTools()
+                        IconTool(R.drawable.ic_opacity, stringResource(R.string.tool_opacity), panel == Panel.Opacity) { toggle(Panel.Opacity) }
                         IconTool(R.drawable.ic_tune, stringResource(R.string.tool_adjust), panel == Panel.Adjust) { toggle(Panel.Adjust) }
                         IconTool(R.drawable.ic_filter_vintage, stringResource(R.string.tool_filters), panel == Panel.Filters) { toggle(Panel.Filters) }
                         if (video != null) IconTool(R.drawable.ic_animation, stringResource(R.string.tool_animate), panel == Panel.Animate) { toggle(Panel.Animate) }
+                        timeTools()
                         IconTool(R.drawable.ic_library_add, stringResource(R.string.tool_save_sticker), onClick = vm::saveSticker)
                         IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, stringResource(R.string.tool_front), onClick = vm::bringToFront)
@@ -498,6 +524,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     // A second tap on the picked clip trims it, as one tap did when there was only one clip.
                     onClipTap = { i -> if (i == picked) trimming = i else vm.selectClip(i) },
                     onClipMove = vm::moveClip,
+                    onClipTrim = { i, start, end -> vm.updateSegment(i) { copy(startMs = start, endMs = end) } },
                     onAddClip = { newClip.launch(PickVisualMediaRequest(PickVisualMedia.ImageAndVideo)) },
                     transitionAt = transitionAt.takeIf { panel == Panel.Transition },
                     onTransition = { i ->
@@ -529,6 +556,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                 vm.applyCrop(layer.id, r[0], r[1], r[2], r[3], turns, angle)
             },
             onCancel = { cropping = null },
+            flipX = layer.t.flipX,
+            flipY = layer.t.flipY,
             turnable = true,
         )
     }

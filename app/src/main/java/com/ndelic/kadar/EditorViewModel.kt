@@ -29,6 +29,7 @@ import com.ndelic.kadar.media.startVoiceRecording
 import com.ndelic.kadar.media.trimTransparent
 import com.ndelic.kadar.media.turnBitmap
 import com.ndelic.kadar.media.videoFrame
+import com.ndelic.kadar.model.Anim
 import com.ndelic.kadar.model.AppSettings
 import com.ndelic.kadar.model.CropRect
 import com.ndelic.kadar.model.DrawLayer
@@ -68,6 +69,8 @@ import com.ndelic.kadar.video.VoiceClip
 import com.ndelic.kadar.video.composition
 import com.ndelic.kadar.video.exportVideo
 import com.ndelic.kadar.video.highBitrate
+import com.ndelic.kadar.video.layerMovedTo
+import com.ndelic.kadar.video.layerSplitPoint
 import com.ndelic.kadar.video.moved
 import com.ndelic.kadar.video.sourceMs
 import com.ndelic.kadar.video.splitPoint
@@ -488,16 +491,39 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val layer = _uiState.value.selected ?: return
         val nudge = min(p.width, p.height) * 0.04f
         val t = layer.t.copy(x = layer.t.x + nudge, y = layer.t.y + nudge)
-        addLayer { id ->
-            when (layer) {
-                is ImageLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
-                is TextLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
-                is VideoLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
-                is DrawLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
-                is ShapeLayer -> layer.copy(id = id, t = t, hidden = false, locked = false)
-            }
-        }
+        addLayer { id -> layer.copied(id).withTransform(t).withFlags(hidden = false, locked = false) }
     }
+
+    private fun Layer.copied(id: Long, animIn: Anim = this.animIn, animOut: Anim = this.animOut) = when (this) {
+        is ImageLayer -> copy(id = id, animIn = animIn, animOut = animOut)
+        is TextLayer -> copy(id = id, animIn = animIn, animOut = animOut)
+        is VideoLayer -> copy(id = id)
+        is DrawLayer -> copy(id = id)
+        is ShapeLayer -> copy(id = id, animIn = animIn, animOut = animOut)
+    }
+
+    /** Cuts the selected layer at [atMs] (output time) into two with the same look, one ending and one starting there. */
+    fun splitSelected(atMs: Long) {
+        val total = _uiState.value.project?.video?.outputDurationMs ?: return
+        val layer = _uiState.value.selected ?: return
+        val at = layerSplitPoint(layer.startMs, layer.endMs, total, atMs)
+        if (at == null) {
+            _effects.trySend(EditorEffect.Message(UiText.Res(R.string.split_layer_outside)))
+            return
+        }
+        val id = nextId++
+        // The parts join without an exit and entrance at the cut; a video layer's second part plays on from where the first stopped in its clip.
+        val first = layer.copied(layer.id, animOut = Anim.None).withTime(layer.startMs, at)
+        val second = (if (layer is VideoLayer) layer.copy(id = id, clipStartMs = layer.clipStartMs + at - layer.startMs) else layer.copied(id, animIn = Anim.None)).withTime(at, layer.endMs)
+        updateProject { p -> p.copy(layers = p.layers.flatMap { if (it.id == layer.id) listOf(first, second) else listOf(it) }) }
+        select(id)
+    }
+
+    /** Moves the selected layer to start at [atMs] (output time), as long as before. */
+    fun moveSelectedTo(atMs: Long) = updateSelected { l -> layerMovedTo(l.startMs, l.endMs, atMs).let { (s, e) -> l.withTime(s, e) } }
+
+    /** Mirrors the selected layer left to right ([horizontal]) or top to bottom. */
+    fun flipSelected(horizontal: Boolean) = updateSelected { l -> l.withTransform(if (horizontal) l.t.copy(flipX = !l.t.flipX) else l.t.copy(flipY = !l.t.flipY)) }
 
     fun sendToBack() {
         val layer = _uiState.value.selected ?: return
@@ -520,7 +546,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val (cut, b) = withContext(Dispatchers.Default) { trimTransparent(subject) } ?: throw UserError(R.string.error_no_subject)
         val file = withContext(Dispatchers.IO) { store.writeImage(dir, cut) }
         // Keep the subject where it was on screen: the crop's center is off the old center.
-        val t = layer.t.shiftedLocal((b[0] + b[2]) / 2f - layer.width / 2, (b[1] + b[3]) / 2f - layer.height / 2)
+        val t = layer.t.shiftedContent((b[0] + b[2]) / 2f - layer.width / 2, (b[1] + b[3]) / 2f - layer.height / 2)
         updateLayer(layer.id) {
             layer.copy(t = t, bitmap = cut, file = file, source = layer.source ?: layer.file, sourceX = layer.sourceX + b[0], sourceY = layer.sourceY + b[1])
         }
@@ -549,9 +575,10 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Crops the layer to `[left, top, right, bottom)` of its bitmap turned by [turns] quarter turns and [angle] degrees
-     * (the crop screen's frame: the bitmap's box after the quarter turns, same center), keeping the kept part where it
-     * was on screen.
+     * Crops the layer to `[left, top, right, bottom)`, keeping the kept part where it was on screen. Unturned, that is in
+     * its bitmap's pixels. Turned by [turns] quarter turns and [angle] degrees, it is in the crop screen's frame (the
+     * picture as shown, flipped like the layer, its box after the quarter turns, same center), and the flip is baked
+     * into the new bitmap and source.
      */
     fun applyCrop(id: Long, left: Int, top: Int, right: Int, bottom: Int, turns: Int = 0, angle: Float = 0f) = work(R.string.busy_cropping) {
         val layer = _uiState.value.project?.layers?.firstOrNull { it.id == id } as? ImageLayer ?: return@work
@@ -560,7 +587,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         if (degrees % 360f == 0f) {
             val cut = Bitmap.createBitmap(layer.bitmap, left, top, right - left, bottom - top)
             val file = withContext(Dispatchers.IO) { store.writeImage(dir, cut) }
-            val t = layer.t.shiftedLocal((left + right) / 2f - layer.width / 2, (top + bottom) / 2f - layer.height / 2)
+            val t = layer.t.shiftedContent((left + right) / 2f - layer.width / 2, (top + bottom) / 2f - layer.height / 2)
             updateLayer(id) {
                 layer.copy(t = t, bitmap = cut, file = file, source = layer.source ?: layer.file, sourceX = layer.sourceX + left, sourceY = layer.sourceY + top)
             }
@@ -574,15 +601,18 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val original = loadSource(layer)
         val src = original ?: layer.bitmap
         val (tw, th) = turnedBounds(src.width.toFloat(), src.height.toFloat(), degrees).let { (w, h) -> ceil(w).toInt() to ceil(h).toInt() }
+        val (fx, fy) = layer.t.flipX to layer.t.flipY
         val (sx, sy) = turnedSourceOffset(
             layer.bitmap.width, layer.bitmap.height, if (original != null) layer.sourceX else 0, if (original != null) layer.sourceY else 0,
-            src.width, src.height, degrees, tw, th, left - fw / 2, top - fh / 2,
+            src.width, src.height, degrees, tw, th, left - fw / 2, top - fh / 2, fx, fy,
         )
-        val cut = withContext(Dispatchers.Default) { turnBitmap(layer.bitmap, degrees, right - left, bottom - top, dx, dy) }
+        val cut = withContext(Dispatchers.Default) { turnBitmap(layer.bitmap, degrees, right - left, bottom - top, dx, dy, fx, fy) }
         val file = withContext(Dispatchers.IO) { store.writeImage(dir, cut) }
-        val source = withContext(Dispatchers.IO) { store.writeImage(dir, turnBitmap(src, degrees, tw, th)) }
+        val source = withContext(Dispatchers.IO) { store.writeImage(dir, turnBitmap(src, degrees, tw, th, flipX = fx, flipY = fy)) }
+        // The frame is the picture as shown in the layer's box, so the shift is in box pixels, and the new bitmap is unflipped.
         val (lx, ly) = turned(dx, dy, -degrees)
-        updateLayer(id) { layer.copy(t = layer.t.shiftedLocal(lx, ly), bitmap = cut, file = file, source = source, sourceX = sx.roundToInt(), sourceY = sy.roundToInt()) }
+        val t = layer.t.shiftedLocal(lx, ly).copy(flipX = false, flipY = false)
+        updateLayer(id) { layer.copy(t = t, bitmap = cut, file = file, source = source, sourceX = sx.roundToInt(), sourceY = sy.roundToInt()) }
     }
 
     /** A frame of video layer [layer] at the playhead ([positionMs]), else its nearest end, to crop on; null (with a message) if unreadable. */
@@ -664,6 +694,9 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     /** Changes clip [index] of the main track (trim, speed, volume, adjust). */
     fun updateSegment(index: Int, change: Segment.() -> Segment) =
         updateClip { copy(segments = segments.mapIndexed { i, s -> if (i == index) s.change() else s }) }
+
+    /** Changes every clip of the main track at once, as one undo step (Apply to all). */
+    fun updateAllSegments(change: Segment.() -> Segment) = updateClip { copy(segments = segments.map { it.change() }) }
 
     /** Picks clip [index] on the clip strip, or none; a picked clip and a selected layer exclude each other. */
     fun selectClip(index: Int?) = _uiState.update { it.copy(selectedClip = index, selectedId = null) }

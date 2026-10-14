@@ -64,4 +64,13 @@ class CropTest {
         assertEquals(100f, x, 0.01f)
         assertEquals(300f, y, 0.01f)
     }
+
+    @Test
+    fun turnedSourceOffsetOfAMirroredLayer() {
+        // The same cut-out mirrored left to right first: its center (150, -50) from the source's becomes (-150, -50),
+        // turned 90° that is (50, -150), so in the 200×400 turned source the center is (150, 50).
+        val (x, y) = turnedSourceOffset(100, 100, 300, 0, 400, 200, 90f, 200, 400, -50f, -50f, flipX = true)
+        assertEquals(100f, x, 0.01f)
+        assertEquals(0f, y, 0.01f)
+    }
 }

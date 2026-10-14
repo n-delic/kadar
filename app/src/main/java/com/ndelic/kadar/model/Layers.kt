@@ -176,6 +176,8 @@ data class VideoLayer(
     /** Where in its own clip it starts playing. */
     val clipStartMs: Long = 0,
     val crop: CropRect = CropRect(),
+    /** Look and color sliders, like a clip's. */
+    val adjust: Adjust = Adjust(),
 ) : Layer {
     override val width get() = videoWidth * crop.width
     override val height get() = videoHeight * crop.height
@@ -235,8 +237,8 @@ private fun PenStroke.path() = Path().apply {
 }
 
 /**
- * Brightness, contrast and saturation, each -1..1 with 0 meaning unchanged, plus a [Look] blended in by [amount] (0..1).
- * Used by image layers and the video.
+ * Brightness, contrast, saturation, warmth, tint and hue, each -1..1, and fade 0..1, with 0 meaning unchanged, plus a
+ * [Look] blended in by [amount] (0..1). Used by image layers, video clips and video layers.
  */
 data class Adjust(
     val brightness: Float = 0f,
@@ -244,8 +246,15 @@ data class Adjust(
     val saturation: Float = 0f,
     val look: Look = Look.None,
     val amount: Float = 1f,
+    /** Toward orange (positive) or blue. */
+    val warmth: Float = 0f,
+    /** Toward magenta (positive) or green. */
+    val tint: Float = 0f,
+    /** A turn of the color wheel, -1..1 for -180°..180°. */
+    val hue: Float = 0f,
+    val fade: Float = 0f,
 ) {
-    val isNone get() = brightness == 0f && contrast == 0f && saturation == 0f && (look == Look.None || amount == 0f)
+    val isNone get() = listOf(brightness, contrast, saturation, warmth, tint, hue, fade).all { it == 0f } && (look == Look.None || amount == 0f)
 
     /** 4x5 color matrix for [android.graphics.ColorMatrix]: saturate, then contrast around mid-gray, then brighten. */
     fun colorMatrix(): FloatArray {

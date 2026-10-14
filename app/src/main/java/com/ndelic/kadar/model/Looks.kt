@@ -3,6 +3,9 @@ package com.ndelic.kadar.model
 import androidx.annotation.StringRes
 import com.ndelic.kadar.R
 import com.ndelic.kadar.ui.editor.label
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 /** Rec. 709 luma weights: how much red, green and blue each add to perceived brightness. */
 val LUMA = floatArrayOf(0.2126f, 0.7152f, 0.0722f)
@@ -47,11 +50,47 @@ private fun tintedGray(gain: FloatArray, offset: FloatArray) = FloatArray(20).al
     m[18] = 1f
 }
 
-/** The look blended in by [Adjust.amount], then the sliders: one matrix for the image layer paint and the video effect. */
+/**
+ * The look blended in by [Adjust.amount], then the sliders (brightness, contrast and saturation, then warmth and tint,
+ * hue, fade): one matrix for the image layer paint and the video effect.
+ */
 fun Adjust.filterMatrix(): FloatArray {
     val identity = Look.None.matrix()
     val look = look.matrix()
-    return concat(colorMatrix(), FloatArray(20) { identity[it] + amount * (look[it] - identity[it]) })
+    // A color slider at 0 is left out rather than multiplied in, so old projects get exactly the matrix they had.
+    val sliders = listOfNotNull(
+        gains(1 + WARMTH * warmth, 1 - TINT * tint, 1 - WARMTH * warmth, 0f).takeIf { warmth != 0f || tint != 0f },
+        hueTurn(hue * PI.toFloat()).takeIf { hue != 0f },
+        gains(1 - FADE_GAIN * fade, 1 - FADE_GAIN * fade, 1 - FADE_GAIN * fade, FADE_LIFT * fade).takeIf { fade != 0f },
+    ).fold(colorMatrix()) { m, next -> concat(next, m) }
+    return concat(sliders, FloatArray(20) { identity[it] + amount * (look[it] - identity[it]) })
+}
+
+/** How far warmth and tint move a channel's gain at the slider's end. */
+private const val WARMTH = 0.2f
+private const val TINT = 0.2f
+
+/** Full fade: lifts black to this (0..255) and pulls white down by [FADE_GAIN], a flat, washed-out picture. */
+private const val FADE_LIFT = 50f
+private const val FADE_GAIN = 0.3f
+
+/** Each channel scaled by its gain, plus [offset] (0..255) on all three. */
+private fun gains(r: Float, g: Float, b: Float, offset: Float) =
+    floatArrayOf(r, 0f, 0f, 0f, offset, 0f, g, 0f, 0f, offset, 0f, 0f, b, 0f, offset, 0f, 0f, 0f, 1f, 0f)
+
+/**
+ * The colors turned [angle] radians around the gray axis, keeping brightness: the hue rotation matrix from the W3C
+ * filter effects spec (feColorMatrix hueRotate).
+ */
+private fun hueTurn(angle: Float): FloatArray {
+    val c = cos(angle)
+    val s = sin(angle)
+    return floatArrayOf(
+        0.213f + c * 0.787f - s * 0.213f, 0.715f - c * 0.715f - s * 0.715f, 0.072f - c * 0.072f + s * 0.928f, 0f, 0f,
+        0.213f - c * 0.213f + s * 0.143f, 0.715f + c * 0.285f + s * 0.140f, 0.072f - c * 0.072f - s * 0.283f, 0f, 0f,
+        0.213f - c * 0.213f - s * 0.787f, 0.715f - c * 0.715f + s * 0.715f, 0.072f + c * 0.928f + s * 0.072f, 0f, 0f,
+        0f, 0f, 0f, 1f, 0f,
+    )
 }
 
 /** [a] applied after [b]; both 4x5 with the implied fifth row (0, 0, 0, 0, 1). */

@@ -2,6 +2,7 @@ package com.ndelic.kadar.model
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -50,5 +51,46 @@ class LooksTest {
         // Green's input into red: row 0, column 1 of the 4x5 matrix lands at column 1, row 0 of the 4x4.
         val warmish = identity.copyOf().also { it[1] = 0.3f }
         assertEquals(0.3f, glRgbMatrix(warmish)[4], 0f)
+    }
+
+    /** [m] applied to the color (r, g, b) in 0..255. */
+    private fun apply(m: FloatArray, r: Float, g: Float, b: Float) = FloatArray(3) { row -> m[row * 5] * r + m[row * 5 + 1] * g + m[row * 5 + 2] * b + m[row * 5 + 4] }
+
+    @Test
+    fun untouchedColorSlidersKeepTheOldMatrixExactly() {
+        val a = Adjust(brightness = 0.3f, contrast = -0.2f, saturation = 0.4f, look = Look.Sepia, amount = 0.7f)
+        // filterMatrix() as it was before warmth, tint, hue and fade.
+        val old = concat(a.colorMatrix(), FloatArray(20) { identity[it] + a.amount * (Look.Sepia.matrix()[it] - identity[it]) })
+        assertArrayEquals(old, a.filterMatrix(), 0f)
+    }
+
+    @Test
+    fun anyColorSliderCounts() {
+        listOf(Adjust(warmth = 0.1f), Adjust(tint = -0.1f), Adjust(hue = 0.5f), Adjust(fade = 0.2f)).forEach { assertFalse(it.toString(), it.isNone) }
+    }
+
+    @Test
+    fun warmthAndTintMoveTheChannels() {
+        val warm = apply(Adjust(warmth = 1f).filterMatrix(), 100f, 100f, 100f)
+        assertTrue(warm[0] > 100f && warm[2] < 100f)
+        assertEquals(100f, warm[1], 0.001f)
+        val magenta = apply(Adjust(tint = 1f).filterMatrix(), 100f, 100f, 100f)
+        assertTrue(magenta[1] < 100f)
+        assertEquals(100f, magenta[0], 0.001f)
+    }
+
+    @Test
+    fun hueTurnsColorsButKeepsGray() {
+        val m = Adjust(hue = 0.5f).filterMatrix()
+        apply(m, 128f, 128f, 128f).forEach { assertEquals(128f, it, 0.01f) }
+        val red = apply(m, 200f, 0f, 0f)
+        assertTrue(red[0] < 200f)
+    }
+
+    @Test
+    fun fadeLiftsBlackAndDimsWhite() {
+        val m = Adjust(fade = 1f).filterMatrix()
+        assertTrue(apply(m, 0f, 0f, 0f)[0] > 30f)
+        assertTrue(apply(m, 255f, 255f, 255f)[0] < 240f)
     }
 }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,33 +18,41 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asComposeColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ndelic.kadar.R
 import com.ndelic.kadar.media.scaleDown
 import com.ndelic.kadar.model.Adjust
 import com.ndelic.kadar.model.Look
 import com.ndelic.kadar.model.filterMatrix
 import com.ndelic.kadar.ui.common.Ink
+import com.ndelic.kadar.ui.common.KIcon
 import com.ndelic.kadar.ui.common.KSlider
 
 /**
  * One tile per [Look], previewed on [source] (the image layer or a video frame) with the current sliders, plus its
- * strength; [onApplyAll] (clips) gives every clip this look and adjustment.
+ * strength; [onApplyAll] (clips) gives every clip this look and adjustment, [onCompare] is held to see the original.
  */
 @Composable
-fun FiltersPanel(source: Bitmap?, adjust: Adjust, onApplyAll: (() -> Unit)? = null, onChange: (Adjust) -> Unit) {
+fun FiltersPanel(source: Bitmap?, adjust: Adjust, onApplyAll: (() -> Unit)? = null, onCompare: (Boolean) -> Unit, onChange: (Adjust) -> Unit) {
     val thumb = remember(source) { source?.let { scaleDown(it, 160).asImageBitmap() } }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -76,6 +85,36 @@ fun FiltersPanel(source: Bitmap?, adjust: Adjust, onApplyAll: (() -> Unit)? = nu
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) { if (adjust.look != Look.None) KSlider(null, adjust.amount, 0f..1f, ::percent) { onChange(adjust.copy(amount = it)) } }
             onApplyAll?.let { ApplyAll(it) }
+            CompareButton(onCompare)
         }
+    }
+}
+
+/** [onHold] gets true while it's pressed and false on release: the stage shows the picture without its look meanwhile. */
+@Composable
+fun CompareButton(onHold: (Boolean) -> Unit) {
+    val hold by rememberUpdatedState(onHold)
+    var held by remember { mutableStateOf(false) }
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(if (held) Ink.accent else Ink.raised)
+            .pointerInput(Unit) {
+                detectTapGestures(onPress = {
+                    held = true
+                    hold(true)
+                    // In finally too, so a panel closed mid-press doesn't leave the stage showing the original.
+                    try {
+                        tryAwaitRelease()
+                    } finally {
+                        held = false
+                        hold(false)
+                    }
+                })
+            },
+    ) {
+        KIcon(R.drawable.ic_compare, Modifier.size(22.dp), if (held) Ink.onAccent else Ink.text, stringResource(R.string.hold_to_compare))
     }
 }

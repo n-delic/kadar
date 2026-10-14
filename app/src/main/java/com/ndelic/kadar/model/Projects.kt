@@ -31,7 +31,19 @@ data class Project(
     val name: String? = null,
     /** Photos only: the canvas shows the bottom picture blurred behind everything ([backdrop]) instead of [background]. */
     val blur: Boolean = false,
-)
+) {
+    /** Every look and color adjustment left out (image layers, clips, video layers): what Hold to compare shows. */
+    fun withoutAdjust() = copy(
+        layers = layers.map {
+            when (it) {
+                is ImageLayer -> it.copy(adjust = Adjust())
+                is VideoLayer -> it.copy(adjust = Adjust())
+                else -> it
+            }
+        },
+        video = video?.let { v -> v.copy(segments = v.segments.map { it.copy(adjust = Adjust()) }) },
+    )
+}
 
 data class SavedProject(val dir: File, val modified: Long, val thumb: Bitmap?, val isVideo: Boolean, val name: String? = null) {
     /** Folder names are creation timestamps (see [ProjectStore.create]). */
@@ -215,6 +227,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                 opacity = j.optDouble("opacity", 1.0).toFloat(),
                 clipStartMs = j.optLong("clipStartMs"),
                 crop = j.optJSONArray("crop")?.let { c -> CropRect(c.getDouble(0).toFloat(), c.getDouble(1).toFloat(), c.getDouble(2).toFloat(), c.getDouble(3).toFloat()) } ?: CropRect(),
+                adjust = adjustFromJson(j),
             )
             // Versions before drawings skip this type too.
             "draw" -> DrawLayer(
@@ -392,6 +405,7 @@ private fun Layer.toJson() = JSONObject().apply {
             put("volume", layer.volume.toDouble())
             put("opacity", layer.opacity.toDouble())
             put("clipStartMs", layer.clipStartMs)
+            putAdjust(layer.adjust)
             layer.crop.run { put("crop", JSONArray(listOf(left.toDouble(), top.toDouble(), right.toDouble(), bottom.toDouble()))) }
         }
         is DrawLayer -> {
@@ -470,6 +484,10 @@ private fun adjustFromJson(j: JSONObject) = Adjust(
     j.optDouble("saturation", 0.0).toFloat(),
     runCatching { Look.valueOf(j.optString("look")) }.getOrDefault(Look.None),
     j.optDouble("lookAmount", 1.0).toFloat(),
+    warmth = j.optDouble("warmth", 0.0).toFloat(),
+    tint = j.optDouble("tint", 0.0).toFloat(),
+    hue = j.optDouble("hue", 0.0).toFloat(),
+    fade = j.optDouble("fade", 0.0).toFloat(),
 )
 
 private fun JSONObject.putAdjust(a: Adjust) {
@@ -478,6 +496,10 @@ private fun JSONObject.putAdjust(a: Adjust) {
     put("saturation", a.saturation.toDouble())
     put("look", a.look.name)
     put("lookAmount", a.amount.toDouble())
+    put("warmth", a.warmth.toDouble())
+    put("tint", a.tint.toDouble())
+    put("hue", a.hue.toDouble())
+    put("fade", a.fade.toDouble())
 }
 
 /** Write-then-rename, so a crash mid-save never leaves a half-written project. */

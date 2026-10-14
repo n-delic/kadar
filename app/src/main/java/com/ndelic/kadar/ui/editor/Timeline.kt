@@ -209,6 +209,7 @@ fun Timeline(
     onSeek: (Long) -> Unit,
     onSelect: (Long?) -> Unit,
     onLayerTime: (Long, Long, Long, Boolean) -> Unit,
+    onLayerStart: (Long, Long, Boolean) -> Unit,
     onFlags: (Long, Boolean, Boolean) -> Unit,
     onMove: (Long, Int) -> Unit,
     onClipTap: (Int) -> Unit,
@@ -270,6 +271,7 @@ fun Timeline(
                             onSeek = onSeek,
                             onSelect = onSelect,
                             onLayerTime = onLayerTime,
+                            onLayerStart = onLayerStart,
                             onFlags = onFlags,
                             onLift = { dy -> lift = l.id to dy },
                             onDrop = {
@@ -318,6 +320,7 @@ private fun Track(
     onSeek: (Long) -> Unit,
     onSelect: (Long?) -> Unit,
     onLayerTime: (Long, Long, Long, Boolean) -> Unit,
+    onLayerStart: (Long, Long, Boolean) -> Unit,
     onFlags: (Long, Boolean, Boolean) -> Unit,
     onLift: (Float) -> Unit,
     onDrop: () -> Unit,
@@ -410,17 +413,20 @@ private fun Track(
                     if (abs(change.position.y - down.position.y) > abs(change.position.x - down.position.x)) return@awaitEachGesture
                     var last = s0 to e0
                     var first = true
+                    // A video layer's start can go back only as far as its own clip begins.
+                    val minStart = if (l is VideoLayer) maxOf(0, s0 - l.clipStartMs) else 0
                     while (change.pressed && !change.isConsumed) {
                         val d = ((change.position.x - down.position.x) / width * view.spanMs).toLong()
                         val next = when (mode) {
                             // Bounds can cross when the clip got shorter than the layer (trim, speed); coerceIn would throw.
-                            TrackDrag.Start -> (s0 + d).coerceIn(0, maxOf(0, e0 - MIN_CLIP_MS)) to e0
+                            TrackDrag.Start -> (s0 + d).coerceIn(minStart, maxOf(minStart, e0 - MIN_CLIP_MS)) to e0
                             TrackDrag.End -> s0 to (e0 + d).coerceIn(minOf(s0 + MIN_CLIP_MS, total), total)
                             else -> d.coerceIn(-s0, total - e0).let { s0 + it to e0 + it }
                         }
                         if (next != last) {
                             // Reaching the end means "to the end", so the layer still covers the video if it gets longer.
-                            onLayerTime(l.id, next.first, if (next.second >= total) Long.MAX_VALUE else next.second, first)
+                            if (mode == TrackDrag.Start) onLayerStart(l.id, next.first, first)
+                            else onLayerTime(l.id, next.first, if (next.second >= total) Long.MAX_VALUE else next.second, first)
                             first = false
                             last = next
                         }
@@ -439,10 +445,21 @@ private fun Track(
                     .alpha(if (layer.hidden) 0.35f else 1f)
                     .clip(RoundedCornerShape(6.dp))
                     .background(color)
-                    .border(if (selected) 2.dp else 0.dp, if (selected) Color.White else Color.Transparent, RoundedCornerShape(6.dp)),
+                    .border(if (selected) 2.dp else 0.dp, if (selected) Color.White else Color.Transparent, RoundedCornerShape(6.dp))
+                    .drawWithContent {
+                        drawContent()
+                        // Trim handles at both ends, like the picked clip's.
+                        if (selected && !layer.locked) {
+                            val tab = HANDLE.toPx()
+                            listOf(0f, size.width - tab).forEach { x ->
+                                drawRect(Color.White, Offset(x, 0f), Size(tab, size.height))
+                                drawLine(Color(0xFF555555), Offset(x + tab / 2, size.height * 0.3f), Offset(x + tab / 2, size.height * 0.7f), 2.dp.toPx())
+                            }
+                        }
+                    },
                 contentAlignment = Alignment.CenterStart,
             ) {
-                Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.padding(horizontal = if (selected) 14.dp else 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     val icon = when {
                         layer.locked -> R.drawable.ic_lock
                         layer is TextLayer -> R.drawable.ic_title

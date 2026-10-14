@@ -88,4 +88,13 @@ class LayersTest {
         // Back to the whole frame puts it where it started.
         assertEquals(500f, right.recropped(CropRect(left = 0.5f), CropRect(), 1000, 2000).x, 0.001f)
     }
+
+    @Test
+    fun trimmingAStartMovesTheInPointWithIt() {
+        // At 2 s, playing its source from 1 s: a start at 3 s plays from 2 s, one at 1.5 s from 0.5 s.
+        assertEquals(3_000L to 2_000L, trimmedIn(2_000, 1_000, 3_000))
+        assertEquals(1_500L to 500L, trimmedIn(2_000, 1_000, 1_500))
+        // It can't start before its source does.
+        assertEquals(1_000L to 0L, trimmedIn(2_000, 1_000, 0))
+    }
 }

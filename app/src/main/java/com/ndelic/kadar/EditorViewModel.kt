@@ -549,6 +549,10 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     /** Timeline drags; like gestures, only the first update of a drag ([first]) becomes an undo step. */
     fun setLayerTime(id: Long, startMs: Long, endMs: Long, first: Boolean) = updateLayer(id, record = first) { it.withTime(startMs, endMs) }
 
+    /** A layer's start dragged on its track; a video layer is trimmed, so its video starts later too. */
+    fun trimLayerStart(id: Long, startMs: Long, first: Boolean) =
+        updateLayer(id, record = first) { (it as? VideoLayer)?.trimmedStart(startMs) ?: it.withTime(startMs, it.endMs) }
+
     fun deleteSelected() {
         val id = _uiState.value.selectedId ?: return
         updateProject { p -> p.copy(layers = p.layers.filter { it.id != id }) }

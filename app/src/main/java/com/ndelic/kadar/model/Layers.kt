@@ -142,6 +142,15 @@ data class ImageLayer(
     override fun withFlags(hidden: Boolean, locked: Boolean) = copy(hidden = hidden, locked = locked)
 }
 
+/**
+ * A clip placed at [startMs] that plays its source from [clipStartMs], with its start trimmed to [ms]: the new start and
+ * in-point. The in-point moves by as much as the start, and the start goes back no further than the source begins.
+ */
+fun trimmedIn(startMs: Long, clipStartMs: Long, ms: Long): Pair<Long, Long> {
+    val s = ms.coerceAtLeast(startMs - clipStartMs)
+    return s to clipStartMs + s - startMs
+}
+
 /** Part of a frame, as fractions (0 to 1) of its width and height. */
 data class CropRect(val left: Float = 0f, val top: Float = 0f, val right: Float = 1f, val bottom: Float = 1f) {
     val width get() = right - left
@@ -188,6 +197,9 @@ data class VideoLayer(
 
     /** Plays the clip from [ms] on; the track gets shorter if less is left than it was long. */
     fun withClipStart(ms: Long) = copy(clipStartMs = ms).let { it.withTime(it.startMs, it.endMs) }
+
+    /** Its start trimmed to [ms] like a clip's: the in-point moves with it, so a later start cuts the frames before it. */
+    fun trimmedStart(ms: Long) = trimmedIn(startMs, clipStartMs, ms).let { (s, c) -> copy(startMs = s, clipStartMs = c) }
 
     /** Shows only [c] of the frame; the part still shown stays where it was on the canvas. */
     fun withCrop(c: CropRect) = copy(crop = c, t = t.recropped(crop, c, videoWidth, videoHeight))

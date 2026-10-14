@@ -110,6 +110,8 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.ExperimentalApi
@@ -268,6 +270,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             onDispose { player.removeListener(listener) }
         }
         LaunchedEffect(player, playing) { player.playWhenReady = playing }
+        // Locking the phone or leaving the app pauses the preview (and ends a voiceover recording).
+        LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { playing = false }
         LaunchedEffect(player) {
             while (true) {
                 positionMs = player.currentPosition
@@ -577,6 +581,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     onSeek = { currentPlayer?.seekTo(it) },
                     onSelect = vm::select,
                     onLayerTime = vm::setLayerTime,
+                    onLayerStart = vm::trimLayerStart,
                     onFlags = vm::setFlags,
                     onMove = vm::moveLayer,
                     // A second tap on the picked clip trims it, as one tap did when there was only one clip.

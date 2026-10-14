@@ -62,6 +62,7 @@ import com.ndelic.kadar.model.ShapeLayer
 import com.ndelic.kadar.model.TextAlign
 import com.ndelic.kadar.model.TextLayer
 import com.ndelic.kadar.model.VideoLayer
+import com.ndelic.kadar.ui.common.AspectTile
 import com.ndelic.kadar.ui.common.ColorRow
 import com.ndelic.kadar.ui.common.Ink
 import com.ndelic.kadar.ui.common.KDialog
@@ -203,23 +204,6 @@ fun ExportSizeRow(project: Project, default: ExportSize, vm: EditorViewModel) {
     Column {
         PanelLabel(stringResource(R.string.export_size))
         TextTabs(listOf<ExportSize?>(null) + ExportSize.entries, project.exportSize, label = { it?.let { s -> stringResource(s.label) } ?: stringResource(R.string.export_size_default, stringResource(default.label)) }) { vm.setProjectExportSize(it) }
-    }
-}
-
-/** A box drawn in the target aspect ratio, so the choice reads at a glance. */
-@Composable
-private fun AspectTile(label: String, ratio: Float, active: Boolean, onClick: () -> Unit) {
-    val color = if (active) Ink.accent else Ink.dim
-    val (w, h) = if (ratio >= 1) 36f to 36f / ratio else 36f * ratio to 36f
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(6.dp),
-    ) {
-        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(w.dp, h.dp).border(2.dp, color, RoundedCornerShape(3.dp)))
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(label, color = color, fontSize = 11.sp)
     }
 }
 

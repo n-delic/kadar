@@ -105,6 +105,10 @@
 - Draw: an eraser that cuts strokes, pen opacity and redo; erase strokes of a drawing you already placed
 - Canvas: 3:4, 4:3, 2:3, 3:2, 2:1 and 2.35:1 for photos and videos, a blurred background for photos, and Blank canvas asks for its shape first
 
+## v0.7.1: done
+
+- Smoother video playback in the editor: the preview shows each frame at its time instead of whenever the screen redraws, the blurred background costs a fraction of what it did, and animated captions redraw once per video frame instead of on every screen refresh
+
 ## Next
 
 Feature parity with the big phone editors, built from how their features behave, never from their code, assets or look (AGENTS.md rules 14 and 15). Offline only: no cloud AI.

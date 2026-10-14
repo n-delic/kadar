@@ -272,9 +272,12 @@ private fun VideoClip.mainSequence(played: List<Segment>, spans: List<Transition
         val effects = drop + dipEffects(dips.filter { it.clip == i || it.clip == i + 1 }, s.width, s.height)
         // A preview copy is smaller than its source, so it is always fitted into the frame.
         val copy = copies[s.uri]
-        // Fades out under the head of an overlapping transition into the next clip, which fades in (incomingSequence).
-        val out = spans.firstOrNull { it.kind.overlaps && it.clip == i + 1 }?.let { it.endMs - it.startMs } ?: 0
-        val audio = audioEffects(s, sound, fadeOutUs = out * 1000)
+        // Fades out under the head of an overlapping transition into the next clip, which fades in (incomingSequence);
+        // a centered one dips the sound to the cut and back, each clip fading over its half.
+        val into = spans.firstOrNull { it.clip == i + 1 }
+        val outMs = into?.let { if (it.kind.overlaps) it.endMs - it.startMs else (it.endMs - it.startMs) / 2 } ?: 0
+        val inMs = dips.firstOrNull { it.clip == i }?.let { (it.endMs - it.startMs) / 2 } ?: 0
+        val audio = audioEffects(s, sound, fadeInUs = inMs * 1000, fadeOutUs = outMs * 1000)
         segmentItem(s.copy(uri = copy ?: s.uri), Effects(audio, videoEffects(s, effects, fit = copy != null)), removeAudio = !sound)
     }
     return EditedMediaItemSequence.Builder(tracks(sound)).addItems(items).build()

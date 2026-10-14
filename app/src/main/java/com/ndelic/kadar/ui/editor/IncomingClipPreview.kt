@@ -89,6 +89,11 @@ fun IncomingClipPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canvasW
     LaunchedEffect(player, main) {
         if (main == null) return@LaunchedEffect
         var lastSeek = 0L
+        // A player told to play shows its first frames this much later; it starts that much before the transition, from
+        // the head's first frame, so it is in step when the transition starts instead of that far behind all through it.
+        var startupMs = STARTUP_MS
+        var startedAt = 0L
+        var startedFrom = 0L
         while (true) {
             val c = current
             val t = main.currentPosition
@@ -98,7 +103,16 @@ fun IncomingClipPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canvasW
             if (next != null) {
                 val s = c.segments[next.clip]
                 val inside = t >= next.startMs
-                val play = inside && main.isPlaying && !s.isImage
+                val starting = !inside && next.startMs - t <= startupMs
+                val play = (inside || starting) && main.isPlaying && !s.isImage
+                val now = SystemClock.uptimeMillis()
+                if (play && !player.playWhenReady) {
+                    startedAt = now
+                    startedFrom = player.currentPosition
+                } else if (startedAt > 0 && player.currentPosition != startedFrom) {
+                    startupMs = (now - startedAt).coerceIn(MIN_STARTUP_MS, MAX_STARTUP_MS)
+                    startedAt = 0
+                }
                 player.playWhenReady = play
                 // Crossfaded in (the main preview's composition fades the clip before out), then muted on its tail past the
                 // cut, where the main preview plays the same clip's sound, like the export's head.
@@ -108,10 +122,11 @@ fun IncomingClipPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canvasW
                     if (player.playbackParameters != params) player.playbackParameters = params
                     val item = c.segments.take(next.clip).count { !it.isImage }
                     val want = sourceMs(s.startMs, s.speed, (t - next.startMs).coerceAtLeast(0))
-                    val now = SystemClock.uptimeMillis()
                     val firstFrame = gate.due(player, now - lastSeek)
                     val otherClip = player.currentMediaItemIndex != item
-                    if (firstFrame || otherClip || player.playbackState != Player.STATE_BUFFERING && overlayNeedsSeek(player.currentPosition, want, play, now - lastSeek)) {
+                    // While it starts early it runs ahead of the head's first frame on purpose.
+                    val drifted = !starting && player.playbackState != Player.STATE_BUFFERING && overlayNeedsSeek(player.currentPosition, want, play, now - lastSeek)
+                    if (firstFrame || otherClip || drifted) {
                         player.seekTo(item, if (firstFrame) gate.nudge(player, want) else want)
                         gate.seeked = true
                         lastSeek = now
@@ -163,3 +178,6 @@ private class FractionShape(private val r: FloatArray) : Shape {
 }
 
 private const val POLL_MS = 32L
+private const val STARTUP_MS = 150L
+private const val MIN_STARTUP_MS = 30L
+private const val MAX_STARTUP_MS = 400L

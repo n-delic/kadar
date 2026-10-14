@@ -37,6 +37,24 @@ class SegmentsTest {
     }
 
     @Test
+    fun layerSplitPointKeepsBothPartsLongEnough() {
+        assertEquals(2000L, layerSplitPoint(1000, 4000, 10_000, 2000))
+        assertNull(layerSplitPoint(1000, 4000, 10_000, 1000 + MIN_CLIP_MS - 1))
+        assertNull(layerSplitPoint(1000, 4000, 10_000, 4000 - MIN_CLIP_MS + 1))
+        assertNull(layerSplitPoint(1000, 4000, 10_000, 5000))
+        // A layer to the end ends with the output.
+        assertEquals(9000L, layerSplitPoint(0, Long.MAX_VALUE, 10_000, 9000))
+        assertNull(layerSplitPoint(0, Long.MAX_VALUE, 10_000, 9900))
+    }
+
+    @Test
+    fun layerMovedToKeepsItsLength() {
+        assertEquals(5000L to 7500L, layerMovedTo(1000, 3500, 5000))
+        assertEquals(0L to 2500L, layerMovedTo(1000, 3500, 0))
+        assertEquals(4000L to Long.MAX_VALUE, layerMovedTo(1000, Long.MAX_VALUE, 4000))
+    }
+
+    @Test
     fun movedReordersOneItem() {
         assertEquals(listOf("b", "c", "a"), listOf("a", "b", "c").moved(0, 2))
         assertEquals(listOf("c", "a", "b"), listOf("a", "b", "c").moved(2, 0))

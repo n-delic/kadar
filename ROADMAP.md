@@ -101,9 +101,9 @@ Feature parity with the big phone editors, built from how their features behave,
 - [ ] Text outline width (fixed at 0.16 of the size today) and shadow color, blur and distance (on/off today); box opacity
 - [ ] Custom colors for text, shapes and boxes: a color wheel with hex, and an eyedropper from the picture
 - [ ] Text format: bold, italic, underline, all caps toggles and a size slider
-- [ ] Text, sticker and shape animations: slide in from all four sides, zoom out, and an adjustable length (300 ms today)
-- [ ] Flip (horizontal and vertical) and opacity for image and sticker layers
-- [ ] Layer tracks: Split at the playhead and Move here (to the playhead)
+- [x] Text, sticker and shape animations: slide in from all four sides, zoom out, and an adjustable length (300 ms today)
+- [x] Flip (horizontal and vertical) and opacity for image and sticker layers
+- [x] Layer tracks: Split at the playhead and Move here (to the playhead)
 - [x] Trim a clip by dragging its edges on the main strip, without opening trim mode
 - [x] Speed as a continuous slider from 0.2x to 10x (8 fixed steps from 0.25x to 4x today)
 - [x] Apply to all clips for speed, filter, adjust and the canvas background (the canvas background is one per project)

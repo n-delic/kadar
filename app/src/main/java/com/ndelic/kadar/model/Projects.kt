@@ -118,7 +118,10 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
     }
 
     private fun layerFromJson(dir: File, j: JSONObject): Layer? {
-        val t = Transform(j.getDouble("x").toFloat(), j.getDouble("y").toFloat(), j.getDouble("scale").toFloat(), j.getDouble("rotation").toFloat())
+        val t = Transform(
+            j.getDouble("x").toFloat(), j.getDouble("y").toFloat(), j.getDouble("scale").toFloat(), j.getDouble("rotation").toFloat(),
+            flipX = j.optBoolean("flipX"), flipY = j.optBoolean("flipY"),
+        )
         val id = j.getLong("id")
         // Absent in projects saved before layers had timing: they show for the whole video.
         val start = j.optLong("startMs", 0)
@@ -126,6 +129,9 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
         val animIn = enumOr(j.optString("animIn"), Anim.None)
         val animOut = enumOr(j.optString("animOut"), Anim.None)
         val loop = enumOr(j.optString("loop"), Loop.None)
+        // Absent before animation lengths were adjustable: each kind's own length.
+        val inMs = if (j.has("animInMs")) j.getLong("animInMs") else null
+        val outMs = if (j.has("animOutMs")) j.getLong("animOutMs") else null
         return when (j.getString("type")) {
             "image" -> {
                 val file = j.getString("file")
@@ -144,6 +150,9 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                         animIn = animIn,
                         animOut = animOut,
                         animLoop = loop,
+                        opacity = j.optDouble("opacity", 1.0).toFloat(),
+                        animInMs = inMs,
+                        animOutMs = outMs,
                     )
                 }
             }
@@ -175,6 +184,8 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                 animIn = animIn,
                 animOut = animOut,
                 animLoop = loop,
+                animInMs = inMs,
+                animOutMs = outMs,
             )
             // Versions before video layers skip this type (the `else` below) rather than fail the whole project.
             "video" -> VideoLayer(
@@ -227,6 +238,8 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                 animIn = animIn,
                 animOut = animOut,
                 animLoop = loop,
+                animInMs = inMs,
+                animOutMs = outMs,
             )
             else -> null
         }
@@ -302,6 +315,8 @@ private fun Layer.toJson() = JSONObject().apply {
     put("y", t.y.toDouble())
     put("scale", t.scale.toDouble())
     put("rotation", t.rotation.toDouble())
+    if (t.flipX) put("flipX", true)
+    if (t.flipY) put("flipY", true)
     put("startMs", startMs)
     put("endMs", endMs)
     put("hidden", hidden)
@@ -309,11 +324,14 @@ private fun Layer.toJson() = JSONObject().apply {
     if (animIn != Anim.None) put("animIn", animIn.name)
     if (animOut != Anim.None) put("animOut", animOut.name)
     if (animLoop != Loop.None) put("loop", animLoop.name)
+    animInMs?.let { put("animInMs", it) }
+    animOutMs?.let { put("animOutMs", it) }
     when (val layer = this@toJson) {
         is ImageLayer -> {
             put("type", "image")
             put("file", layer.file)
             putAdjust(layer.adjust)
+            put("opacity", layer.opacity.toDouble())
             layer.source?.let {
                 put("source", it)
                 put("sourceX", layer.sourceX)

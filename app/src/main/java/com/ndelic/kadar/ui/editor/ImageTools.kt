@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
@@ -106,9 +107,12 @@ fun EraseScreen(layer: ImageLayer, source: Bitmap?, onDone: (Bitmap) -> Unit, on
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
             val fit = min(constraints.maxWidth / work.width.toFloat(), constraints.maxHeight / work.height.toFloat()) * 0.92f
             val center = Offset(constraints.maxWidth / 2f, constraints.maxHeight / 2f)
+            // Shown flipped like on the canvas, so the brush lands where it looks like it does.
+            val fx = if (layer.t.flipX) -1f else 1f
+            val fy = if (layer.t.flipY) -1f else 1f
             fun toBitmap(p: Offset): Offset {
                 val s = fit * zoom
-                return Offset((p.x - center.x - pan.x) / s + work.width / 2f, (p.y - center.y - pan.y) / s + work.height / 2f)
+                return Offset((p.x - center.x - pan.x) / (s * fx) + work.width / 2f, (p.y - center.y - pan.y) / (s * fy) + work.height / 2f)
             }
             Canvas(
                 // Strokes near the screen edge must paint, not trigger the system back gesture.
@@ -153,7 +157,7 @@ fun EraseScreen(layer: ImageLayer, source: Bitmap?, onDone: (Bitmap) -> Unit, on
                 frame // read so each stroke segment redraws
                 withTransform({
                     translate(center.x + pan.x, center.y + pan.y)
-                    scale(fit * zoom, fit * zoom, Offset.Zero)
+                    scale(fit * zoom * fx, fit * zoom * fy, Offset.Zero)
                     translate(-work.width / 2f, -work.height / 2f)
                 }) {
                     checker(Size(work.width.toFloat(), work.height.toFloat()), 24f)
@@ -197,10 +201,11 @@ private val CROP_RATIOS = listOf(null to null, "1:1" to 1f, "4:5" to 0.8f, "9:16
 
 /**
  * Crop [bitmap] (an image layer's, or a video layer's frame), starting from [initial] or the whole of it: drag the
- * corners or the middle; ratios lock the shape. Returns `[left, top, right, bottom)` in [bitmap]'s pixels.
+ * corners or the middle; ratios lock the shape. Returns `[left, top, right, bottom)` in [bitmap]'s pixels. A layer
+ * flipped on the canvas ([flipX], [flipY]) shows flipped here too.
  */
 @Composable
-fun CropScreen(bitmap: Bitmap, onDone: (IntArray) -> Unit, onCancel: () -> Unit, initial: Rect? = null) {
+fun CropScreen(bitmap: Bitmap, onDone: (IntArray) -> Unit, onCancel: () -> Unit, initial: Rect? = null, flipX: Boolean = false, flipY: Boolean = false) {
     val bw = bitmap.width.toFloat()
     val bh = bitmap.height.toFloat()
     var rect by remember { mutableStateOf(initial ?: Rect(0f, 0f, bw, bh)) }
@@ -209,7 +214,9 @@ fun CropScreen(bitmap: Bitmap, onDone: (IntArray) -> Unit, onCancel: () -> Unit,
 
     Column(Modifier.fillMaxSize().background(Ink.bg).blockTouches()) {
         ToolTopBar(onCancel = onCancel, doneEnabled = true, onDone = {
-            onDone(intArrayOf(rect.left.roundToInt(), rect.top.roundToInt(), rect.right.roundToInt(), rect.bottom.roundToInt()))
+            // [rect] is in the picture as shown; mirror it back onto the bitmap.
+            val r = Rect(if (flipX) bw - rect.right else rect.left, if (flipY) bh - rect.bottom else rect.top, if (flipX) bw - rect.left else rect.right, if (flipY) bh - rect.top else rect.bottom)
+            onDone(intArrayOf(r.left.roundToInt(), r.top.roundToInt(), r.right.roundToInt(), r.bottom.roundToInt()))
         })
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(24.dp)) {
             val fit = min(constraints.maxWidth / bw, constraints.maxHeight / bh)
@@ -242,11 +249,13 @@ fun CropScreen(bitmap: Bitmap, onDone: (IntArray) -> Unit, onCancel: () -> Unit,
                 },
             ) {
                 translate(origin.x, origin.y) { checker(Size(bw * fit, bh * fit), 12.dp.toPx()) }
-                drawImage(
-                    bitmap.asImageBitmap(),
-                    dstOffset = IntOffset(origin.x.roundToInt(), origin.y.roundToInt()),
-                    dstSize = IntSize((bw * fit).roundToInt(), (bh * fit).roundToInt()),
-                )
+                scale(if (flipX) -1f else 1f, if (flipY) -1f else 1f, Offset(origin.x + bw * fit / 2, origin.y + bh * fit / 2)) {
+                    drawImage(
+                        bitmap.asImageBitmap(),
+                        dstOffset = IntOffset(origin.x.roundToInt(), origin.y.roundToInt()),
+                        dstSize = IntSize((bw * fit).roundToInt(), (bh * fit).roundToInt()),
+                    )
+                }
                 val r = Rect(rect.topLeft * fit + origin, rect.bottomRight * fit + origin)
                 val dim = Color.Black.copy(alpha = 0.6f)
                 val full = Rect(origin, Offset(origin.x + bw * fit, origin.y + bh * fit))

@@ -14,7 +14,8 @@ import kotlin.math.sin
  * letter: [Typewriter] shows them one by one, [LettersPop] pops them in one after another.
  */
 enum class Anim(@StringRes val label: Int, val ms: Long = ANIM_MS, val perLetter: Boolean = false) {
-    None(R.string.anim_none), Fade(R.string.anim_fade), Pop(R.string.anim_pop), SlideUp(R.string.anim_slide_up),
+    None(R.string.anim_none), Fade(R.string.anim_fade), Pop(R.string.anim_pop), ZoomOut(R.string.anim_zoom_out),
+    SlideUp(R.string.anim_slide_up), SlideDown(R.string.anim_slide_down), SlideLeft(R.string.anim_slide_left), SlideRight(R.string.anim_slide_right),
     Typewriter(R.string.anim_typewriter, LETTERS_MS, true), LettersPop(R.string.anim_letters_pop, LETTERS_MS, true),
 }
 
@@ -25,28 +26,28 @@ enum class Loop(@StringRes val label: Int) { None(R.string.anim_none), Wiggle(R.
 data class Reveal(val anim: Anim, val p: Float)
 
 /**
- * A layer's animated look at one moment: [dy] is a fraction of the canvas height added to its y, [rotation] degrees added
- * to its own, and [reveal] a per-letter entrance in progress (text only).
+ * A layer's animated look at one moment: [dx] and [dy] are fractions of the canvas height added to its x and y, [rotation]
+ * degrees added to its own, and [reveal] a per-letter entrance in progress (text only).
  */
-data class Motion(val alpha: Float = 1f, val scale: Float = 1f, val dy: Float = 0f, val rotation: Float = 0f, val reveal: Reveal? = null)
+data class Motion(val alpha: Float = 1f, val scale: Float = 1f, val dx: Float = 0f, val dy: Float = 0f, val rotation: Float = 0f, val reveal: Reveal? = null)
 
 val Steady = Motion()
 
 const val ANIM_MS = 300L
 const val LETTERS_MS = 1200L
 
-/** How long [anim] runs for a layer shown from [start] to [end]: at most half that, so short layers still settle. */
-fun animMs(anim: Anim, start: Long, end: Long) = minOf(anim.ms, (end - start) / 2)
+/** How long [anim] runs for a layer shown from [start] to [end]: [ms] (else its own length), at most half the layer's time, so short layers still settle. */
+fun animMs(anim: Anim, start: Long, end: Long, ms: Long? = null) = minOf(ms ?: anim.ms, (end - start) / 2)
 
 /**
  * The look at output time [ms] of a layer shown from [start] to [end] (the real end, not [Long.MAX_VALUE]):
- * [animIn] plays over its first [animMs], [animOut] over its last, and [loop] all through. Outside its time it's [Steady];
- * whether it shows at all is up to the caller (the stage keeps the selected layer on screen).
+ * [animIn] plays over its first [animMs] ([inMs] long if set), [animOut] over its last ([outMs]), and [loop] all through.
+ * Outside its time it's [Steady]; whether it shows at all is up to the caller (the stage keeps the selected layer on screen).
  */
-fun motionAt(animIn: Anim, animOut: Anim, start: Long, end: Long, ms: Long, loop: Loop = Loop.None): Motion {
+fun motionAt(animIn: Anim, animOut: Anim, start: Long, end: Long, ms: Long, loop: Loop = Loop.None, inMs: Long? = null, outMs: Long? = null): Motion {
     if (ms < start || ms >= end) return Steady
-    val dIn = animMs(animIn, start, end)
-    val dOut = animMs(animOut, start, end)
+    val dIn = animMs(animIn, start, end, inMs)
+    val dOut = animMs(animOut, start, end, outMs)
     val ends = when {
         dIn > 0 && ms - start < dIn -> animIn.entering((ms - start).toFloat() / dIn)
         dOut > 0 && end - ms < dOut -> animOut.leaving((end - ms).toFloat() / dOut)
@@ -57,14 +58,14 @@ fun motionAt(animIn: Anim, animOut: Anim, start: Long, end: Long, ms: Long, loop
     return ends.copy(scale = ends.scale * l.scale, dy = ends.dy + l.dy, rotation = ends.rotation + l.rotation)
 }
 
-fun Layer.motionAt(ms: Long, end: Long) = motionAt(animIn, animOut, startMs, end, ms, animLoop)
+fun Layer.motionAt(ms: Long, end: Long) = motionAt(animIn, animOut, startMs, end, ms, animLoop, animInMs, animOutMs)
 
 /** The stretches of time in which a layer animates, so a timeline split at them is animated all through a piece or not at all. */
-fun animationSpans(animIn: Anim, animOut: Anim, start: Long, end: Long, loop: Loop = Loop.None): List<Pair<Long, Long>> {
+fun animationSpans(animIn: Anim, animOut: Anim, start: Long, end: Long, loop: Loop = Loop.None, inMs: Long? = null, outMs: Long? = null): List<Pair<Long, Long>> {
     if (end <= start) return emptyList()
     if (loop != Loop.None) return listOf(start to end)
-    val dIn = animMs(animIn, start, end)
-    val dOut = animMs(animOut, start, end)
+    val dIn = animMs(animIn, start, end, inMs)
+    val dOut = animMs(animOut, start, end, outMs)
     return listOfNotNull((start to start + dIn).takeIf { animIn != Anim.None && dIn > 0 }, (end - dOut to end).takeIf { animOut != Anim.None && dOut > 0 })
 }
 
@@ -97,15 +98,29 @@ private fun Anim.entering(p: Float) = when (this) {
     Anim.None -> Steady
     Anim.Fade -> Motion(alpha = easeOut(p))
     Anim.Pop -> Motion(alpha = easeOut(p), scale = 0.6f + 0.4f * backOut(p))
-    Anim.SlideUp -> Motion(alpha = easeOut(p), dy = 0.08f * (1 - easeOut(p)))
+    Anim.ZoomOut -> Motion(alpha = easeOut(p), scale = 1 + 0.5f * (1 - easeOut(p)))
+    Anim.SlideUp, Anim.SlideDown, Anim.SlideLeft, Anim.SlideRight -> slide(-(1 - easeOut(p)), p)
     Anim.Typewriter, Anim.LettersPop -> Motion(reveal = Reveal(this, p))
 }
 
-/** [p] runs 1 to 0 as the layer goes: the entrance played backwards, except a slide keeps going up. */
+/** [p] runs 1 to 0 as the layer goes: the entrance played backwards, except a slide keeps going its way. */
 private fun Anim.leaving(p: Float) = when (this) {
-    Anim.SlideUp -> Motion(alpha = easeOut(p), dy = -0.08f * (1 - easeOut(p)))
+    Anim.SlideUp, Anim.SlideDown, Anim.SlideLeft, Anim.SlideRight -> slide(1 - easeOut(p), p)
     else -> entering(p)
 }
+
+/** A slide [d] of its way along (-1 before it, 0 in place, 1 past it) and faded by [p]: it moves [SLIDE] of the canvas height. */
+private fun Anim.slide(d: Float, p: Float): Motion {
+    val (x, y) = when (this) {
+        Anim.SlideUp -> 0f to -1f
+        Anim.SlideDown -> 0f to 1f
+        Anim.SlideLeft -> -1f to 0f
+        else -> 1f to 0f
+    }
+    return Motion(alpha = easeOut(p), dx = x * SLIDE * d, dy = y * SLIDE * d)
+}
+
+private const val SLIDE = 0.08f
 
 private fun easeOut(p: Float) = 1 - (1 - p) * (1 - p) * (1 - p)
 
@@ -116,12 +131,12 @@ private fun backOut(p: Float): Float {
 }
 
 /**
- * [drawLayer] with [m] applied around the layer's center; [canvasHeight] turns its slide into canvas pixels. A per-letter
+ * [drawLayer] with [m] applied around the layer's center; [canvasHeight] turns its slide (either way) into canvas pixels. A per-letter
  * reveal is handed to the layer's own drawing, so the letters still go through [TextLayer]'s one text path.
  */
 fun Canvas.drawLayer(layer: Layer, m: Motion, canvasHeight: Int) {
     if (m.alpha <= 0f) return
-    val x = layer.t.x
+    val x = layer.t.x + m.dx * canvasHeight
     val y = layer.t.y + m.dy * canvasHeight
     // A fade goes through one offscreen layer, so an outline doesn't show through its fill. Its bounds cover any
     // rotation, with room for a text shadow.

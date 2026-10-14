@@ -22,8 +22,11 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-/** Where a layer's center sits on the canvas, in canvas pixels. Rotation is in degrees, clockwise. */
-data class Transform(val x: Float, val y: Float, val scale: Float = 1f, val rotation: Float = 0f) {
+/**
+ * Where a layer's center sits on the canvas, in canvas pixels. Rotation is in degrees, clockwise. [flipX] mirrors the
+ * content left to right and [flipY] top to bottom inside its box; the box itself (handles, hit test) doesn't flip.
+ */
+data class Transform(val x: Float, val y: Float, val scale: Float = 1f, val rotation: Float = 0f, val flipX: Boolean = false, val flipY: Boolean = false) {
 
     /** True if canvas point ([px], [py]) falls inside a [width]×[height] box placed by this transform. */
     fun contains(width: Float, height: Float, px: Float, py: Float): Boolean {
@@ -58,6 +61,9 @@ data class Transform(val x: Float, val y: Float, val scale: Float = 1f, val rota
             y = y + ((dx * sin(r) + dy * cos(r)) * scale).toFloat(),
         )
     }
+
+    /** [shiftedLocal] by ([dx], [dy]) in the content's own pixels, which a flip mirrors. */
+    fun shiftedContent(dx: Float, dy: Float) = shiftedLocal(if (flipX) -dx else dx, if (flipY) -dy else dy)
 }
 
 /** [name] is what projects store, so fonts can change without breaking saved files. */
@@ -81,6 +87,10 @@ sealed interface Layer {
     val animIn: Anim get() = Anim.None
     val animOut: Anim get() = Anim.None
     val animLoop: Loop get() = Loop.None
+
+    /** How long the entrance and exit run, or null for their kind's own length ([Anim.ms]). */
+    val animInMs: Long? get() = null
+    val animOutMs: Long? get() = null
 
     /** How far from its center it draws, unscaled: its box's half diagonal, or more for a bubble's tail. */
     val reach: Float get() = hypot(width, height) / 2
@@ -115,8 +125,15 @@ data class ImageLayer(
     override val animIn: Anim = Anim.None,
     override val animOut: Anim = Anim.None,
     override val animLoop: Loop = Loop.None,
+    /** 0 to 1. */
+    val opacity: Float = 1f,
+    override val animInMs: Long? = null,
+    override val animOutMs: Long? = null,
 ) : Layer {
-    private val paint = if (adjust.isNone) bitmapPaint else Paint(bitmapPaint).apply { colorFilter = ColorMatrixColorFilter(adjust.filterMatrix()) }
+    private val paint = if (adjust.isNone && opacity >= 1f) bitmapPaint else Paint(bitmapPaint).apply {
+        if (!adjust.isNone) colorFilter = ColorMatrixColorFilter(adjust.filterMatrix())
+        alpha = (opacity * 255).roundToInt()
+    }
     override val width get() = bitmap.width.toFloat()
     override val height get() = bitmap.height.toFloat()
     override fun drawContent(canvas: Canvas) = canvas.drawBitmap(bitmap, -width / 2, -height / 2, paint)
@@ -286,6 +303,8 @@ data class TextLayer(
     override val animIn: Anim = Anim.None,
     override val animOut: Anim = Anim.None,
     override val animLoop: Loop = Loop.None,
+    override val animInMs: Long? = null,
+    override val animOutMs: Long? = null,
 ) : Layer {
     private val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).also {
         it.typeface = font.typeface
@@ -486,6 +505,8 @@ data class ShapeLayer(
     override val animIn: Anim = Anim.None,
     override val animOut: Anim = Anim.None,
     override val animLoop: Loop = Loop.None,
+    override val animInMs: Long? = null,
+    override val animOutMs: Long? = null,
 ) : Layer {
     // Per layer, like the text paints: the video export draws copies of animated layers off the main thread.
     private val paint by lazy {
@@ -569,7 +590,7 @@ fun Canvas.drawLayer(layer: Layer, reveal: Reveal? = null) {
     save()
     translate(layer.t.x, layer.t.y)
     rotate(layer.t.rotation)
-    scale(layer.t.scale, layer.t.scale)
+    scale(if (layer.t.flipX) -layer.t.scale else layer.t.scale, if (layer.t.flipY) -layer.t.scale else layer.t.scale)
     if (layer is TextLayer) layer.drawContent(this, reveal) else layer.drawContent(this)
     restore()
 }

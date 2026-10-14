@@ -47,4 +47,15 @@ class StrokesTest {
         assertArrayEquals(floatArrayOf(15f, 0f), more.strokes[1].points, 0.001f)
         assertEquals(2f, more.strokes[1].width, 0.001f)
     }
+
+    @Test
+    fun addedStrokesLandWhereTheyShowOnAMirroredDrawing() {
+        val layer = DrawLayer(1, Transform(500f, 500f, flipX = true), listOf(PenStroke(0, 2f, floatArrayOf(-10f, 0f))))
+        // 30 px right on the canvas is 30 px left in a mirrored drawing's own space.
+        val more = layer.withStrokes(listOf(PenStroke(0, 2f, floatArrayOf(530f, 500f))))
+        assertArrayEquals(floatArrayOf(10f, 0f), more.strokes[0].points, 0.001f)
+        assertArrayEquals(floatArrayOf(-10f, 0f), more.strokes[1].points, 0.001f)
+        // Re-centered on local -20, which is 20 px right on the canvas.
+        assertEquals(520f, more.t.x, 0.001f)
+    }
 }

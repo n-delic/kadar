@@ -115,7 +115,7 @@ Feature parity with the big phone editors, built from how their features behave,
 
 ### Existing tools that do less than the big editors
 
-- [ ] Music and voiceovers as timeline tracks: start anywhere, move, trim and split (music always starts at 0 today); fade in and out lengths (fixed 1.5 s today)
+- [x] Music and voiceovers as timeline tracks: start anywhere, move, trim and split (music always starts at 0 today); fade in and out lengths (fixed 1.5 s today)
 - [x] Video layers: filter and adjust, like the main clips
 - [x] Adjust: warmth, tint, hue and fade (color matrices, so video still matches photos)
 - [ ] Adjust: vignette and grain (need shaders)

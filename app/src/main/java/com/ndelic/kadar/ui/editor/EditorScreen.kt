@@ -149,6 +149,7 @@ import com.ndelic.kadar.ui.common.LocalEyedropper
 import com.ndelic.kadar.ui.common.blockTouches
 import com.ndelic.kadar.ui.common.fullWidthPanel
 import com.ndelic.kadar.video.VideoClip
+import com.ndelic.kadar.video.audioPart
 import com.ndelic.kadar.video.composition
 import com.ndelic.kadar.video.drawnGroups
 import com.ndelic.kadar.video.frameStartMs
@@ -173,13 +174,13 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     // null: closed; otherwise whether the export dialog shares (true) or saves.
     var exporting by rememberSaveable { mutableStateOf<Boolean?>(null) }
     val image = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::addImage) }
-    val music = rememberLauncherForActivityResult(OpenDocument()) { it?.let(vm::setMusic) }
     // Bumped to swap in a fresh preview player after it failed, resuming at [resumeAt].
     var playerGeneration by remember { mutableIntStateOf(0) }
     val resumeAt = remember { longArrayOf(0) }
     val player = if (video != null) rememberCompositionPlayer(playerGeneration) else null
     var playing by remember { mutableStateOf(false) }
     var positionMs by remember { mutableLongStateOf(0L) }
+    val music = rememberLauncherForActivityResult(OpenDocument()) { it?.let { uri -> vm.addMusic(uri, positionMs) } }
     val overlayVideo = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let { uri -> vm.addVideo(uri, positionMs) } }
     val newClip = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::addClip) }
     // The clip being trimmed, by index.
@@ -189,6 +190,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     // The clip the clip tools act on: the one picked on the strip, else the one under the playhead.
     val picked = state.selectedClip?.takeIf { video != null && it in video.segments.indices }
     val clipIndex = picked ?: video?.segmentAt(positionMs)?.first ?: 0
+    val audio = state.selectedAudio?.takeIf { video?.audioPart(it) != null }
     // With several clips a clip tool picks the clip it acts on, so the strip shows which one that is.
     fun pickClip() {
         if (video != null && video.segments.size > 1 && picked == null) vm.selectClip(clipIndex)
@@ -214,11 +216,17 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         if (panel != Panel.Layers) panel = null
         if (state.selectedId != null) trimming = null
     }
+    LaunchedEffect(state.selectedAudio) {
+        // The Audio panel shows the selected track's settings; other panels are about something else.
+        if (panel != Panel.Audio) panel = null
+        if (state.selectedAudio != null) trimming = null
+    }
     BackHandler {
         when {
             dropper != null -> dropper = null
             panel != null -> panel = null
             selected != null -> vm.select(null)
+            audio != null -> vm.selectAudio(null)
             else -> vm.close()
         }
     }
@@ -337,7 +345,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         Panel.Canvas -> CanvasPanel(project, state.settings.exportSize, vm)
                         Panel.Speed -> video?.let { SpeedPanel(it, clipIndex, vm) }
                         Panel.Audio -> video?.let { v ->
-                            AudioPanel(v, clipIndex, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }) {
+                            AudioPanel(v, clipIndex, audio, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }) {
                                 VoiceoverSection(v, state.recordingFromMs, positionMs, playing, player, vm, onPlay = { playing = it })
                             }
                         }
@@ -380,7 +388,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         }
 
         val toolset = when (selected) {
-            null -> if (picked != null) 6 else 0
+            null -> if (audio != null) 7 else if (picked != null) 6 else 0
             is TextLayer -> 1
             is ImageLayer -> 2
             is VideoLayer -> 3
@@ -498,6 +506,13 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate)) { vm.duplicateClip(clipIndex) }
                         if (video != null && video.segments.size > 1) IconTool(R.drawable.ic_delete, stringResource(R.string.delete)) { vm.deleteClip(clipIndex) }
                     }
+                    7 -> {
+                        IconTool(R.drawable.ic_check, stringResource(R.string.done)) { vm.selectAudio(null) }
+                        ToolDivider()
+                        IconTool(R.drawable.ic_volume_up, stringResource(R.string.tool_audio), panel == Panel.Audio) { toggle(Panel.Audio) }
+                        IconTool(R.drawable.ic_split_scene, stringResource(R.string.tool_split)) { vm.splitAudio(positionMs) }
+                        IconTool(R.drawable.ic_delete, stringResource(R.string.delete), onClick = vm::deleteAudio)
+                    }
                     3 -> {
                         IconTool(R.drawable.ic_check, stringResource(R.string.done)) { vm.select(null) }
                         ToolDivider()
@@ -575,6 +590,9 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         transitionAt = i
                         panel = if (open) null else Panel.Transition
                     },
+                    selectedAudio = audio,
+                    onAudioSelect = vm::selectAudio,
+                    onAudioPart = vm::setAudioPart,
                 )
             }
         }

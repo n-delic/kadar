@@ -4,6 +4,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.net.Uri
+import com.ndelic.kadar.video.AudioPart
+import com.ndelic.kadar.video.MUSIC_FADE_MS
 import com.ndelic.kadar.video.Music
 import com.ndelic.kadar.video.DEFAULT_TRANSITION_MS
 import com.ndelic.kadar.video.Segment
@@ -279,20 +281,29 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
         height = j.optInt("videoHeight", projectHeight),
         canvas = if (j.has("canvas")) j.getDouble("canvas").toFloat() else null,
         blur = j.optBoolean("blur"),
-        music = j.optJSONObject("music")?.let {
-            Music(
-                Uri.parse(it.getString("uri")), it.getString("name"), it.getLong("durationMs"), it.getLong("startMs"), it.getDouble("volume").toFloat(),
-                fadeIn = it.optBoolean("fadeIn"),
-                fadeOut = it.optBoolean("fadeOut"),
-            )
+        // Before version 3 a project had at most one song, from the start of the video to its end.
+        music = (j.optJSONArray("music")?.let { a -> (0 until a.length()).map { a.getJSONObject(it) } } ?: listOfNotNull(j.optJSONObject("music"))).map {
+            Music(Uri.parse(it.getString("uri")), it.getString("name"), it.getLong("durationMs"), it.getLong("startMs"), audioPartFromJson(it, it.optLong("atMs"), Long.MAX_VALUE))
         },
         // A missing recording drops only that voice.
         voices = j.optJSONArray("voices")?.let { a ->
             (0 until a.length()).mapNotNull { i ->
                 val v = a.getJSONObject(i)
-                File(dir, v.getString("file")).takeIf { it.exists() }?.let { VoiceClip(it, v.getLong("startMs"), v.getLong("durationMs"), v.optDouble("volume", 1.0).toFloat()) }
+                val durationMs = v.getLong("durationMs")
+                File(dir, v.getString("file")).takeIf { it.exists() }?.let { VoiceClip(it, durationMs, audioPartFromJson(v, v.getLong("startMs"), durationMs)) }
             }
         }.orEmpty(),
+    )
+
+    /** [atMs] and the [defaultLengthMs] of a part from before version 3 come from the music's or voice's own fields. */
+    private fun audioPartFromJson(j: JSONObject, atMs: Long, defaultLengthMs: Long) = AudioPart(
+        atMs = atMs,
+        offsetMs = j.optLong("offsetMs"),
+        lengthMs = j.optLong("lengthMs", defaultLengthMs),
+        volume = j.optDouble("volume", 1.0).toFloat(),
+        // Before version 3 music faded in and out over MUSIC_FADE_MS or not at all.
+        fadeInMs = j.optLong("fadeInMs", if (j.optBoolean("fadeIn")) MUSIC_FADE_MS else 0),
+        fadeOutMs = j.optLong("fadeOutMs", if (j.optBoolean("fadeOut")) MUSIC_FADE_MS else 0),
     )
 
     private fun segmentFromJson(dir: File, j: JSONObject, projectWidth: Int, projectHeight: Int) = Segment(
@@ -323,7 +334,8 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
 
 private fun Project.toJson() = JSONObject().apply {
     // 2: the video's clips are a list ("clips"); version 1 had the one clip's fields on the video.
-    put("version", 2)
+    // 3: music is a list of parts ("music" an array), music and voices have offsets, lengths and fade lengths.
+    put("version", 3)
     put("width", width)
     put("height", height)
     put("originalHeight", originalHeight)
@@ -456,26 +468,33 @@ private fun VideoClip.toJson() = JSONObject().apply {
     put("videoHeight", height)
     canvas?.let { put("canvas", it.toDouble()) }
     put("blur", blur)
-    music?.let { m ->
-        put("music", JSONObject().apply {
+    if (music.isNotEmpty()) put("music", JSONArray(music.map { m ->
+        JSONObject().apply {
             put("uri", m.uri.toString())
             put("name", m.name)
             put("durationMs", m.durationMs)
             put("startMs", m.startMs)
-            put("volume", m.volume.toDouble())
-            put("fadeIn", m.fadeIn)
-            put("fadeOut", m.fadeOut)
-        })
-    }
+            put("atMs", m.part.atMs)
+            putAudioPart(m.part)
+        }
+    }))
     if (voices.isNotEmpty()) put("voices", JSONArray(voices.map { v ->
         JSONObject().apply {
             // Only the name: the folder moves with the project (duplicates load it from their own copy).
             put("file", v.file.name)
-            put("startMs", v.startMs)
+            put("startMs", v.part.atMs)
             put("durationMs", v.durationMs)
-            put("volume", v.volume.toDouble())
+            putAudioPart(v.part)
         }
     }))
+}
+
+private fun JSONObject.putAudioPart(p: AudioPart) {
+    put("offsetMs", p.offsetMs)
+    put("lengthMs", p.lengthMs)
+    put("volume", p.volume.toDouble())
+    put("fadeInMs", p.fadeInMs)
+    put("fadeOutMs", p.fadeOutMs)
 }
 
 private fun adjustFromJson(j: JSONObject) = Adjust(

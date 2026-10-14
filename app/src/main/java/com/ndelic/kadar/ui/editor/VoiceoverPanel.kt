@@ -5,12 +5,10 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,17 +31,14 @@ import com.ndelic.kadar.EditorViewModel
 import com.ndelic.kadar.R
 import com.ndelic.kadar.ui.common.Ink
 import com.ndelic.kadar.ui.common.KIcon
-import com.ndelic.kadar.ui.common.KSlider
 import com.ndelic.kadar.ui.common.PanelLabel
 import com.ndelic.kadar.video.VideoClip
+import com.ndelic.kadar.video.audioStartMs
 import kotlinx.coroutines.delay
-
-/** Under this much video left, a recording starts from the beginning instead of the playhead. */
-private const val MIN_VOICE_ROOM_MS = 1000L
 
 /**
  * Voiceover part of the Audio panel: record from the playhead while the preview plays (muted, so the speaker isn't
- * recorded too), then each recording with its start, volume and a delete button.
+ * recorded too). Each recording gets a track of its own on the timeline.
  */
 @Composable
 fun VoiceoverSection(
@@ -58,7 +53,7 @@ fun VoiceoverSection(
     val context = LocalContext.current
     var denied by rememberSaveable { mutableStateOf(false) }
     fun start() {
-        val from = if (positionMs < clip.outputDurationMs - MIN_VOICE_ROOM_MS) positionMs else 0L
+        val from = audioStartMs(positionMs, clip.outputDurationMs)
         if (from != positionMs) player?.seekTo(0)
         if (vm.startVoice(from)) onPlay(true)
     }
@@ -103,17 +98,4 @@ fun VoiceoverSection(
         )
     }
     Text(stringResource(if (denied) R.string.voice_permission_denied else R.string.voice_hint), color = Ink.dim, fontSize = 12.sp)
-    clip.voices.sortedBy { it.startMs }.forEach { voice ->
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(formatMs(voice.startMs), color = Ink.text, fontSize = 12.sp, modifier = Modifier.width(52.dp))
-            Box(Modifier.weight(1f)) {
-                KSlider(R.drawable.ic_volume_up, voice.volume, 0f..1f, ::percent) { v ->
-                    vm.updateClip { copy(voices = voices.map { if (it == voice) it.copy(volume = v) else it }) }
-                }
-            }
-            Box(Modifier.clip(RoundedCornerShape(8.dp)).clickable { vm.updateClip { copy(voices = voices - voice) } }.padding(8.dp)) {
-                KIcon(R.drawable.ic_delete, Modifier.size(22.dp), description = stringResource(R.string.voice_remove))
-            }
-        }
-    }
 }

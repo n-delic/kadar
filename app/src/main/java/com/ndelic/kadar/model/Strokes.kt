@@ -57,7 +57,7 @@ fun strokeBounds(strokes: List<PenStroke>): FloatArray? {
 }
 
 /**
- * Adds [strokes] drawn in canvas pixels on top of this layer's own, mapped into its moved, scaled and rotated space,
+ * Adds [strokes] drawn in canvas pixels on top of this layer's own, mapped into its moved, scaled, rotated and flipped space,
  * then re-centers everything on the layer's origin, so it still hit-tests, scales and rotates around its middle.
  * A new drawing is an empty layer at the canvas origin plus its strokes.
  */
@@ -65,12 +65,14 @@ fun DrawLayer.withStrokes(strokes: List<PenStroke>): DrawLayer {
     val r = Math.toRadians(-t.rotation.toDouble())
     val c = cos(r).toFloat()
     val s = sin(r).toFloat()
+    val fx = if (t.flipX) -1 else 1
+    val fy = if (t.flipY) -1 else 1
     val local = strokes.map { stroke ->
         val p = stroke.points
         PenStroke(stroke.color, stroke.width / t.scale, FloatArray(p.size) { i ->
             val dx = p[i - i % 2] - t.x
             val dy = p[i - i % 2 + 1] - t.y
-            (if (i % 2 == 0) dx * c - dy * s else dx * s + dy * c) / t.scale
+            (if (i % 2 == 0) (dx * c - dy * s) * fx else (dx * s + dy * c) * fy) / t.scale
         })
     }
     val all = this.strokes + local
@@ -78,7 +80,7 @@ fun DrawLayer.withStrokes(strokes: List<PenStroke>): DrawLayer {
     val cx = (b[0] + b[2]) / 2
     val cy = (b[1] + b[3]) / 2
     return copy(
-        t = t.shiftedLocal(cx, cy),
+        t = t.shiftedContent(cx, cy),
         strokes = all.map { PenStroke(it.color, it.width, FloatArray(it.points.size) { i -> it.points[i] - if (i % 2 == 0) cx else cy }) },
     )
 }

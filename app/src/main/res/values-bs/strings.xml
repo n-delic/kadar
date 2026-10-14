@@ -97,6 +97,10 @@
     <string name="tool_trim">Skrati</string>
     <string name="tool_speed">Brzina</string>
     <string name="tool_split">Razdvoji</string>
+    <string name="tool_move_here">Pomjeri tu</string>
+    <string name="tool_mirror">Ogledalo</string>
+    <string name="tool_flip">Preokreni</string>
+    <string name="tool_opacity">Prozirnost</string>
     <string name="tool_canvas">Platno</string>
     <string name="tool_adjust">Podesi</string>
     <string name="tool_filters">Filteri</string>
@@ -165,6 +169,10 @@
     <string name="anim_fade">Blijeđenje</string>
     <string name="anim_pop">Iskoči</string>
     <string name="anim_slide_up">Klizi gore</string>
+    <string name="anim_slide_down">Klizi dolje</string>
+    <string name="anim_slide_left">Klizi lijevo</string>
+    <string name="anim_slide_right">Klizi desno</string>
+    <string name="anim_zoom_out">Udalji</string>
     <string name="anim_typewriter">Kucanje</string>
     <string name="anim_letters_pop">Slova iskaču</string>
     <string name="anim_loop">Ponavljanje</string>
@@ -230,6 +238,7 @@
     <string name="busy_adding_video">Dodajem video</string>
     <string name="busy_adding_clip">Dodajem klip</string>
     <string name="split_too_close">Pomjeri oznaku dalje od krajeva klipa da ga razdvojiš</string>
+    <string name="split_layer_outside">Pomjeri oznaku unutar sloja, dalje od njegovih krajeva, da ga razdvojiš</string>
     <string name="add_clip">Dodaj video ili sliku na kraj</string>
     <string name="transition">Prijelaz u klip %1$d</string>
     <string name="transition_none">Bez</string>

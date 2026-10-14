@@ -26,6 +26,17 @@ fun sourceMs(startMs: Long, speed: Float, intoMs: Long) = startMs + (intoMs * sp
 fun splitPoint(startMs: Long, endMs: Long, speed: Float, intoMs: Long): Long? =
     sourceMs(startMs, speed, intoMs).takeIf { it - startMs >= MIN_CLIP_MS && endMs - it >= MIN_CLIP_MS }
 
+/**
+ * Where to cut a layer shown [startMs]..[endMs] (output time) at [atMs]: [atMs], or null when either part would be shorter
+ * than [MIN_CLIP_MS]. A layer that runs to the end ([Long.MAX_VALUE]) ends at [totalMs], the output's length.
+ */
+fun layerSplitPoint(startMs: Long, endMs: Long, totalMs: Long, atMs: Long): Long? =
+    atMs.takeIf { it - startMs >= MIN_CLIP_MS && minOf(endMs, totalMs) - it >= MIN_CLIP_MS }
+
+/** A layer shown [startMs]..[endMs] moved to start at [toMs], as long as before; one that runs to the end still does. */
+fun layerMovedTo(startMs: Long, endMs: Long, toMs: Long): Pair<Long, Long> =
+    toMs to if (endMs == Long.MAX_VALUE) endMs else toMs + (endMs - startMs)
+
 /** This list with the item at [from] moved to [to]. */
 fun <T> List<T>.moved(from: Int, to: Int) = toMutableList().apply { add(to, removeAt(from)) }
 

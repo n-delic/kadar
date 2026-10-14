@@ -465,7 +465,7 @@ private val FULL_FRAME by lazy { StaticOverlaySettings.Builder().build() }
 fun timedOverlay(width: Int, height: Int, layers: List<Layer>, durationMs: Long): TextureOverlay {
     val shown = layers.filter { !it.hidden }
     fun Layer.until() = minOf(endMs, durationMs)
-    val bounds = shown.flatMap { listOf(it.startMs to it.endMs) + animationSpans(it.animIn, it.animOut, it.startMs, it.until(), it.animLoop) }
+    val bounds = shown.flatMap { listOf(it.startMs to it.endMs) + animationSpans(it.animIn, it.animOut, it.startMs, it.until(), it.animLoop, it.animInMs, it.animOutMs) }
     val stretches = segmentBounds(bounds, durationMs).mapNotNull { (start, end) ->
         val mid = (start + end) / 2
         val visible = shown.filter { it.visibleAt(mid) }

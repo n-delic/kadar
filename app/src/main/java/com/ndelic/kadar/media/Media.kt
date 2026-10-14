@@ -8,6 +8,8 @@ import android.graphics.ImageDecoder
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.fonts.FontFamily
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.media.MediaRecorder
 import android.net.Uri
@@ -170,6 +172,17 @@ fun mediaInfo(context: Context, uri: Uri): MediaInfo = MediaMetadataRetriever().
     val duration = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0
     val fps = if (duration > 0) int(MediaMetadataRetriever.METADATA_KEY_VIDEO_FRAME_COUNT) * 1000f / duration else 0f
     if (rotated) MediaInfo(h, w, duration, fps) else MediaInfo(w, h, duration, fps)
+}
+
+/** The MIME types of [uri]'s tracks, such as "video/av01" and "audio/opus". */
+fun trackMimes(context: Context, uri: Uri): List<String> {
+    val extractor = MediaExtractor()
+    try {
+        extractor.setDataSource(context, uri, null)
+        return (0 until extractor.trackCount).mapNotNull { extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME) }
+    } finally {
+        extractor.release()
+    }
 }
 
 /** A frame near [timeMs], small enough for a thumbnail. */

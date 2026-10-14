@@ -156,6 +156,7 @@ Feature parity with the big phone editors, built from how their features behave,
 ## Later / maybe
 
 - [ ] Templates hosted as JSON in this repo (`templates/index.json` plus one folder per template, added by pull request): a project file with blanks (your photo, editable text) that the app downloads only when the Templates screen is opened and keeps for offline use. Downloads are untrusted (size caps, every field checked, data and images only), template images must be CC0 or own work, and About mentions that GitHub sees who downloads. Read the claims of patent US11989808B2 first (AGENTS.md rule 15): a finished layout with blanks, not a replay of someone's edit steps
+- [ ] FFmpeg (FFmpegKitNext, https://github.com/arthenica/ffmpeg-kit-next) for formats the phone can't open itself. It has no ready package, so it would be built from source for every ABI (and for F-Droid); LGPL by default. Not needed for AV1 or VP9: Media3 decodes them, only its preview stalls on them, which the preview copies cover
 
 ## Not planned
 

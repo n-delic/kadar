@@ -180,6 +180,7 @@ fun VideoClip.composition(
     incoming: Boolean = true,
     dropFrames: Boolean = true,
     frameClock: Boolean = false,
+    previewCopies: Map<Uri, Uri> = emptyMap(),
 ): Composition {
     // Media3's compositor takes every output frame time from sequence 0 and draws it on top, then the others in order.
     // So sequence 0 is an invisible frame clock at the clip's rate, then the overlays (topmost layer first), each padded
@@ -218,7 +219,7 @@ fun VideoClip.composition(
         inputs += outgoingSettings(o, fps)
     }
     // The clips set the output's frame times only when they are sequence 0; with a frame clock its rate already holds.
-    sequences += mainSequence(played, spans, dropFrames && sequences.isEmpty())
+    sequences += mainSequence(played, spans, dropFrames && sequences.isEmpty(), previewCopies)
     if (blurred) sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItems(played.map { blurredBackground(it) }).build()
     // Audio only, after every video sequence, so the compositor's input numbers above stay as they are.
     sequences += music.flatMap { audioSequences(it.uri, it.startMs, it.durationMs, it.part, outputDurationMs) }
@@ -263,13 +264,15 @@ private fun VideoClip.blankStill(effects: List<Effect> = emptyList()): EditedMed
  * handing the encoder speed times as many (300 fps at 10x). Media3 1.11's preview runs on past the end with the frame
  * drop effect, so the preview leaves it out; the frames it shows are the same.
  */
-private fun VideoClip.mainSequence(played: List<Segment>, spans: List<TransitionSpan>, dropFrames: Boolean): EditedMediaItemSequence {
+private fun VideoClip.mainSequence(played: List<Segment>, spans: List<TransitionSpan>, dropFrames: Boolean, copies: Map<Uri, Uri>): EditedMediaItemSequence {
     val sound = hasSound(played)
     val dips = spans.filter { !it.kind.overlaps }
     val items = played.mapIndexed { i, s ->
         val drop = if (dropFrames && s.speed > 1f && !s.isImage) listOf(FrameDropEffect.createDefaultFrameDropEffect(outputFrameRate(frameRate).toFloat())) else emptyList()
         val effects = drop + dipEffects(dips.filter { it.clip == i || it.clip == i + 1 }, s.width, s.height)
-        segmentItem(s, Effects(audioEffects(s, sound), videoEffects(s, effects)), removeAudio = !sound)
+        // A preview copy is smaller than its source, so it is always fitted into the frame.
+        val copy = copies[s.uri]
+        segmentItem(s.copy(uri = copy ?: s.uri), Effects(audioEffects(s, sound), videoEffects(s, effects, fit = copy != null)), removeAudio = !sound)
     }
     return EditedMediaItemSequence.Builder(tracks(sound)).addItems(items).build()
 }
@@ -553,6 +556,33 @@ suspend fun exportVideo(context: Context, composition: Composition, out: File, b
 }
 
 /**
+ * Whether a clip with these track MIME types plays from a preview copy: Media3 1.11's preview stalls when it plays into
+ * an AV1 or VP9 clip that starts between keyframes (a trim, or the head a transition cuts off). Exports read them fine.
+ */
+fun needsPreviewCopy(trackMimes: List<String>) = trackMimes.any { it == MimeTypes.VIDEO_AV1 || it == MimeTypes.VIDEO_VP9 }
+
+/**
+ * Encodes [source] ([width]×[height]) to an H.264/AAC MP4 at [out] for the preview, its short side at most
+ * [PREVIEW_COPY_SHORT_SIDE]; [out] appears only when the copy is whole. Must be called on the main thread.
+ */
+suspend fun makePreviewCopy(context: Context, source: Uri, width: Int, height: Int, sound: Boolean, out: File) {
+    val tmp = File(out.path + ".tmp")
+    val resize = Presentation.createForShortSide(PREVIEW_COPY_SHORT_SIDE).takeIf { minOf(width, height) > PREVIEW_COPY_SHORT_SIDE }
+    val item = EditedMediaItem.Builder(MediaItem.fromUri(source)).setEffects(Effects(emptyList(), listOfNotNull(resize))).build()
+    val composition = Composition.Builder(EditedMediaItemSequence.Builder(tracks(sound)).addItem(item).build())
+        .setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
+        .build()
+    try {
+        exportVideo(context, composition, tmp, bitrate = null) {}
+        check(tmp.renameTo(out))
+    } finally {
+        tmp.delete()
+    }
+}
+
+private const val PREVIEW_COPY_SHORT_SIDE = 720
+
+/**
  * Bitrate for a High quality export of a [width]×[height] canvas downscaled to [shortSide] (null keeps it): 0.28 bits
  * per pixel per frame, twice Media3's default and about what a phone camera records 1080p at, capped at 50 Mbps.
  * The encoder clamps it further to what it supports.
@@ -588,11 +618,11 @@ private const val MAX_BITRATE = 50_000_000f
 private const val AAC_BITRATE = 131_072
 
 /** Clip [s]'s look, then [transition] effects, then its fit into the canvas. */
-private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyList()): List<Effect> = buildList {
+private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyList(), fit: Boolean = false): List<Effect> = buildList {
     adjustEffect(s.adjust)?.let(::add)
     addAll(transition)
     // Clips of another size or orientation than the first are fitted into its frame.
-    if (canvas != null || s.width != width || s.height != height) {
+    if (fit || canvas != null || s.width != width || s.height != height) {
         val (w, h) = outputSize
         add(Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_SCALE_TO_FIT))
     }

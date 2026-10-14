@@ -14,6 +14,7 @@ import com.ndelic.kadar.video.TransitionKind
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.VoiceClip
 import java.io.File
+import java.security.MessageDigest
 import java.io.OutputStream
 import kotlin.math.roundToInt
 import org.json.JSONArray
@@ -102,13 +103,20 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
     /** A new, not yet existing file in the project folder for a voice recording (AAC in MP4, so `.m4a`). */
     fun newVoiceFile(dir: File) = File(dir, "${System.nanoTime()}$VOICE_EXTENSION")
 
-    /** Deletes images and voice recordings nothing uses any more (after undo history is gone, so nothing can bring them back). */
+    /** Where the preview copy of the video at [uri] goes in the project folder (see `needsPreviewCopy`). */
+    fun previewCopyFile(dir: File, uri: Uri): File {
+        val hash = MessageDigest.getInstance("SHA-1").digest(uri.toString().toByteArray()).joinToString("") { "%02x".format(it) }
+        return File(dir, "$PREVIEW_COPY_PREFIX${hash.take(16)}.mp4")
+    }
+
+    /** Deletes images, voice recordings and preview copies nothing uses any more (after undo history is gone, so nothing can bring them back). */
     fun cleanUp(dir: File, project: Project) {
         val used = project.layers.filterIsInstance<ImageLayer>().flatMap { listOfNotNull(it.file, it.source) }.toSet() +
             project.video?.voices.orEmpty().map { it.file.name } +
-            project.video?.segments.orEmpty().filter { it.isImage }.map { File(it.uri.path!!).name } + THUMB
+            project.video?.segments.orEmpty().filter { it.isImage }.map { File(it.uri.path!!).name } +
+            project.video?.segments.orEmpty().filter { !it.isImage }.map { previewCopyFile(dir, it.uri).name } + THUMB
         dir.listFiles().orEmpty()
-            .filter { (it.name.endsWith(".png") || it.name.endsWith(".jpg") || it.name.endsWith(VOICE_EXTENSION)) && it.name !in used }
+            .filter { (it.name.endsWith(".png") || it.name.endsWith(".jpg") || it.name.endsWith(VOICE_EXTENSION) || it.name.startsWith(PREVIEW_COPY_PREFIX)) && it.name !in used }
             .forEach { it.delete() }
     }
 
@@ -329,6 +337,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
         const val PROJECT = "project.json"
         const val THUMB = "thumb.jpg"
         const val VOICE_EXTENSION = ".m4a"
+        const val PREVIEW_COPY_PREFIX = "preview_"
     }
 }
 

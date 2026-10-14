@@ -26,6 +26,7 @@ import com.ndelic.kadar.media.renderEmoji
 import com.ndelic.kadar.media.saveToGallery
 import com.ndelic.kadar.media.scaleDown
 import com.ndelic.kadar.media.startVoiceRecording
+import com.ndelic.kadar.media.trackMimes
 import com.ndelic.kadar.media.trimTransparent
 import com.ndelic.kadar.media.turnBitmap
 import com.ndelic.kadar.media.videoFrame
@@ -75,6 +76,8 @@ import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.VoiceClip
 import com.ndelic.kadar.video.audioPart
 import com.ndelic.kadar.video.audioStartMs
+import com.ndelic.kadar.video.makePreviewCopy
+import com.ndelic.kadar.video.needsPreviewCopy
 import com.ndelic.kadar.video.composition
 import com.ndelic.kadar.video.exportVideo
 import com.ndelic.kadar.video.gifShortSide
@@ -132,6 +135,8 @@ data class EditorUiState(
     val canRedo: Boolean = false,
     /** Evenly spaced frames of each clip's source (a photo's one picture), for the timeline. */
     val filmstrip: Map<Uri, List<Bitmap>> = emptyMap(),
+    /** Clip sources the preview plays from a copy instead (`needsPreviewCopy`), by source; the export uses the sources. */
+    val previewCopies: Map<Uri, Uri> = emptyMap(),
     /** Index of the clip picked on the timeline's clip strip; never set together with [selectedId]. */
     val selectedClip: Int? = null,
     /** The music or voiceover track picked on the timeline; never set together with [selectedId] or [selectedClip]. */
@@ -175,6 +180,8 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     /** Imported fonts, reused in every project like stickers; a file's name (without extension) is the font's name. */
     private val fontDir = File(app.filesDir, "fonts")
     private val saveLock = Mutex()
+    /** One preview copy at a time: each is a Transformer run with a hardware decoder and encoder. */
+    private val copyLock = Mutex()
     private var videoFrame: Bitmap? = null
     /** What's on disk for the open project, so just opening one doesn't rewrite it (and bump it to the top). */
     private var lastSaved: Project? = null
@@ -311,8 +318,26 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         nextId = (project.layers.maxOfOrNull { it.id } ?: 0) + 1
         undoStack.clear()
         redoStack.clear()
-        _uiState.update { it.copy(projectDir = dir, project = project, selectedId = null, selectedClip = null, selectedAudio = null, canUndo = false, canRedo = false, filmstrip = emptyMap()) }
-        project.video?.segments?.distinctBy { it.uri }?.forEach { loadFilmstrip(dir, it) }
+        _uiState.update { it.copy(projectDir = dir, project = project, selectedId = null, selectedClip = null, selectedAudio = null, canUndo = false, canRedo = false, filmstrip = emptyMap(), previewCopies = emptyMap()) }
+        project.video?.segments?.distinctBy { it.uri }?.forEach {
+            loadFilmstrip(dir, it)
+            loadPreviewCopy(dir, it)
+        }
+    }
+
+    /** Makes clip [s]'s preview copy in the background if its codec needs one, and lets the preview use it once whole. */
+    private fun loadPreviewCopy(dir: File, s: Segment) {
+        if (s.isImage || s.uri in _uiState.value.previewCopies) return
+        viewModelScope.launch {
+            val file = store.previewCopyFile(dir, s.uri)
+            val made = file.exists() || copyLock.withLock {
+                val mimes = withContext(Dispatchers.IO) { runCatching { trackMimes(app, s.uri) }.getOrDefault(emptyList()) }
+                if (!needsPreviewCopy(mimes) || _uiState.value.projectDir != dir) return@withLock false
+                // Without a copy the preview still plays: EditorScreen gets it past the stalls with a seek.
+                runCatching { makePreviewCopy(app, s.uri, s.width, s.height, mimes.any { it.startsWith("audio/") }, file) }.isSuccess
+            }
+            if (made) _uiState.update { if (it.projectDir == dir) it.copy(previewCopies = it.previewCopies + (s.uri to Uri.fromFile(file))) else it }
+        }
     }
 
     private fun loadFilmstrip(dir: File, s: Segment) {
@@ -746,6 +771,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         updateClip { copy(segments = segments + segment) }
         _uiState.value.project?.video?.let { selectClip(it.segments.lastIndex) }
         loadFilmstrip(dir, segment)
+        loadPreviewCopy(dir, segment)
     }
 
     /** Cuts the clip under the playhead ([atMs], output time) in two there; a message when too close to its ends. */

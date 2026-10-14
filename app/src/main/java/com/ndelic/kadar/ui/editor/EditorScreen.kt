@@ -242,10 +242,11 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         // BlurBackgroundPreview the blurred canvas, so the main player stays single-input. Media3 1.11's multi-input
         // preview fails mid-playback ("frame for an ended input") on devices; the export still composites everything.
         val previewed = staged.video ?: video
-        LaunchedEffect(player, previewed) {
+        val copies = state.previewCopies
+        LaunchedEffect(player, previewed, copies) {
             // After an edit (a split, a trim) the playhead stays where it was.
             val start = resumeAt[0].also { resumeAt[0] = 0 }.takeIf { it > 0 } ?: positionMs.coerceAtMost(previewed.outputDurationMs)
-            player.setComposition(previewed.copy(blur = false).composition(incoming = false, dropFrames = false), start)
+            player.setComposition(previewed.copy(blur = false).composition(incoming = false, dropFrames = false, previewCopies = copies), start)
             player.prepare()
             // A paused player keeps showing the old frame after a new composition; seek once it's loaded to repaint.
             delay(300)

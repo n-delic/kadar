@@ -75,6 +75,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.keepScreenOn
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
@@ -270,6 +271,24 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             onDispose { player.removeListener(listener) }
         }
         LaunchedEffect(player, playing) { player.playWhenReady = playing }
+        // Media3 1.11 buffers for good when playback runs into an AV1 clip that starts between keyframes (a trim, or the head a
+        // transition cuts off); a seek to the same spot plays on. Local files never buffer this long otherwise.
+        LaunchedEffect(player, playing) {
+            if (!playing) return@LaunchedEffect
+            var stalledSince = 0L
+            while (true) {
+                delay(100)
+                val now = SystemClock.uptimeMillis()
+                when {
+                    player.playbackState != Player.STATE_BUFFERING -> stalledSince = 0
+                    stalledSince == 0L -> stalledSince = now
+                    now - stalledSince >= STALL_MS -> {
+                        player.seekTo(player.currentPosition)
+                        stalledSince = 0
+                    }
+                }
+            }
+        }
         // Locking the phone or leaving the app pauses the preview (and ends a voiceover recording).
         LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { playing = false }
         LaunchedEffect(player) {
@@ -280,7 +299,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         }
     }
 
-    Column(Modifier.fillMaxSize().background(Ink.bg)) {
+    Column(Modifier.fillMaxSize().then(if (playing) Modifier.keepScreenOn() else Modifier).background(Ink.bg)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             CircleButton(R.drawable.ic_close, stringResource(R.string.back_to_projects), onClick = vm::close)
             Spacer(Modifier.weight(1f))
@@ -1233,6 +1252,7 @@ private fun rememberCompositionPlayer(generation: Int): CompositionPlayer? {
 }
 
 private const val RETRY_WINDOW_MS = 5_000L
+private const val STALL_MS = 700L
 
 /** Full-screen typing: the text appears big, in its own font and color. */
 @Composable

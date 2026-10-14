@@ -33,7 +33,6 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,11 +41,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.keepScreenOn
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -164,15 +163,11 @@ private fun App(vm: EditorViewModel) {
 /** [progress] in percent fills the ring (spins when null); [onCancel] shows a Cancel button. */
 @Composable
 private fun BusyOverlay(label: UiText, progress: Int?, onCancel: (() -> Unit)?) {
-    // A long export must not stop because the screen timed out and the phone locked.
-    val view = LocalView.current
-    DisposableEffect(view) {
-        view.keepScreenOn = true
-        onDispose { view.keepScreenOn = false }
-    }
     Box(
         Modifier
             .fillMaxSize()
+            // A long export must not stop because the screen timed out and the phone locked.
+            .keepScreenOn()
             .background(Color.Black.copy(alpha = 0.55f))
             // Swallow touches so nothing changes while the task runs.
             .blockTouches(),

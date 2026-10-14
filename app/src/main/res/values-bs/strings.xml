@@ -285,4 +285,17 @@
     <string name="discard_title">Odbaciti promjene?</string>
     <string name="discard_text">Ovo što si uradio ovdje još nije primijenjeno.</string>
     <string name="discard_confirm">Odbaci</string>
+    <string name="shadow_blur">Zamućenje</string>
+    <string name="shadow_distance">Udaljenost</string>
+    <string name="text_size">Veličina</string>
+    <string name="text_bold">Podebljano</string>
+    <string name="text_italic">Kurziv</string>
+    <string name="text_underline">Podvučeno</string>
+    <string name="text_caps">Sva velika slova</string>
+    <string name="color_custom">Vlastita boja</string>
+    <string name="color_hex">Hex boja</string>
+    <string name="color_hue">Nijansa</string>
+    <string name="color_shade">Zasićenost i svjetlina</string>
+    <string name="eyedropper">Uzmi boju sa slike</string>
+    <string name="eyedropper_hint">Dodirni sliku da uzmeš boju</string>
 </resources>

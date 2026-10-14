@@ -157,10 +157,19 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                 color = j.getInt("color"),
                 outline = if (j.has("outline")) j.getInt("outline") else null,
                 box = if (j.has("box")) j.getInt("box") else null,
+                boxOpacity = j.optDouble("boxOpacity", 1.0).toFloat(),
                 bubble = enumOr(j.optString("bubble"), Bubble.Box),
                 boxOutline = if (j.has("boxOutline")) j.getInt("boxOutline") else null,
                 tail = if (j.has("tailX")) j.getDouble("tailX").toFloat() to j.getDouble("tailY").toFloat() else null,
-                shadow = j.optBoolean("shadow"),
+                // Before shadow colors "shadow" was true or false.
+                shadow = if (j.has("shadowColor")) j.getInt("shadowColor") else DEFAULT_SHADOW.takeIf { j.optBoolean("shadow") },
+                shadowBlur = j.optDouble("shadowBlur", 0.08).toFloat(),
+                shadowDistance = j.optDouble("shadowDistance", 0.04).toFloat(),
+                outlineWidth = j.optDouble("outlineWidth", 0.16).toFloat(),
+                bold = j.optBoolean("bold"),
+                italic = j.optBoolean("italic"),
+                underline = j.optBoolean("underline"),
+                caps = j.optBoolean("caps"),
                 spacing = j.optDouble("spacing", 0.0).toFloat(),
                 align = runCatching { TextAlign.valueOf(j.optString("align")) }.getOrDefault(TextAlign.Center),
                 glow = if (j.has("glow")) j.getInt("glow") else null,
@@ -328,13 +337,22 @@ private fun Layer.toJson() = JSONObject().apply {
             put("color", layer.color)
             layer.outline?.let { put("outline", it) }
             layer.box?.let { put("box", it) }
+            put("boxOpacity", layer.boxOpacity.toDouble())
             put("bubble", layer.bubble.name)
             layer.boxOutline?.let { put("boxOutline", it) }
             layer.tail?.let { (x, y) ->
                 put("tailX", x.toDouble())
                 put("tailY", y.toDouble())
             }
-            put("shadow", layer.shadow)
+            put("shadow", layer.shadow != null)
+            layer.shadow?.let { put("shadowColor", it) }
+            put("shadowBlur", layer.shadowBlur.toDouble())
+            put("shadowDistance", layer.shadowDistance.toDouble())
+            put("outlineWidth", layer.outlineWidth.toDouble())
+            put("bold", layer.bold)
+            put("italic", layer.italic)
+            put("underline", layer.underline)
+            put("caps", layer.caps)
             put("spacing", layer.spacing.toDouble())
             put("align", layer.align.name)
             layer.glow?.let { put("glow", it) }

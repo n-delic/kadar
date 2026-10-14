@@ -287,4 +287,17 @@
     <string name="discard_title">Discard changes?</string>
     <string name="discard_text">What you did here hasn\'t been applied yet.</string>
     <string name="discard_confirm">Discard</string>
+    <string name="shadow_blur">Blur</string>
+    <string name="shadow_distance">Distance</string>
+    <string name="text_size">Size</string>
+    <string name="text_bold">Bold</string>
+    <string name="text_italic">Italic</string>
+    <string name="text_underline">Underline</string>
+    <string name="text_caps">All caps</string>
+    <string name="color_custom">Custom color</string>
+    <string name="color_hex">Hex color</string>
+    <string name="color_hue">Hue</string>
+    <string name="color_shade">Saturation and brightness</string>
+    <string name="eyedropper">Pick a color from the picture</string>
+    <string name="eyedropper_hint">Touch the picture to pick a color</string>
 </resources>

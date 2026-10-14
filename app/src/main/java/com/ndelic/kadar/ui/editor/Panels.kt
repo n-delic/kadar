@@ -62,6 +62,7 @@ import com.ndelic.kadar.model.ShapeLayer
 import com.ndelic.kadar.model.TextAlign
 import com.ndelic.kadar.model.TextLayer
 import com.ndelic.kadar.model.VideoLayer
+import com.ndelic.kadar.ui.common.CircleButton
 import com.ndelic.kadar.ui.common.ColorRow
 import com.ndelic.kadar.ui.common.Ink
 import com.ndelic.kadar.ui.common.KDialog
@@ -173,7 +174,7 @@ fun AdjustPanel(adjust: Adjust, onChange: (Adjust) -> Unit) {
 }
 
 @Composable
-private fun LabeledSlider(
+fun LabeledSlider(
     label: String,
     value: Float,
     range: ClosedFloatingPointRange<Float> = -1f..1f,
@@ -190,7 +191,12 @@ private fun LabeledSlider(
 fun TextStylePanel(layer: TextLayer, vm: EditorViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         TextTabs(TextAlign.entries, layer.align, label = { stringResource(it.label) }) { a -> vm.editText { copy(align = a) } }
-        KToggle(stringResource(R.string.shadow), null, layer.shadow) { on -> vm.editText { copy(shadow = on) } }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(horizontal = 4.dp)) {
+            CircleButton(R.drawable.ic_format_bold, stringResource(R.string.text_bold), active = layer.bold) { vm.editText { copy(bold = !bold) } }
+            CircleButton(R.drawable.ic_format_italic, stringResource(R.string.text_italic), active = layer.italic) { vm.editText { copy(italic = !italic) } }
+            CircleButton(R.drawable.ic_format_underlined, stringResource(R.string.text_underline), active = layer.underline) { vm.editText { copy(underline = !underline) } }
+            CircleButton(R.drawable.ic_uppercase, stringResource(R.string.text_caps), active = layer.caps) { vm.editText { copy(caps = !caps) } }
+        }
         LabeledSlider(stringResource(R.string.spacing), layer.spacing * 2) { v -> vm.editText { copy(spacing = v / 2) } }
         LabeledSlider(stringResource(R.string.line_height), layer.lineSpacing, 0.6f..2f, { "${(it * 10).roundToInt() / 10f}" }) { v -> vm.editText { copy(lineSpacing = v) } }
         LabeledSlider(stringResource(R.string.opacity), layer.opacity, 0.05f..1f, ::percent) { v -> vm.editText { copy(opacity = v) } }
@@ -340,37 +346,43 @@ private val FONT_TYPES = arrayOf("font/*", "application/font-sfnt", "application
 
 /** [fonts] are the bundled ones, then the imported ones; the last tile imports a font file. */
 @Composable
-fun FontPanel(layer: TextLayer, fonts: List<Font>, vm: EditorViewModel) {
+fun FontPanel(layer: TextLayer, fonts: List<Font>, defaultSize: Float, vm: EditorViewModel) {
     val pick = rememberLauncherForActivityResult(OpenDocument()) { it?.let(vm::importFont) }
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        items(fonts, key = { it.name }) { f ->
-            val active = layer.font.name == f.name
-            val shape = RoundedCornerShape(10.dp)
-            Box(
-                Modifier.heightIn(min = 44.dp).widthIn(max = 120.dp).clip(shape)
-                    .border(1.5.dp, if (active) Ink.accent else Color.Transparent, shape)
-                    .clickable { vm.editText { copy(font = f) } }.padding(horizontal = 10.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    f.name,
-                    fontFamily = FontFamily(f.typeface),
-                    fontSize = 22.sp,
-                    color = if (active) Ink.accent else Ink.dim,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            items(fonts, key = { it.name }) { f ->
+                val active = layer.font.name == f.name
+                val shape = RoundedCornerShape(10.dp)
+                Box(
+                    Modifier.heightIn(min = 44.dp).widthIn(max = 120.dp).clip(shape)
+                        .border(1.5.dp, if (active) Ink.accent else Color.Transparent, shape)
+                        .clickable { vm.editText { copy(font = f) } }.padding(horizontal = 10.dp, vertical = 4.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        f.name,
+                        fontFamily = FontFamily(f.typeface),
+                        fontSize = 22.sp,
+                        color = if (active) Ink.accent else Ink.dim,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            item {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(10.dp)).clickable { pick.launch(FONT_TYPES) }.padding(horizontal = 10.dp),
+                ) {
+                    KIcon(R.drawable.ic_add, Modifier.size(22.dp), Ink.accent)
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.font_import), color = Ink.accent, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
-        item {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(10.dp)).clickable { pick.launch(FONT_TYPES) }.padding(horizontal = 10.dp),
-            ) {
-                KIcon(R.drawable.ic_add, Modifier.size(22.dp), Ink.accent)
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(R.string.font_import), color = Ink.accent, fontWeight = FontWeight.SemiBold)
-            }
+        // Size is the layer's placement scale, like a pinch, so the wrap and the bubble tail keep their shape.
+        LabeledSlider(stringResource(R.string.text_size), layer.size * layer.t.scale / defaultSize, 0.2f..4f, ::percent) { v ->
+            vm.editText { copy(t = t.copy(scale = v * defaultSize / size)) }
         }
     }
 }

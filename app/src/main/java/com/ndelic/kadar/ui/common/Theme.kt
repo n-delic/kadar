@@ -34,6 +34,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -176,12 +177,30 @@ fun <T> TextTabs(options: List<T>, selected: T?, label: @Composable (T) -> Strin
     }
 }
 
-/** A row of color dots; [allowNone] adds a crossed-out dot that picks null. */
+/**
+ * A row of color dots; [allowNone] adds a crossed-out dot that picks null. Any other color comes from the custom picker
+ * or, where [LocalEyedropper] is provided, from the picture; those are remembered in the row for a while.
+ */
 @Composable
 fun ColorRow(selected: Int?, allowNone: Boolean, onPick: (Int?) -> Unit) {
+    var custom by remember { mutableStateOf(false) }
+    val eyedropper = LocalEyedropper.current
+    fun pickCustom(c: Int) {
+        rememberColor(c)
+        onPick(c)
+    }
     LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         if (allowNone) item { ColorDot(null, selected == null) { onPick(null) } }
+        item { CustomColorDot(selected?.takeIf { it !in SWATCHES && it !in recentColors }) { custom = true } }
+        eyedropper?.let { start -> item { EyedropperDot { start(::pickCustom) } } }
+        items(recentColors.toList()) { c -> ColorDot(c, selected == c) { onPick(c) } }
         items(SWATCHES) { c -> ColorDot(c, selected == c) { onPick(c) } }
+    }
+    if (custom) {
+        CustomColorDialog(selected ?: android.graphics.Color.WHITE, onDismiss = { custom = false }) { c ->
+            custom = false
+            pickCustom(c)
+        }
     }
 }
 

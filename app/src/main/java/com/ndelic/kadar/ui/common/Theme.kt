@@ -221,16 +221,26 @@ private fun ColorDot(color: Int?, active: Boolean, onClick: () -> Unit) {
     )
 }
 
-/** Thin-track slider that reports only when the finger lifts, so the video preview isn't rebuilt on every pixel. */
+/** Thin-track slider that commits only when the finger lifts (one undo step); [onDrag] gets the value meanwhile. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun KSlider(@DrawableRes icon: Int?, value: Float, range: ClosedFloatingPointRange<Float>, valueLabel: (Float) -> String, onCommit: (Float) -> Unit) {
+fun KSlider(
+    @DrawableRes icon: Int?,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    valueLabel: (Float) -> String,
+    onDrag: (Float) -> Unit = {},
+    onCommit: (Float) -> Unit,
+) {
     var current by remember(value) { mutableFloatStateOf(value) }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         icon?.let { KIcon(it, Modifier.size(22.dp), Ink.dim) }
         Slider(
             value = current,
-            onValueChange = { current = it },
+            onValueChange = {
+                current = it
+                onDrag(it)
+            },
             valueRange = range,
             onValueChangeFinished = { onCommit(current) },
             modifier = Modifier.weight(1f),

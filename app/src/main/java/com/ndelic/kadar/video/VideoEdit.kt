@@ -108,6 +108,9 @@ data class VideoClip(
     val frameRate: Float = 0f,
     val voices: List<VoiceClip> = emptyList(),
 ) {
+    /** Every clip without its look and color adjustment. */
+    fun withoutAdjust() = copy(segments = segments.map { it.copy(adjust = Adjust()) })
+
     /** How much of each clip's start an overlapping transition plays over the clip before it (output time). */
     val headsMs get() = headsMs(segments.map { it.outputDurationMs }, segments.map { it.transition })
 
@@ -172,7 +175,8 @@ private const val BLUR_LONG_SIDE = 320
  * own. [incoming] adds the heads of overlapping transitions as a sequence over the clips (the preview leaves it out and
  * draws them itself, with IncomingClipPreview). [dropFrames] keeps sped-up clips at the clip's frame rate when they set
  * the output's frame times (the preview turns it off). [frameClock] times the output by the frame clock at [VideoClip.frameRate]
- * even without video layers or transitions, for an export at a chosen frame rate. Call it on the main thread, like [timedOverlay].
+ * even without video layers or transitions, for an export at a chosen frame rate. With [looks] (the preview's) the clips
+ * take their looks from it on every frame instead of each baking its own in. Call it on the main thread, like [timedOverlay].
  */
 fun VideoClip.composition(
     layers: List<Layer> = emptyList(),
@@ -181,6 +185,7 @@ fun VideoClip.composition(
     dropFrames: Boolean = true,
     frameClock: Boolean = false,
     previewCopies: Map<Uri, Uri> = emptyMap(),
+    looks: LiveLooks? = null,
 ): Composition {
     // Media3's compositor takes every output frame time from sequence 0 and draws it on top, then the others in order.
     // So sequence 0 is an invisible frame clock at the clip's rate, then the overlays (topmost layer first), each padded
@@ -219,7 +224,7 @@ fun VideoClip.composition(
         inputs += outgoingSettings(o, fps)
     }
     // The clips set the output's frame times only when they are sequence 0; with a frame clock its rate already holds.
-    sequences += mainSequence(played, spans, dropFrames && sequences.isEmpty(), previewCopies)
+    sequences += mainSequence(played, spans, dropFrames && sequences.isEmpty(), previewCopies, looks)
     if (blurred) sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItems(played.map { blurredBackground(it) }).build()
     // Audio only, after every video sequence, so the compositor's input numbers above stay as they are.
     sequences += music.flatMap { audioSequences(it.uri, it.startMs, it.durationMs, it.part, outputDurationMs) }
@@ -264,7 +269,7 @@ private fun VideoClip.blankStill(effects: List<Effect> = emptyList()): EditedMed
  * handing the encoder speed times as many (300 fps at 10x). Media3 1.11's preview runs on past the end with the frame
  * drop effect, so the preview leaves it out; the frames it shows are the same.
  */
-private fun VideoClip.mainSequence(played: List<Segment>, spans: List<TransitionSpan>, dropFrames: Boolean, copies: Map<Uri, Uri>): EditedMediaItemSequence {
+private fun VideoClip.mainSequence(played: List<Segment>, spans: List<TransitionSpan>, dropFrames: Boolean, copies: Map<Uri, Uri>, looks: LiveLooks?): EditedMediaItemSequence {
     val sound = hasSound(played)
     val dips = spans.filter { !it.kind.overlaps }
     val items = played.mapIndexed { i, s ->
@@ -278,7 +283,8 @@ private fun VideoClip.mainSequence(played: List<Segment>, spans: List<Transition
         val outMs = into?.let { if (it.kind.overlaps) it.endMs - it.startMs else (it.endMs - it.startMs) / 2 } ?: 0
         val inMs = dips.firstOrNull { it.clip == i }?.let { (it.endMs - it.startMs) / 2 } ?: 0
         val audio = audioEffects(s, sound, fadeInUs = inMs * 1000, fadeOutUs = outMs * 1000)
-        segmentItem(s.copy(uri = copy ?: s.uri), Effects(audio, videoEffects(s, effects, fit = copy != null)), removeAudio = !sound)
+        val look = looks?.effect(i) ?: adjustEffect(s.adjust)
+        segmentItem(s.copy(uri = copy ?: s.uri), Effects(audio, videoEffects(s, effects, fit = copy != null, look)), removeAudio = !sound)
     }
     return EditedMediaItemSequence.Builder(tracks(sound)).addItems(items).build()
 }
@@ -628,9 +634,9 @@ private const val HIGH_BITS_PER_PIXEL = 0.28f
 private const val MAX_BITRATE = 50_000_000f
 private const val AAC_BITRATE = 131_072
 
-/** Clip [s]'s look, then [transition] effects, then its fit into the canvas. */
-private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyList(), fit: Boolean = false): List<Effect> = buildList {
-    adjustEffect(s.adjust)?.let(::add)
+/** Clip [s]'s [look], then [transition] effects, then its fit into the canvas. */
+private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyList(), fit: Boolean = false, look: Effect? = adjustEffect(s.adjust)): List<Effect> = buildList {
+    look?.let(::add)
     addAll(transition)
     // Clips of another size or orientation than the first are fitted into its frame.
     if (fit || canvas != null || s.width != width || s.height != height) {
@@ -641,6 +647,24 @@ private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyL
 
 /** The same matrix as an image layer's paint, so a look or adjustment matches between photo and video. */
 private fun adjustEffect(adjust: Adjust) = if (adjust.isNone) null else glRgbMatrix(adjust.filterMatrix()).let { m -> RgbMatrix { _, _ -> m } }
+
+/**
+ * The clips' looks as the preview shows them, read on every frame: [show] swaps in new ones (a filter tapped, a slider
+ * dragged) without a new composition, so the preview doesn't reload. Each clip always gets the effect, so a clip with
+ * no look can get one live.
+ */
+class LiveLooks {
+    @Volatile private var matrices: List<FloatArray> = emptyList()
+
+    /** Each clip's look and adjustment, in clip order. */
+    fun show(adjusts: List<Adjust>) {
+        matrices = adjusts.map { glRgbMatrix(it.filterMatrix()) }
+    }
+
+    fun effect(clip: Int) = RgbMatrix { _, _ -> matrices.getOrNull(clip) ?: NO_LOOK }
+}
+
+private val NO_LOOK = glRgbMatrix(Adjust().filterMatrix())
 
 private fun clipped(uri: Uri, startMs: Long, endMs: Long) = MediaItem.Builder()
     .setUri(uri)

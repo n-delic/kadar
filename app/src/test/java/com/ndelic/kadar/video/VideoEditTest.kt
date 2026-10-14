@@ -1,5 +1,10 @@
 package com.ndelic.kadar.video
 
+import com.ndelic.kadar.model.Adjust
+import com.ndelic.kadar.model.Look
+import com.ndelic.kadar.model.filterMatrix
+import com.ndelic.kadar.model.glRgbMatrix
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -37,6 +42,21 @@ class VideoEditTest {
         assertEquals(10_000_000L, estimatedBytes(10_000, 8_000_000, sound = false))
         assertEquals(10_000_000L + 163_840, estimatedBytes(10_000, 8_000_000, sound = true))
         assertEquals(0L, estimatedBytes(0, 8_000_000, sound = true))
+    }
+
+    @Test
+    fun liveLooksSwapTheMatrixAnEffectReads() {
+        val looks = LiveLooks()
+        val first = looks.effect(0)
+        val identity = glRgbMatrix(Adjust().filterMatrix())
+        // Before any look, and for a clip past the list: no change to the picture.
+        assertArrayEquals(identity, first.getMatrix(0, false), 0f)
+        val bw = Adjust(look = Look.Mono)
+        looks.show(listOf(bw, Adjust(brightness = 0.5f)))
+        // The effect already in the composition reads the new look on its next frame.
+        assertArrayEquals(glRgbMatrix(bw.filterMatrix()), first.getMatrix(33_000, false), 0f)
+        assertArrayEquals(glRgbMatrix(Adjust(brightness = 0.5f).filterMatrix()), looks.effect(1).getMatrix(0, false), 0f)
+        assertArrayEquals(identity, looks.effect(2).getMatrix(0, false), 0f)
     }
 
     private fun assertEquals(expected: Int, actual: Int, delta: Int) = assertEquals(expected.toDouble(), actual.toDouble(), delta.toDouble())

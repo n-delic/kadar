@@ -44,8 +44,24 @@ data class Project(
                 else -> it
             }
         },
-        video = video?.let { v -> v.copy(segments = v.segments.map { it.copy(adjust = Adjust()) }) },
+        video = video?.withoutAdjust(),
     )
+
+    /** [adjust] on layer [layerId] (an image or video layer) or, with none, on clip [clip]: a look shown while it's changed. */
+    fun withAdjust(layerId: Long?, clip: Int, adjust: Adjust) = if (layerId != null) {
+        copy(
+            layers = layers.map {
+                when {
+                    it.id != layerId -> it
+                    it is ImageLayer -> it.copy(adjust = adjust)
+                    it is VideoLayer -> it.copy(adjust = adjust)
+                    else -> it
+                }
+            },
+        )
+    } else {
+        copy(video = video?.let { v -> v.copy(segments = v.segments.mapIndexed { i, s -> if (i == clip) s.copy(adjust = adjust) else s }) })
+    }
 }
 
 data class SavedProject(val dir: File, val modified: Long, val thumb: Bitmap?, val isVideo: Boolean, val name: String? = null) {

@@ -27,6 +27,7 @@ import com.ndelic.kadar.media.saveToGallery
 import com.ndelic.kadar.media.scaleDown
 import com.ndelic.kadar.media.startVoiceRecording
 import com.ndelic.kadar.media.trimTransparent
+import com.ndelic.kadar.media.turnBitmap
 import com.ndelic.kadar.media.videoFrame
 import com.ndelic.kadar.model.Anim
 import com.ndelic.kadar.model.AppSettings
@@ -50,10 +51,14 @@ import com.ndelic.kadar.model.Transform
 import com.ndelic.kadar.model.UiText
 import com.ndelic.kadar.model.UserError
 import com.ndelic.kadar.model.VideoLayer
+import com.ndelic.kadar.model.backdrop
 import com.ndelic.kadar.model.defaultTextSize
 import com.ndelic.kadar.model.newShape
 import com.ndelic.kadar.model.renderLayers
 import com.ndelic.kadar.model.styled
+import com.ndelic.kadar.model.turned
+import com.ndelic.kadar.model.turnedBounds
+import com.ndelic.kadar.model.turnedSourceOffset
 import com.ndelic.kadar.model.withStrokes
 import com.ndelic.kadar.ui.editor.Timeline
 import com.ndelic.kadar.ui.editor.label
@@ -71,6 +76,7 @@ import com.ndelic.kadar.video.moved
 import com.ndelic.kadar.video.sourceMs
 import com.ndelic.kadar.video.splitPoint
 import java.io.File
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -200,7 +206,11 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         open(dir, Project(bitmap.width, bitmap.height, layers = listOf(layer)))
     }
 
-    fun newBlank() = open(store.create(), Project(1080, 1080))
+    /** A blank canvas of [ratio] (width / height), 1080 px on its short side. */
+    fun newBlank(ratio: Float) {
+        val (w, h) = if (ratio >= 1) (BLANK_SIDE * ratio).roundToInt() to BLANK_SIDE else BLANK_SIDE to (BLANK_SIDE / ratio).roundToInt()
+        open(store.create(), Project(w, h))
+    }
 
     fun newVideo(uri: Uri) = work(R.string.busy_opening_video) { newVideoNow(uri) }
 
@@ -321,7 +331,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** True when the project is on disk. */
     private suspend fun save(dir: File, project: Project): Boolean {
-        val thumb = renderLayers(project.width, project.height, project.background, project.layers, THUMB_SIZE / max(project.width, project.height), videoFrame)
+        val thumb = renderLayers(project.width, project.height, project.background, project.layers, THUMB_SIZE / max(project.width, project.height), videoFrame, project.backdrop())
         try {
             saveLock.withLock { withContext(Dispatchers.IO) { store.save(dir, project, thumb) } }
             lastSaved = project
@@ -403,11 +413,19 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         addLayer { VideoLayer(it, Transform(p.width / 2f, p.height / 2f, p.width * 0.5f / info.width), uri, info.durationMs, info.width, info.height, startMs = start) }
     }
 
-    /** Result of the draw screen, one undo step: [strokes] (canvas pixels) become a new layer, or go onto drawing [id]. */
+    /**
+     * Result of the draw screen, one undo step: [strokes] (canvas pixels) become a new layer, or replace drawing [id]'s
+     * (keeping its rotation and scale); a drawing erased to nothing is deleted.
+     */
     fun applyDrawing(id: Long?, strokes: List<PenStroke>) {
-        if (strokes.isEmpty()) return
-        if (id == null) addLayer { DrawLayer(it, Transform(0f, 0f), emptyList()).withStrokes(strokes) }
-        else updateLayer(id) { (it as? DrawLayer)?.withStrokes(strokes) ?: it }
+        when {
+            id == null -> if (strokes.isNotEmpty()) addLayer { DrawLayer(it, Transform(0f, 0f), emptyList()).withStrokes(strokes) }
+            strokes.isEmpty() -> {
+                updateProject { p -> p.copy(layers = p.layers.filter { it.id != id }) }
+                select(null)
+            }
+            else -> updateLayer(id) { (it as? DrawLayer)?.copy(strokes = emptyList())?.withStrokes(strokes) ?: it }
+        }
     }
 
     fun addShape(kind: ShapeKind) {
@@ -565,16 +583,45 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         updateLayer(id) { (it as ImageLayer).copy(bitmap = bitmap, file = file) }
     }
 
-    /** Crops the layer to `[left, top, right, bottom)` of its bitmap, keeping the kept part where it was on screen. */
-    fun applyCrop(id: Long, left: Int, top: Int, right: Int, bottom: Int) = work(R.string.busy_cropping) {
+    /**
+     * Crops the layer to `[left, top, right, bottom)`, keeping the kept part where it was on screen. Unturned, that is in
+     * its bitmap's pixels. Turned by [turns] quarter turns and [angle] degrees, it is in the crop screen's frame (the
+     * picture as shown, flipped like the layer, its box after the quarter turns, same center), and the flip is baked
+     * into the new bitmap and source.
+     */
+    fun applyCrop(id: Long, left: Int, top: Int, right: Int, bottom: Int, turns: Int = 0, angle: Float = 0f) = work(R.string.busy_cropping) {
         val layer = _uiState.value.project?.layers?.firstOrNull { it.id == id } as? ImageLayer ?: return@work
         val dir = _uiState.value.projectDir ?: return@work
-        val cut = Bitmap.createBitmap(layer.bitmap, left, top, right - left, bottom - top)
-        val file = withContext(Dispatchers.IO) { store.writeImage(dir, cut) }
-        val t = layer.t.shiftedContent((left + right) / 2f - layer.width / 2, (top + bottom) / 2f - layer.height / 2)
-        updateLayer(id) {
-            layer.copy(t = t, bitmap = cut, file = file, source = layer.source ?: layer.file, sourceX = layer.sourceX + left, sourceY = layer.sourceY + top)
+        val degrees = turns * 90 + angle
+        if (degrees % 360f == 0f) {
+            val cut = Bitmap.createBitmap(layer.bitmap, left, top, right - left, bottom - top)
+            val file = withContext(Dispatchers.IO) { store.writeImage(dir, cut) }
+            val t = layer.t.shiftedContent((left + right) / 2f - layer.width / 2, (top + bottom) / 2f - layer.height / 2)
+            updateLayer(id) {
+                layer.copy(t = t, bitmap = cut, file = file, source = layer.source ?: layer.file, sourceX = layer.sourceX + left, sourceY = layer.sourceY + top)
+            }
+            return@work
         }
+        val (fw, fh) = if (turns % 2 == 0) layer.width to layer.height else layer.height to layer.width
+        // The crop's center from the frame's center, in the turned picture.
+        val dx = (left + right) / 2f - fw / 2
+        val dy = (top + bottom) / 2f - fh / 2
+        // The restore brush paints from the source by offset only, so the source turns with the layer.
+        val original = loadSource(layer)
+        val src = original ?: layer.bitmap
+        val (tw, th) = turnedBounds(src.width.toFloat(), src.height.toFloat(), degrees).let { (w, h) -> ceil(w).toInt() to ceil(h).toInt() }
+        val (fx, fy) = layer.t.flipX to layer.t.flipY
+        val (sx, sy) = turnedSourceOffset(
+            layer.bitmap.width, layer.bitmap.height, if (original != null) layer.sourceX else 0, if (original != null) layer.sourceY else 0,
+            src.width, src.height, degrees, tw, th, left - fw / 2, top - fh / 2, fx, fy,
+        )
+        val cut = withContext(Dispatchers.Default) { turnBitmap(layer.bitmap, degrees, right - left, bottom - top, dx, dy, fx, fy) }
+        val file = withContext(Dispatchers.IO) { store.writeImage(dir, cut) }
+        val source = withContext(Dispatchers.IO) { store.writeImage(dir, turnBitmap(src, degrees, tw, th, flipX = fx, flipY = fy)) }
+        // The frame is the picture as shown in the layer's box, so the shift is in box pixels, and the new bitmap is unflipped.
+        val (lx, ly) = turned(dx, dy, -degrees)
+        val t = layer.t.shiftedLocal(lx, ly).copy(flipX = false, flipY = false)
+        updateLayer(id) { layer.copy(t = t, bitmap = cut, file = file, source = source, sourceX = sx.roundToInt(), sourceY = sy.roundToInt()) }
     }
 
     /** A frame of video layer [layer] at the playhead ([positionMs]), else its nearest end, to crop on; null (with a message) if unreadable. */
@@ -644,7 +691,10 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         p.copy(height = h, layers = p.layers.map { it.withTransform(it.t.copy(y = it.t.y + dy)) })
     }
 
-    fun setBackground(color: Int) = updateProject { it.copy(background = color) }
+    fun setBackground(color: Int) = updateProject { it.copy(background = color, blur = false) }
+
+    /** Photos: the canvas shows the bottom picture blurred behind everything, until a color is picked. */
+    fun setBlur() = updateProject { it.copy(blur = true) }
 
     // Video
 
@@ -791,8 +841,9 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val shortSide = (p.exportSize ?: _uiState.value.settings.exportSize).shortSide
         if (video == null) {
             val scale = shortSide?.let { min(1f, it / min(p.width, p.height).toFloat()) } ?: 1f
-            val bitmap = renderLayers(p.width, p.height, p.background, p.layers, scale)
-            val transparent = p.background == Color.TRANSPARENT
+            val backdrop = p.backdrop()
+            val bitmap = renderLayers(p.width, p.height, p.background, p.layers, scale, backdrop = backdrop)
+            val transparent = p.background == Color.TRANSPARENT && backdrop == null
             val mime = if (transparent) "image/png" else "image/jpeg"
             val uri = withContext(Dispatchers.IO) {
                 saveToGallery(app, mime) { bitmap.compress(if (transparent) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG, 95, it) }
@@ -880,6 +931,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     private companion object {
         const val MAX_PHOTO = 2160
+        const val BLANK_SIDE = 1080
         const val MAX_LAYER = 1440
         const val THUMB_SIZE = 360f
         const val PICK_SIZE = 1080f

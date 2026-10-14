@@ -216,6 +216,12 @@
     <string name="pen_highlighter">Highlighter</string>
     <string name="brush_erase">Erase</string>
     <string name="brush_restore">Restore</string>
+    <string name="redo_stroke">Redo stroke</string>
+    <string name="pen_eraser">Eraser</string>
+    <string name="rotate_90">Rotate 90°</string>
+    <string name="straighten">Straighten</string>
+    <string name="degrees">%1$d°</string>
+    <string name="blank_create">Create</string>
     <string name="crop_free">Free</string>
 
     <!-- Web images -->

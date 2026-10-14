@@ -81,6 +81,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -89,6 +90,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -129,6 +131,8 @@ import com.ndelic.kadar.model.TextLayer
 import com.ndelic.kadar.model.Transform
 import com.ndelic.kadar.model.UiText
 import com.ndelic.kadar.model.VideoLayer
+import com.ndelic.kadar.model.backdrop
+import com.ndelic.kadar.model.blurBase
 import com.ndelic.kadar.model.defaultTextSize
 import com.ndelic.kadar.model.drawLayer
 import com.ndelic.kadar.model.motionAt
@@ -570,13 +574,14 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     cropping?.let { layer ->
         CropScreen(
             bitmap = layer.bitmap,
-            onDone = { r ->
+            onDone = { r, turns, angle ->
                 cropping = null
-                vm.applyCrop(layer.id, r[0], r[1], r[2], r[3])
+                vm.applyCrop(layer.id, r[0], r[1], r[2], r[3], turns, angle)
             },
             onCancel = { cropping = null },
             flipX = layer.t.flipX,
             flipY = layer.t.flipY,
+            turnable = true,
         )
     }
     croppingVideo?.let { (layer, frame) ->
@@ -585,7 +590,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         CropScreen(
             bitmap = frame,
             initial = layer.crop.run { Rect(left * fw, top * fh, right * fw, bottom * fh) },
-            onDone = { r ->
+            onDone = { r, _, _ ->
                 croppingVideo = null
                 vm.cropVideo(layer.id, CropRect(r[0] / fw, r[1] / fh, r[2] / fw, r[3] / fh))
             },
@@ -595,8 +600,10 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     drawing?.let { (target, under) ->
         DrawScreen(
             project = project,
-            layers = project.layers.filter { !it.hidden && (video == null || it.visibleAt(positionMs) || it.id == target) },
+            // The drawing being edited is drawn by the pad itself, so its strokes can be erased.
+            layers = project.layers.filter { !it.hidden && it.id != target && (video == null || it.visibleAt(positionMs)) },
             under = under,
+            target = project.layers.firstOrNull { it.id == target } as? DrawLayer,
             onDone = { strokes ->
                 drawing = null
                 vm.applyDrawing(target, strokes)
@@ -785,6 +792,10 @@ private fun Stage(
         ) {
             Box(Modifier.fillMaxSize().clipToBounds().background(if (transparent) Color(0xFF3A3A3A) else Color(project.background))) {
                 if (transparent) Checkerboard()
+                // Rebuilt only when its picture or the canvas changes, not on every drag.
+                val base = project.blurBase()
+                val backdrop = remember(base?.bitmap, base?.adjust, base?.t?.flipX, base?.t?.flipY, project.width, project.height) { project.backdrop()?.asImageBitmap() }
+                backdrop?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds) }
                 project.video?.takeIf { it.blurred }?.let { BlurBackgroundPreview(it, stills, project.width, project.height, scale, player) }
                 player?.let { p ->
                     VideoSurface(

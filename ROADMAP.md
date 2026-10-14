@@ -111,10 +111,10 @@ Feature parity with the big phone editors, built from how their features behave,
 - [ ] Video layers: filter and adjust, like the main clips
 - [ ] Adjust: warmth, tint, hue and fade (color matrices, so video still matches photos); vignette and grain need shaders
 - [ ] Export: frame rate (24 to 60), GIF, and the estimated file size shown before export; JPG or PNG chosen at save time for photos
-- [ ] Eraser and restore brush: a soft edge (hardness) and undo/redo inside the tool
-- [ ] Crop: 3:4 and 3:2 ratios, straighten (angle dial) and 90° rotate
-- [ ] Draw: an eraser, pen opacity and redo
-- [ ] Photo canvas: more ratios (as for video) and a blurred background (video has it); blank canvas starts with a chosen ratio (always 1080×1080 today)
+- [x] Eraser and restore brush: a soft edge (hardness) and undo/redo inside the tool
+- [x] Crop: 3:4 and 3:2 ratios, straighten (angle dial) and 90° rotate
+- [x] Draw: an eraser, pen opacity and redo
+- [x] Photo canvas: more ratios (as for video) and a blurred background (video has it); blank canvas starts with a chosen ratio (always 1080×1080 today)
 - [ ] Hold to compare with the original while adjusting
 
 ### Video

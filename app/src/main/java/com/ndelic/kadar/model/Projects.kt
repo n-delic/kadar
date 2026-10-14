@@ -29,6 +29,8 @@ data class Project(
     val exportSize: ExportSize? = null,
     /** Set from the home screen; null shows [defaultName]. */
     val name: String? = null,
+    /** Photos only: the canvas shows the bottom picture blurred behind everything ([backdrop]) instead of [background]. */
+    val blur: Boolean = false,
 )
 
 data class SavedProject(val dir: File, val modified: Long, val thumb: Bitmap?, val isVideo: Boolean, val name: String? = null) {
@@ -114,6 +116,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
             video = j.optJSONObject("video")?.let { clipFromJson(dir, it, j.getInt("width"), j.getInt("height")) },
             exportSize = j.optString("exportSize").ifEmpty { null }?.let { enumOr<ExportSize>(it, ExportSize.Original) },
             name = j.optString("name").ifEmpty { null },
+            blur = j.optBoolean("blur"),
         )
     }
 
@@ -316,6 +319,7 @@ private fun Project.toJson() = JSONObject().apply {
     video?.let { put("video", it.toJson()) }
     exportSize?.let { put("exportSize", it.name) }
     name?.let { put("name", it) }
+    if (blur) put("blur", true)
 }
 
 private fun Layer.toJson() = JSONObject().apply {

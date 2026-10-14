@@ -121,6 +121,22 @@ fun scaleDown(bitmap: Bitmap, maxSide: Int): Bitmap {
     return Bitmap.createScaledBitmap(bitmap, (bitmap.width * f).roundToInt(), (bitmap.height * f).roundToInt(), true)
 }
 
+/**
+ * [bitmap] mirrored ([flipX], [flipY]) and turned by [degrees] about its center into a new [outW]×[outH] bitmap whose
+ * center is ([dx], [dy]) from the turned picture's center; what the picture doesn't cover is transparent.
+ */
+fun turnBitmap(bitmap: Bitmap, degrees: Float, outW: Int, outH: Int, dx: Float = 0f, dy: Float = 0f, flipX: Boolean = false, flipY: Boolean = false): Bitmap =
+    Bitmap.createBitmap(outW.coerceAtLeast(1), outH.coerceAtLeast(1), Bitmap.Config.ARGB_8888).also {
+        Canvas(it).apply {
+            translate(outW / 2f - dx, outH / 2f - dy)
+            rotate(degrees)
+            scale(if (flipX) -1f else 1f, if (flipY) -1f else 1f)
+            drawBitmap(bitmap, -bitmap.width / 2f, -bitmap.height / 2f, Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG))
+        }
+        // Quarter turns of an opaque photo leave no empty corners: keep it a JPEG in the project.
+        if (degrees % 90f == 0f && !bitmap.hasAlpha()) it.setHasAlpha(false)
+    }
+
 /** Crops away transparent borders. Returns the crop and its `[left, top, right, bottom)` in [src], or null if nothing is visible. */
 fun trimTransparent(src: Bitmap): Pair<Bitmap, IntArray>? {
     val pixels = IntArray(src.width * src.height)

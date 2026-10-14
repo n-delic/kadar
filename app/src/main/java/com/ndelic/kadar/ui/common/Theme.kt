@@ -249,6 +249,29 @@ fun KSlider(@DrawableRes icon: Int?, value: Float, range: ClosedFloatingPointRan
     }
 }
 
+/** Canvas shapes (width / height) for photos, videos and a blank canvas. */
+val CANVAS_RATIOS = listOf(
+    "1:1" to 1f, "4:5" to 0.8f, "3:4" to 0.75f, "2:3" to 2f / 3, "9:16" to 9f / 16,
+    "16:9" to 16f / 9, "4:3" to 4f / 3, "3:2" to 1.5f, "2:1" to 2f, "2.35:1" to 2.35f,
+)
+
+/** A box drawn in the target aspect ratio, so the choice reads at a glance. */
+@Composable
+fun AspectTile(label: String, ratio: Float, active: Boolean, onClick: () -> Unit) {
+    val color = if (active) Ink.accent else Ink.dim
+    val (w, h) = if (ratio >= 1) 36f to 36f / ratio else 36f * ratio to 36f
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(6.dp),
+    ) {
+        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(w.dp, h.dp).border(2.dp, color, RoundedCornerShape(3.dp)))
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(label, color = color, fontSize = 11.sp)
+    }
+}
+
 /** A setting row with a small pill switch on the right. */
 @Composable
 fun KToggle(title: String, subtitle: String?, on: Boolean, onChange: (Boolean) -> Unit) {

@@ -154,7 +154,7 @@ Feature parity with the big phone editors, built from how their features behave,
 
 ## Later / maybe
 
-- [ ] Templates, once it's clear which layouts get used most (check patent US11989808B2 first, AGENTS.md rule 15)
+- [ ] Templates hosted as JSON in this repo (`templates/index.json` plus one folder per template, added by pull request): a project file with blanks (your photo, editable text) that the app downloads only when the Templates screen is opened and keeps for offline use. Downloads are untrusted (size caps, every field checked, data and images only), template images must be CC0 or own work, and About mentions that GitHub sees who downloads. Read the claims of patent US11989808B2 first (AGENTS.md rule 15): a finished layout with blanks, not a replay of someone's edit steps
 
 ## Not planned
 

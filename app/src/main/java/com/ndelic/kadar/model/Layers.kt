@@ -322,7 +322,8 @@ data class TextLayer(
     private val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val isBubble get() = box != null && bubble != Bubble.Box
     private val layout: StaticLayout = run {
-        val line = shown.lines().maxOf { paint.measureText(it) }
+        // Italic letters lean past their measured width; the room keeps the last one inside the box.
+        val line = shown.lines().maxOf { paint.measureText(it) } + if (italic) size * 0.3f else 0f
         // Bubbles wrap long text into a rounder block; the caption box keeps the lines as typed.
         val word = if (isBubble && wrap == null) shown.split(' ', '\n').maxOf { paint.measureText(it) } else 0f
         val w = wrap?.roundToInt()?.coerceAtLeast(1) ?: ((if (isBubble) bubbleWrapWidth(line, paint.fontSpacing, word) else line).toInt() + 1)

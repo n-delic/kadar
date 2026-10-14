@@ -156,6 +156,7 @@ internal fun CustomColorDialog(initial: Int, onDismiss: () -> Unit, onPick: (Int
                     },
                     stringResource(R.string.color_hex),
                     Modifier.weight(1f),
+                    background = Ink.panel,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
                 )
             }

@@ -67,7 +67,7 @@ fun ExportDialog(project: Project, settings: AppSettings, share: Boolean, vm: Ed
                     if (video.outputDurationMs > GIF_MAX_MS) Text(stringResource(R.string.gif_too_long, GIF_MAX_MS / 1000), color = Ink.accent, fontSize = 13.sp)
                 } else {
                     PanelLabel(stringResource(R.string.export_frame_rate))
-                    TextTabs((FRAME_RATES + outputFrameRate(video.frameRate)).distinct().sorted(), fps, { stringResource(R.string.fps, it) }) { fps = it }
+                    TextTabs((FRAME_RATES + outputFrameRate(video.frameRate)).distinct().sorted(), fps, { it.toString() }) { fps = it }
                     PanelLabel(stringResource(R.string.settings_quality))
                     TextTabs(ExportQuality.entries, quality, { stringResource(it.label) }) { quality = it }
                     val bytes = video.estimatedSize(vm.exportShortSide, fps, quality)

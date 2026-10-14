@@ -272,7 +272,7 @@
     <string name="busy_saving_video">Saving video</string>
     <string name="busy_saving_gif">Saving GIF</string>
     <string name="export_format">Format</string>
-    <string name="export_frame_rate">Frame rate</string>
+    <string name="export_frame_rate">Frames per second</string>
     <string name="export_estimate">About %1$s</string>
     <string name="export_png_only">The background is transparent, so it\'s saved as a PNG.</string>
     <string name="gif_hint">Up to %1$d s, %2$d px, %3$d fps, no sound</string>
@@ -281,7 +281,6 @@
     <string name="format_png" translatable="false">PNG</string>
     <string name="format_mp4" translatable="false">MP4</string>
     <string name="format_gif" translatable="false">GIF</string>
-    <string name="fps" translatable="false">%1$d fps</string>
     <string name="export_cancelled">Export cancelled</string>
     <string name="percent" translatable="false">%1$d%%</string>
     <string name="busy_cropping">Cropping</string>

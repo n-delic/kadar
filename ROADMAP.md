@@ -119,15 +119,19 @@
 - Downloaded AV1 and VP9 videos play smoothly in the preview (a small preview copy; exports use the original)
 - The preview pauses when the phone locks and keeps the screen on while it plays
 
+## v0.7.3: done
+
+- Filters and adjustments show in the video preview at once, also while a slider is dragged and while it plays, instead of after a second-long reload
+- Cropping the photo a project was opened with makes the canvas the cropped picture; the other layers keep their spot on it
+- Images, stickers, shapes and drawings stretch one way with a handle in the middle of each side; the corner handle and pinching still resize evenly
+
 ## Next
 
 Feature parity with the big phone editors, built from how their features behave, never from their code, assets or look (AGENTS.md rules 14 and 15). Offline only: no cloud AI.
 
 ### Urgent
 
-- [ ] Effects show instantly: changing a filter, an adjust slider, speed, volume or a transition shows in the video preview right away, without the second-long reload. Today every change rebuilds the preview's composition and reloads its player. Idea: show looks and adjustments on the preview view itself while changing them (as video layers already do with their view's color filter) and rebuild only when the change is done; measure which other edits need a reload at all
-- [ ] Cropping the photo a project was opened with makes the canvas the cropped size (and shape), so there are no empty bars around it; other layers keep their place on the picture. Only that first photo does this: cropping any other image layer leaves the canvas alone. Undo brings the old canvas back
-- [ ] Free resize for images, stickers, shapes and drawings, in photos and videos: the corner handle keeps the proportions (as today), and a handle in the middle of each side stretches only that way, with the opposite side staying put (like text's wrap handles). A shape changes its width or height, so its outline keeps its thickness; images, stickers and drawings stretch. A pinch still scales evenly. Undo takes back each drag
+- [ ] Speed, volume, trim and transition changes still reload the video preview (0.5 to 1.3 s on the emulator): they change the composition's structure. Find which can change without a reload (volume, for one)
 
 ### Existing tools that do less than the big editors
 

@@ -109,18 +109,23 @@
 
 - Smoother video playback in the editor: the preview shows each frame at its time instead of whenever the screen redraws, the blurred background costs a fraction of what it did, and animated captions redraw once per video frame instead of on every screen refresh
 
+## v0.7.2: done
+
+- Music and voiceovers are timeline tracks: start anywhere, move, trim and split them, fade in and out up to 5 s each
+- Adjust: warmth, tint, hue and fade, one slider at a time from tabs; video layers get filters and adjust too; hold to compare with the original
+- Export dialog: MP4 frame rate (24 to 60), quality and estimated size, or a GIF; JPG or PNG for photos
+- Trim handles on every layer track; trimming a video layer's start trims its video too
+- Transitions: the sound crossfades through dissolves, wipes, slides and pushes and dips through black, white, zoom and blur; no flash of the previous clip or jump at the end of a transition in the preview
+- Downloaded AV1 and VP9 videos play smoothly in the preview (a small preview copy; exports use the original)
+- The preview pauses when the phone locks and keeps the screen on while it plays
+
 ## Next
 
 Feature parity with the big phone editors, built from how their features behave, never from their code, assets or look (AGENTS.md rules 14 and 15). Offline only: no cloud AI.
 
 ### Existing tools that do less than the big editors
 
-- [x] Music and voiceovers as timeline tracks: start anywhere, move, trim and split (music always starts at 0 today); fade in and out lengths (fixed 1.5 s today)
-- [x] Video layers: filter and adjust, like the main clips
-- [x] Adjust: warmth, tint, hue and fade (color matrices, so video still matches photos)
 - [ ] Adjust: vignette and grain (need shaders)
-- [x] Export: frame rate (24 to 60), GIF, and the estimated file size shown before export; JPG or PNG chosen at save time for photos
-- [x] Hold to compare with the original while adjusting
 
 ### Video
 

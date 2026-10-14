@@ -2,6 +2,7 @@ package com.ndelic.kadar.ui.editor
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
+import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -34,6 +35,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -178,9 +181,24 @@ fun VideoCanvasPanel(project: Project, clip: VideoClip, defaultExport: ExportSiz
     }
 }
 
-/** Brightness, contrast and saturation sliders; [onChange] gets the whole new value, [onApplyAll] (clips) copies it to every clip. */
+/** The color sliders on [Adjust], picked one at a time from tabs so the panel stays short. */
+private enum class AdjustSlider(@StringRes val label: Int, val value: (Adjust) -> Float, val set: Adjust.(Float) -> Adjust, val range: ClosedFloatingPointRange<Float> = -1f..1f) {
+    Brightness(R.string.brightness, { it.brightness }, { copy(brightness = it) }),
+    Contrast(R.string.contrast, { it.contrast }, { copy(contrast = it) }),
+    Saturation(R.string.saturation, { it.saturation }, { copy(saturation = it) }),
+    Warmth(R.string.warmth, { it.warmth }, { copy(warmth = it) }),
+    Tint(R.string.tint, { it.tint }, { copy(tint = it) }),
+    Hue(R.string.hue, { it.hue }, { copy(hue = it) }),
+    Fade(R.string.fade, { it.fade }, { copy(fade = it) }, 0f..1f),
+}
+
+/**
+ * Brightness, contrast, saturation, warmth, tint, hue and fade, one slider at a time; [onChange] gets the whole new
+ * value, [onApplyAll] (clips) copies it to every clip, [onCompare] is held to see the picture without any of it.
+ */
 @Composable
-fun AdjustPanel(adjust: Adjust, onApplyAll: (() -> Unit)? = null, onChange: (Adjust) -> Unit) {
+fun AdjustPanel(adjust: Adjust, onApplyAll: (() -> Unit)? = null, onCompare: (Boolean) -> Unit, onChange: (Adjust) -> Unit) {
+    var slider by rememberSaveable { mutableStateOf(AdjustSlider.Brightness) }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PanelLabel(stringResource(R.string.tool_adjust))
@@ -191,10 +209,10 @@ fun AdjustPanel(adjust: Adjust, onApplyAll: (() -> Unit)? = null, onChange: (Adj
             if (adjust != reset) {
                 Text(stringResource(R.string.reset), color = Ink.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onChange(reset) }.padding(6.dp))
             }
+            CompareButton(onCompare)
         }
-        LabeledSlider(stringResource(R.string.brightness), adjust.brightness) { onChange(adjust.copy(brightness = it)) }
-        LabeledSlider(stringResource(R.string.contrast), adjust.contrast) { onChange(adjust.copy(contrast = it)) }
-        LabeledSlider(stringResource(R.string.saturation), adjust.saturation) { onChange(adjust.copy(saturation = it)) }
+        TextTabs(AdjustSlider.entries, slider, label = { stringResource(it.label) }) { slider = it }
+        key(slider) { KSlider(null, slider.value(adjust), slider.range, { "${(it * 100).roundToInt()}" }) { onChange(adjust.(slider.set)(it)) } }
     }
 }
 

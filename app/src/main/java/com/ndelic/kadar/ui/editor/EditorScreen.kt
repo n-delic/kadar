@@ -66,6 +66,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -202,6 +203,9 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     // The eyedropper while it's on: the stage picture it picks from and where the color goes.
     var dropper by remember { mutableStateOf<Pair<Bitmap, (Int) -> Unit>?>(null) }
     LaunchedEffect(panel, state.selectedId) { dropper = null }
+    // Held in Filters or Adjust: the stage and the preview show the picture without any look or color adjustment.
+    var comparing by remember { mutableStateOf(false) }
+    val staged = remember(project, comparing) { if (comparing) project.withoutAdjust() else project }
 
     LaunchedEffect(state.selectedId) {
         // Selecting from the Layers list keeps the list open; anything else starts from the layer's tools.
@@ -224,10 +228,11 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         // The preview's composition is the clip alone: VideoLayerPreview draws each video layer with its own player and
         // BlurBackgroundPreview the blurred canvas, so the main player stays single-input. Media3 1.11's multi-input
         // preview fails mid-playback ("frame for an ended input") on devices; the export still composites everything.
-        LaunchedEffect(player, video) {
+        val previewed = staged.video ?: video
+        LaunchedEffect(player, previewed) {
             // After an edit (a split, a trim) the playhead stays where it was.
-            val start = resumeAt[0].also { resumeAt[0] = 0 }.takeIf { it > 0 } ?: positionMs.coerceAtMost(video.outputDurationMs)
-            player.setComposition(video.copy(blur = false).composition(incoming = false, dropFrames = false), start)
+            val start = resumeAt[0].also { resumeAt[0] = 0 }.takeIf { it > 0 } ?: positionMs.coerceAtMost(previewed.outputDurationMs)
+            player.setComposition(previewed.copy(blur = false).composition(incoming = false, dropFrames = false), start)
             player.prepare()
             // A paused player keeps showing the old frame after a new composition; seek once it's loaded to repaint.
             delay(300)
@@ -283,7 +288,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         }
 
         Stage(
-            project, selected, player, if (video != null) positionMs else null, state.filmstrip, vm, onEditText = { typing = it.text },
+            staged, selected, player, if (video != null) positionMs else null, state.filmstrip, vm, onEditText = { typing = it.text },
             picking = dropper?.first,
             onPicked = { c ->
                 dropper?.second?.invoke(c)
@@ -317,6 +322,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             playing = false
             scope.launch { vm.stagePicture(positionMs)?.let { dropper = it to onColor } }
         }
+        val compare: (Boolean) -> Unit = { comparing = it }
         CompositionLocalProvider(LocalEyedropper provides eyedropper) {
             AnimatedContent(
                 targetState = panel,
@@ -351,13 +357,19 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         Panel.Opacity -> (selected as? ImageLayer)?.let { l -> KSlider(R.drawable.ic_opacity, l.opacity, 0.05f..1f, ::percent) { v -> vm.editImage { copy(opacity = v) } } }
                         Panel.Transition -> video?.let { v -> transitionAt?.takeIf { it in 1 until v.segments.size }?.let { TransitionPanel(v, it, vm) } }
                         Panel.Adjust -> when (val l = selected) {
-                            is ImageLayer -> AdjustPanel(l.adjust) { a -> vm.editImage { copy(adjust = a) } }
-                            null -> video?.let { v -> AdjustPanel(v.segments[clipIndex].adjust, applyAdjustToAll(v)) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } }
+                            is ImageLayer -> AdjustPanel(l.adjust, onCompare = compare) { a -> vm.editImage { copy(adjust = a) } }
+                            is VideoLayer -> AdjustPanel(l.adjust, onCompare = compare) { a -> vm.editVideo { copy(adjust = a) } }
+                            null -> video?.let { v -> AdjustPanel(v.segments[clipIndex].adjust, applyAdjustToAll(v), compare) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } }
                             else -> {}
                         }
                         Panel.Filters -> when (val l = selected) {
-                            is ImageLayer -> FiltersPanel(l.bitmap, l.adjust) { a -> vm.editImage { copy(adjust = a) } }
-                            null -> video?.let { v -> v.segments[clipIndex].let { s -> FiltersPanel(state.filmstrip[s.uri]?.firstOrNull(), s.adjust, applyAdjustToAll(v)) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } } }
+                            is ImageLayer -> FiltersPanel(l.bitmap, l.adjust, onCompare = compare) { a -> vm.editImage { copy(adjust = a) } }
+                            is VideoLayer -> {
+                                // The tiles show the layer's frame at its in-point.
+                                val frame by produceState<Bitmap?>(null, l.uri, l.clipStartMs) { value = vm.layerFrame(l, l.startMs) }
+                                FiltersPanel(frame, l.adjust, onCompare = compare) { a -> vm.editVideo { copy(adjust = a) } }
+                            }
+                            null -> video?.let { v -> v.segments[clipIndex].let { s -> FiltersPanel(state.filmstrip[s.uri]?.firstOrNull(), s.adjust, applyAdjustToAll(v), compare) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } } }
                             else -> {}
                         }
                     }
@@ -487,7 +499,9 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     3 -> {
                         IconTool(R.drawable.ic_check, stringResource(R.string.done)) { vm.select(null) }
                         ToolDivider()
-                        IconTool(R.drawable.ic_tune, stringResource(R.string.edit), panel == Panel.Overlay) { toggle(Panel.Overlay) }
+                        IconTool(R.drawable.ic_edit, stringResource(R.string.edit), panel == Panel.Overlay) { toggle(Panel.Overlay) }
+                        IconTool(R.drawable.ic_tune, stringResource(R.string.tool_adjust), panel == Panel.Adjust) { toggle(Panel.Adjust) }
+                        IconTool(R.drawable.ic_filter_vintage, stringResource(R.string.tool_filters), panel == Panel.Filters) { toggle(Panel.Filters) }
                         IconTool(R.drawable.ic_crop, stringResource(R.string.tool_crop)) {
                             playing = false
                             (state.selected as? VideoLayer)?.let { l -> scope.launch { vm.layerFrame(l, positionMs)?.let { croppingVideo = l to it } } }

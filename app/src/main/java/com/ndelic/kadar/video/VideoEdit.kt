@@ -385,8 +385,8 @@ private fun VideoLayer.sequence(span: Pair<Long, Long>, totalMs: Long): EditedMe
     val clip = EditedMediaItem.Builder(clipped(uri, clipStartMs, clipStartMs + end - start))
         .setDurationUs(durationMs * 1000)
         .setRemoveAudio(volume == 0f)
-        // Cropped, then presented at the layer's own size, so the compositor's scale is the layer's scale.
-        .setEffects(Effects(listOf(gain(volume)), listOf(Crop(left, right, bottom, top), Presentation.createForWidthAndHeight(width.roundToInt(), height.roundToInt(), Presentation.LAYOUT_STRETCH_TO_FIT))))
+        // Its look, cropped, then presented at the layer's own size, so the compositor's scale is the layer's scale.
+        .setEffects(Effects(listOf(gain(volume)), listOfNotNull(adjustEffect(adjust), Crop(left, right, bottom, top), Presentation.createForWidthAndHeight(width.roundToInt(), height.roundToInt(), Presentation.LAYOUT_STRETCH_TO_FIT))))
         .build()
     val tracks = if (volume == 0f) setOf(C.TRACK_TYPE_VIDEO) else setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO)
     return EditedMediaItemSequence.Builder(tracks)

@@ -132,6 +132,11 @@
     <string name="brightness">Brightness</string>
     <string name="contrast">Contrast</string>
     <string name="saturation">Saturation</string>
+    <string name="warmth">Warmth</string>
+    <string name="tint">Tint</string>
+    <string name="hue">Hue</string>
+    <string name="fade">Fade</string>
+    <string name="hold_to_compare">Hold to compare with the original</string>
     <string name="shadow">Shadow</string>
     <string name="spacing">Spacing</string>
     <string name="line_height">Line height</string>

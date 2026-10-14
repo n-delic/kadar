@@ -1,5 +1,7 @@
 package com.ndelic.kadar.ui.editor
 
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
 import android.os.SystemClock
 import android.view.TextureView
 import androidx.compose.foundation.layout.Box
@@ -27,6 +29,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.ndelic.kadar.model.VideoLayer
+import com.ndelic.kadar.model.filterMatrix
 import com.ndelic.kadar.video.overlayNeedsSeek
 import com.ndelic.kadar.video.overlaySourceMs
 import com.ndelic.kadar.video.overlaySpan
@@ -91,9 +94,12 @@ fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Play
             clip = true
         },
     ) {
+        // The same matrix as the export's RgbMatrix, offsets in 0..255 on the view and divided by 255 there.
+        val look = remember(layer.adjust) { if (layer.adjust.isNone) null else Paint().apply { colorFilter = ColorMatrixColorFilter(layer.adjust.filterMatrix()) } }
         key(player) {
             AndroidView(
                 factory = { TextureView(it).also(player::setVideoTextureView) },
+                update = { it.setLayerPaint(look) },
                 modifier = Modifier.wrapContentSize(Alignment.TopStart, unbounded = true).size(frame).graphicsLayer {
                     translationX = -layer.crop.left * layer.videoWidth * scale
                     translationY = -layer.crop.top * layer.videoHeight * scale

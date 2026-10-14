@@ -1,5 +1,10 @@
 package com.ndelic.kadar.video
 
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.ln
+import kotlin.math.roundToInt
+
 /** Output length of [startMs]..[endMs] of a source played at [speed]. */
 fun outputMs(startMs: Long, endMs: Long, speed: Float) = ((endMs - startMs) / speed).toLong()
 
@@ -25,6 +30,35 @@ fun sourceMs(startMs: Long, speed: Float, intoMs: Long) = startMs + (intoMs * sp
  */
 fun splitPoint(startMs: Long, endMs: Long, speed: Float, intoMs: Long): Long? =
     sourceMs(startMs, speed, intoMs).takeIf { it - startMs >= MIN_CLIP_MS && endMs - it >= MIN_CLIP_MS }
+
+/**
+ * A clip trimmed to [startMs]..[endMs] of a [durationMs] source (a photo's longest showing) at [speed], with its left
+ * ([left]) or right edge dragged [dMs] of output time: the new trim, inside the source and at least [MIN_CLIP_MS] long.
+ */
+fun edgeTrim(startMs: Long, endMs: Long, durationMs: Long, speed: Float, left: Boolean, dMs: Long): Pair<Long, Long> {
+    val d = (dMs * speed).toLong()
+    // Bounds can cross for a source shorter than MIN_CLIP_MS; coerceIn would throw.
+    return if (left) (startMs + d).coerceIn(0, maxOf(0, endMs - MIN_CLIP_MS)) to endMs
+    else startMs to (endMs + d).coerceIn(minOf(startMs + MIN_CLIP_MS, durationMs), durationMs)
+}
+
+/**
+ * The speed at [p] (0 to 1) along the speed slider: [MIN_SPEED] to [MAX_SPEED] by equal ratios, so 1x sits in the
+ * middle-ish and slow and fast get the same room; rounded to 0.01 below 1x and 0.1 above, and caught by 0.5x, 1x and 2x
+ * when within 8%.
+ */
+fun speedAt(p: Float): Float {
+    val s = MIN_SPEED * exp(p.coerceIn(0f, 1f) * ln(MAX_SPEED / MIN_SPEED))
+    SPEED_SNAPS.firstOrNull { abs(ln(s / it)) < 0.08f }?.let { return it }
+    return if (s < 1) (s * 100).roundToInt() / 100f else (s * 10).roundToInt() / 10f
+}
+
+/** Where [speed] sits on the speed slider, 0 to 1: the inverse of [speedAt]. */
+fun speedPosition(speed: Float) = (ln(speed / MIN_SPEED) / ln(MAX_SPEED / MIN_SPEED)).coerceIn(0f, 1f)
+
+const val MIN_SPEED = 0.2f
+const val MAX_SPEED = 10f
+private val SPEED_SNAPS = listOf(0.5f, 1f, 2f)
 
 /** This list with the item at [from] moved to [to]. */
 fun <T> List<T>.moved(from: Int, to: Int) = toMutableList().apply { add(to, removeAt(from)) }

@@ -23,6 +23,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.Brightness
 import androidx.media3.effect.Crop
+import androidx.media3.effect.FrameDropEffect
 import androidx.media3.effect.GaussianBlur
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.Presentation
@@ -172,9 +173,10 @@ private const val BLUR_LONG_SIDE = 320
  * layers above the topmost video layer are one [timedOverlay] on the composition, not the clip, so it gets output
  * timestamps (after trim and speed) like the layers, and those under a video layer are drawn into a sequence of their
  * own. [incoming] adds the heads of overlapping transitions as a sequence over the clips (the preview leaves it out and
- * draws them itself, with IncomingClipPreview). Call it on the main thread, like [timedOverlay].
+ * draws them itself, with IncomingClipPreview). [dropFrames] keeps sped-up clips at the clip's frame rate when they set
+ * the output's frame times (the preview turns it off). Call it on the main thread, like [timedOverlay].
  */
-fun VideoClip.composition(layers: List<Layer> = emptyList(), shortSide: Int? = null, incoming: Boolean = true): Composition {
+fun VideoClip.composition(layers: List<Layer> = emptyList(), shortSide: Int? = null, incoming: Boolean = true, dropFrames: Boolean = true): Composition {
     // Media3's compositor takes every output frame time from sequence 0 and draws it on top, then the others in order.
     // So sequence 0 is an invisible frame clock at the clip's rate, then the overlays (topmost layer first), each padded
     // with gaps to the output's full length and followed by the layers drawn right under it, then the heads of
@@ -210,7 +212,8 @@ fun VideoClip.composition(layers: List<Layer> = emptyList(), shortSide: Int? = n
         sequences += incomingSequence(o, tails, played, fps)
         inputs += outgoingSettings(o, fps)
     }
-    sequences += mainSequence(played, spans)
+    // The clips set the output's frame times only when they are sequence 0; with a frame clock its rate already holds.
+    sequences += mainSequence(played, spans, dropFrames && sequences.isEmpty())
     if (blurred) sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItems(played.map { blurredBackground(it) }).build()
     music?.let { sequences += it.sequences(outputDurationMs) }
     // Audio only, after every video sequence, so the compositor's input numbers above stay as they are.
@@ -251,13 +254,16 @@ private fun VideoClip.blankStill(effects: List<Effect> = emptyList()): EditedMed
 /**
  * The [played] clips end to end, with the centered transitions among [spans] as effects on the clips either side of
  * each cut. With sound in any clip every clip gets an audio track (silence for photos and silent clips), so the
- * sequence's audio runs through without a break.
+ * sequence's audio runs through without a break. With [dropFrames] a sped-up clip keeps the clip's frame rate instead of
+ * handing the encoder speed times as many (300 fps at 10x). Media3 1.11's preview runs on past the end with the frame
+ * drop effect, so the preview leaves it out; the frames it shows are the same.
  */
-private fun VideoClip.mainSequence(played: List<Segment>, spans: List<TransitionSpan>): EditedMediaItemSequence {
+private fun VideoClip.mainSequence(played: List<Segment>, spans: List<TransitionSpan>, dropFrames: Boolean): EditedMediaItemSequence {
     val sound = hasSound(played)
     val dips = spans.filter { !it.kind.overlaps }
     val items = played.mapIndexed { i, s ->
-        val effects = dipEffects(dips.filter { it.clip == i || it.clip == i + 1 }, s.width, s.height)
+        val drop = if (dropFrames && s.speed > 1f && !s.isImage) listOf(FrameDropEffect.createDefaultFrameDropEffect(outputFrameRate(frameRate).toFloat())) else emptyList()
+        val effects = drop + dipEffects(dips.filter { it.clip == i || it.clip == i + 1 }, s.width, s.height)
         segmentItem(s, Effects(audioEffects(s, sound), videoEffects(s, effects)), removeAudio = !sound)
     }
     return EditedMediaItemSequence.Builder(tracks(sound)).addItems(items).build()

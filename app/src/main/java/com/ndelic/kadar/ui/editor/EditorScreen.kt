@@ -137,6 +137,7 @@ import com.ndelic.kadar.ui.common.Ink
 import com.ndelic.kadar.ui.common.KIcon
 import com.ndelic.kadar.ui.common.blockTouches
 import com.ndelic.kadar.ui.common.fullWidthPanel
+import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.composition
 import com.ndelic.kadar.video.drawnGroups
 import com.ndelic.kadar.video.outgoingOffset
@@ -177,6 +178,9 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     fun pickClip() {
         if (video != null && video.segments.size > 1 && picked == null) vm.selectClip(clipIndex)
     }
+    // Filters and Adjust share one Adjust per clip, so Apply to all copies the look and the sliders together.
+    fun applyAdjustToAll(v: VideoClip): (() -> Unit)? =
+        if (v.segments.size > 1) v.segments[clipIndex].adjust.let { a -> { vm.updateAllSegments { copy(adjust = a) } } } else null
     var erasing by remember { mutableStateOf<Pair<ImageLayer, Bitmap?>?>(null) }
     var cropping by remember { mutableStateOf<ImageLayer?>(null) }
     var croppingVideo by remember { mutableStateOf<Pair<VideoLayer, Bitmap>?>(null) }
@@ -207,7 +211,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         LaunchedEffect(player, video) {
             // After an edit (a split, a trim) the playhead stays where it was.
             val start = resumeAt[0].also { resumeAt[0] = 0 }.takeIf { it > 0 } ?: positionMs.coerceAtMost(video.outputDurationMs)
-            player.setComposition(video.copy(blur = false).composition(incoming = false), start)
+            player.setComposition(video.copy(blur = false).composition(incoming = false, dropFrames = false), start)
             player.prepare()
             // A paused player keeps showing the old frame after a new composition; seek once it's loaded to repaint.
             delay(300)
@@ -294,7 +298,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                 when (p) {
                     Panel.Sticker -> StickerPanel(state.stickers, vm)
                     Panel.Canvas -> CanvasPanel(project, state.settings.exportSize, vm)
-                    Panel.Speed -> video?.let { SpeedPanel(it.segments[clipIndex], clipIndex, vm) }
+                    Panel.Speed -> video?.let { SpeedPanel(it, clipIndex, vm) }
                     Panel.Audio -> video?.let { v ->
                         AudioPanel(v, clipIndex, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }) {
                             VoiceoverSection(v, state.recordingFromMs, positionMs, playing, player, vm, onPlay = { playing = it })
@@ -317,12 +321,12 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     Panel.Transition -> video?.let { v -> transitionAt?.takeIf { it in 1 until v.segments.size }?.let { TransitionPanel(v, it, vm) } }
                     Panel.Adjust -> when (val l = selected) {
                         is ImageLayer -> AdjustPanel(l.adjust) { a -> vm.editImage { copy(adjust = a) } }
-                        null -> video?.let { v -> AdjustPanel(v.segments[clipIndex].adjust) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } }
+                        null -> video?.let { v -> AdjustPanel(v.segments[clipIndex].adjust, applyAdjustToAll(v)) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } }
                         else -> {}
                     }
                     Panel.Filters -> when (val l = selected) {
                         is ImageLayer -> FiltersPanel(l.bitmap, l.adjust) { a -> vm.editImage { copy(adjust = a) } }
-                        null -> video?.segments?.get(clipIndex)?.let { s -> FiltersPanel(state.filmstrip[s.uri]?.firstOrNull(), s.adjust) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } }
+                        null -> video?.let { v -> v.segments[clipIndex].let { s -> FiltersPanel(state.filmstrip[s.uri]?.firstOrNull(), s.adjust, applyAdjustToAll(v)) { a -> vm.updateSegment(clipIndex) { copy(adjust = a) } } } }
                         else -> {}
                     }
                 }
@@ -494,6 +498,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                     // A second tap on the picked clip trims it, as one tap did when there was only one clip.
                     onClipTap = { i -> if (i == picked) trimming = i else vm.selectClip(i) },
                     onClipMove = vm::moveClip,
+                    onClipTrim = { i, start, end -> vm.updateSegment(i) { copy(startMs = start, endMs = end) } },
                     onAddClip = { newClip.launch(PickVisualMediaRequest(PickVisualMedia.ImageAndVideo)) },
                     transitionAt = transitionAt.takeIf { panel == Panel.Transition },
                     onTransition = { i ->

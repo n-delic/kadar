@@ -71,8 +71,9 @@ import com.ndelic.kadar.ui.common.KToggle
 import com.ndelic.kadar.ui.common.PanelLabel
 import com.ndelic.kadar.ui.common.TextTabs
 import com.ndelic.kadar.video.Music
-import com.ndelic.kadar.video.Segment
 import com.ndelic.kadar.video.VideoClip
+import com.ndelic.kadar.video.speedAt
+import com.ndelic.kadar.video.speedPosition
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -83,8 +84,6 @@ private val EMOJIS = listOf(
 
 // A null label is the localized "Original".
 private val ASPECTS = listOf(null to null, "1:1" to 1f, "4:5" to 0.8f, "9:16" to 9f / 16, "16:9" to 16f / 9)
-
-private val SPEEDS = listOf(0.25f, 0.5f, 0.75f, 1f, 1.5f, 2f, 3f, 4f)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -153,13 +152,14 @@ fun VideoCanvasPanel(project: Project, clip: VideoClip, defaultExport: ExportSiz
     }
 }
 
-/** Brightness, contrast and saturation sliders; [onChange] gets the whole new value. */
+/** Brightness, contrast and saturation sliders; [onChange] gets the whole new value, [onApplyAll] (clips) copies it to every clip. */
 @Composable
-fun AdjustPanel(adjust: Adjust, onChange: (Adjust) -> Unit) {
+fun AdjustPanel(adjust: Adjust, onApplyAll: (() -> Unit)? = null, onChange: (Adjust) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             PanelLabel(stringResource(R.string.tool_adjust))
             Spacer(Modifier.weight(1f))
+            onApplyAll?.let { ApplyAll(it) }
             // Resets the sliders only; the look has its own panel.
             val reset = Adjust(look = adjust.look, amount = adjust.amount)
             if (adjust != reset) {
@@ -223,12 +223,34 @@ private fun AspectTile(label: String, ratio: Float, active: Boolean, onClick: ()
     }
 }
 
+/** Clip [index]'s speed on a slider from 0.2x to 10x, its pitch fix, and both for every video clip. */
 @Composable
-fun SpeedPanel(clip: Segment, index: Int, vm: EditorViewModel) {
+fun SpeedPanel(video: VideoClip, index: Int, vm: EditorViewModel) {
+    val clip = video.segments[index]
     Column {
-        TextTabs(SPEEDS, clip.speed, label = { "${it}x".replace(".0x", "x") }) { s -> vm.updateSegment(index) { copy(speed = s) } }
-        Text(stringResource(R.string.speed_length, formatMs(clip.outputDurationMs)), color = Ink.dim, fontSize = 12.sp, modifier = Modifier.padding(start = 12.dp, top = 4.dp))
+        // KSlider's value label is a plain function, so it fills in the format itself.
+        val format = stringResource(R.string.speed_value)
+        fun label(speed: Float) = format.format(speed.toString().removeSuffix(".0"))
+        KSlider(R.drawable.ic_speed, speedPosition(clip.speed), 0f..1f, { label(speedAt(it)) }) { p -> vm.updateSegment(index) { copy(speed = speedAt(p)) } }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.speed_length, formatMs(clip.outputDurationMs)), color = Ink.dim, fontSize = 12.sp, modifier = Modifier.weight(1f).padding(start = 12.dp))
+            // Photos keep their length: speed on a still only shortens it.
+            if (video.segments.size > 1) ApplyAll { vm.updateAllSegments { if (isImage) this else copy(speed = clip.speed, keepPitch = clip.keepPitch) } }
+        }
         KToggle(stringResource(R.string.keep_pitch), stringResource(R.string.keep_pitch_hint), clip.keepPitch) { on -> vm.updateSegment(index) { copy(keepPitch = on) } }
+    }
+}
+
+/** "Apply to all": gives every clip (or cut) the setting the panel shows, in one undo step. */
+@Composable
+fun ApplyAll(onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(vertical = 8.dp, horizontal = 4.dp),
+    ) {
+        KIcon(R.drawable.ic_select_all, Modifier.size(22.dp), Ink.accent)
+        Spacer(Modifier.size(8.dp))
+        Text(stringResource(R.string.apply_all), color = Ink.accent, fontWeight = FontWeight.SemiBold)
     }
 }
 

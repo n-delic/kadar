@@ -96,6 +96,27 @@
 
 Feature parity with the big phone editors, built from how their features behave, never from their code, assets or look (AGENTS.md rules 14 and 15). Offline only: no cloud AI.
 
+### Existing tools that do less than the big editors
+
+- [ ] Text outline width (fixed at 0.16 of the size today) and shadow color, blur and distance (on/off today); box opacity
+- [ ] Custom colors for text, shapes and boxes: a color wheel with hex, and an eyedropper from the picture
+- [ ] Text format: bold, italic, underline, all caps toggles and a size slider
+- [ ] Text, sticker and shape animations: slide in from all four sides, zoom out, and an adjustable length (300 ms today)
+- [ ] Flip (horizontal and vertical) and opacity for image and sticker layers
+- [ ] Layer tracks: Split at the playhead and Move here (to the playhead)
+- [ ] Trim a clip by dragging its edges on the main strip, without opening trim mode
+- [ ] Speed as a continuous slider from 0.2x to 10x (8 fixed steps from 0.25x to 4x today)
+- [ ] Apply to all clips for speed, filter, adjust and the canvas background
+- [ ] Music and voiceovers as timeline tracks: start anywhere, move, trim and split (music always starts at 0 today); fade in and out lengths (fixed 1.5 s today)
+- [ ] Video layers: filter and adjust, like the main clips
+- [ ] Adjust: warmth, tint, hue and fade (color matrices, so video still matches photos); vignette and grain need shaders
+- [ ] Export: frame rate (24 to 60), GIF, and the estimated file size shown before export; JPG or PNG chosen at save time for photos
+- [ ] Eraser and restore brush: a soft edge (hardness) and undo/redo inside the tool
+- [ ] Crop: 3:4 and 3:2 ratios, straighten (angle dial) and 90° rotate
+- [ ] Draw: an eraser, pen opacity and redo
+- [ ] Photo canvas: more ratios (as for video) and a blurred background (video has it); blank canvas starts with a chosen ratio (always 1080×1080 today)
+- [ ] Hold to compare with the original while adjusting
+
 ### Video
 
 - [ ] Replace a clip with another video or photo, keeping its place and settings
@@ -105,15 +126,25 @@ Feature parity with the big phone editors, built from how their features behave,
 - [ ] Timed video effects on their own track: slow zoom, jump zoom, shake, glitch, blur, flash, fade to black, film grain
 - [ ] Audio: a bundled CC0 sound-effect pack (meme sounds), several music tracks, extract the sound of a video, voice effects (higher, deeper, robot), text-to-speech with the phone's offline voices
 - [ ] Clip in/out animations (zoom, slide, spin) and keyframes for layers and clips (position, scale, rotation, opacity over time)
+- [ ] Blur or pixelate part of the video (faces, usernames): a rectangle, circle or heart region on its own track, with strength and opacity; also mosaic, frosted glass and magnifier looks
+- [ ] Green screen: remove a picked color from a video layer, with strength and edge-shadow sliders
+- [ ] Video layers: blend modes (multiply, screen, overlay, darken, lighten) and shaped masks (linear, radial, rectangle, heart, star) with a soft edge
+- [ ] More transitions: spin, flip, glitch, color split
+- [ ] Precut: cut out the middle of a clip, and step one frame back or forward while trimming
+- [ ] Mute a clip in one tap
 - [ ] Overlay clips with long frame gaps (screen recordings that only emit frames when the screen changes) make Media3's compositor draw a stretched copy of the overlay over the main clip during the gap. Constant-frame-rate clips (phone camera) are fine. Fix idea: re-time such overlays to a constant rate before compositing
 
 ### Photo
 
 - [ ] Effects: blur, pixelate, glitch, posterize, pop art, vignette, sharpen, noise, duotone, with strength
-- [ ] Layer tools: flip, opacity, blend modes, shape crop (circle, heart, star), outline and shadow around cut-outs
+- [ ] Layer blend modes
 - [ ] Canvas tools: free crop and rotate of the whole picture, resize, perspective, border and frame, fit with a blurred or colored background
 - [ ] Clone and stretch/warp brushes, curves, tilt-shift, motion trail
-- [ ] Collage: a grid of photos (2 to 9 cells) with spacing, rounded corners and a background
+- [ ] Collage: a grid of photos (2 to 9 cells) with inner spacing, outer padding, rounded corners and a background; long-press to swap two photos; a free layout; stitch photos into one long strip
+- [ ] Curved text (a bend slider), gradient text fill, text perspective
+- [ ] Bubble styles: pill and double outline
+- [ ] Cut-out outlines: solid, dotted, glow and offset shadow around the cut-out; shape cut-outs (circle, heart, star, triangle, diamond); a lasso to pick the area
+- [ ] Draw: more pens (neon, dotted, spray, soft)
 - [ ] A CC0 sticker pack
 
 ## Later / maybe

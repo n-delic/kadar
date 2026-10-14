@@ -350,13 +350,14 @@ private fun Track(
         Box(
             Modifier.fillMaxSize().drawWithContent { clipRect(left = header) { this@drawWithContent.drawContent() } }.pointerInput(total, view, start, width) {
                 awaitEachGesture {
+                    val down = awaitFirstDown()
+                    // Read after the touch, so a drag starts from where the last one left the layer.
                     val l = current
                     val s0 = l.startMs.coerceIn(0, total)
                     val e0 = l.endMs.coerceIn(0, total)
                     val x0 = start + view.x(s0, width)
                     val x1 = start + view.x(e0, width)
                     val grab = 20.dp.toPx()
-                    val down = awaitFirstDown()
                     val mode = when (down.position.x) {
                         in x0 - grab..x0 + grab / 2 -> TrackDrag.Start
                         in x1 - grab / 2..x1 + grab -> TrackDrag.End
@@ -639,9 +640,10 @@ private fun ClipRow(
                 .semantics { customActions = transitionLabels.mapIndexed { i, label -> CustomAccessibilityAction(label) { onTransition(i + 1); true } } }
                 .pointerInput(total, view) {
                     awaitEachGesture {
+                        val down = awaitFirstDown()
+                        // Read after the touch: a gesture starts waiting as soon as the last one ends, before its drop is in.
                         val c = current
                         fun timeAt(x: Float) = view.time(x, size.width.toFloat(), total)
-                        val down = awaitFirstDown()
                         val index = c.segmentAt(timeAt(down.position.x)).first
                         // A tap on a cut's button opens its transition.
                         val cuts = c.played.runningFold(0L) { t, s -> t + s.outputDurationMs }

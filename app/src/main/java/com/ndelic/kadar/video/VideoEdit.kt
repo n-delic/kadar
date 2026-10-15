@@ -283,7 +283,7 @@ private fun VideoClip.mainSequence(played: List<Segment>, spans: List<Transition
         val outMs = into?.let { if (it.kind.overlaps) it.endMs - it.startMs else (it.endMs - it.startMs) / 2 } ?: 0
         val inMs = dips.firstOrNull { it.clip == i }?.let { (it.endMs - it.startMs) / 2 } ?: 0
         val audio = audioEffects(s, sound, fadeInUs = inMs * 1000, fadeOutUs = outMs * 1000)
-        val look = looks?.effect(i) ?: adjustEffect(s.adjust)
+        val look = looks?.let { listOf(it.effect(i), it.texture(i)) } ?: lookEffects(s.adjust)
         segmentItem(s.copy(uri = copy ?: s.uri), Effects(audio, videoEffects(s, effects, fit = copy != null, look)), removeAudio = !sound)
     }
     return EditedMediaItemSequence.Builder(tracks(sound)).addItems(items).build()
@@ -400,8 +400,9 @@ private fun VideoLayer.sequence(span: Pair<Long, Long>, totalMs: Long): EditedMe
     val clip = EditedMediaItem.Builder(clipped(uri, clipStartMs, clipStartMs + end - start))
         .setDurationUs(durationMs * 1000)
         .setRemoveAudio(volume == 0f)
-        // Its look, cropped, then presented at the layer's own size, so the compositor's scale is the layer's scale.
-        .setEffects(Effects(listOf(gain(volume)), listOfNotNull(adjustEffect(adjust), Crop(left, right, bottom, top), Presentation.createForWidthAndHeight(width.roundToInt(), height.roundToInt(), Presentation.LAYOUT_STRETCH_TO_FIT))))
+        // Its look, cropped, then presented at the layer's own size, so the compositor's scale is the layer's scale; then
+        // its vignette and grain, which fit what it shows, like the preview's (VideoLayerPreview).
+        .setEffects(Effects(listOf(gain(volume)), listOfNotNull(adjustEffect(adjust), Crop(left, right, bottom, top), Presentation.createForWidthAndHeight(width.roundToInt(), height.roundToInt(), Presentation.LAYOUT_STRETCH_TO_FIT), textureEffect(adjust))))
         .build()
     val tracks = if (volume == 0f) setOf(C.TRACK_TYPE_VIDEO) else setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO)
     return EditedMediaItemSequence.Builder(tracks)
@@ -635,8 +636,8 @@ private const val MAX_BITRATE = 50_000_000f
 private const val AAC_BITRATE = 131_072
 
 /** Clip [s]'s [look], then [transition] effects, then its fit into the canvas. */
-private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyList(), fit: Boolean = false, look: Effect? = adjustEffect(s.adjust)): List<Effect> = buildList {
-    look?.let(::add)
+private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyList(), fit: Boolean = false, look: List<Effect> = lookEffects(s.adjust)): List<Effect> = buildList {
+    addAll(look)
     addAll(transition)
     // Clips of another size or orientation than the first are fitted into its frame.
     if (fit || canvas != null || s.width != width || s.height != height) {
@@ -648,6 +649,11 @@ private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyL
 /** The same matrix as an image layer's paint, so a look or adjustment matches between photo and video. */
 private fun adjustEffect(adjust: Adjust) = if (adjust.isNone) null else glRgbMatrix(adjust.filterMatrix()).let { m -> RgbMatrix { _, _ -> m } }
 
+private fun textureEffect(adjust: Adjust) = if (adjust.hasTexture) VignetteGrain { adjust } else null
+
+/** Its colors, then its vignette and grain, like an image layer. */
+private fun lookEffects(adjust: Adjust) = listOfNotNull(adjustEffect(adjust), textureEffect(adjust))
+
 /**
  * The clips' looks as the preview shows them, read on every frame: [show] swaps in new ones (a filter tapped, a slider
  * dragged) without a new composition, so the preview doesn't reload. Each clip always gets the effect, so a clip with
@@ -655,13 +661,18 @@ private fun adjustEffect(adjust: Adjust) = if (adjust.isNone) null else glRgbMat
  */
 class LiveLooks {
     @Volatile private var matrices: List<FloatArray> = emptyList()
+    @Volatile private var adjusts: List<Adjust> = emptyList()
 
     /** Each clip's look and adjustment, in clip order. */
     fun show(adjusts: List<Adjust>) {
         matrices = adjusts.map { glRgbMatrix(it.filterMatrix()) }
+        this.adjusts = adjusts
     }
 
     fun effect(clip: Int) = RgbMatrix { _, _ -> matrices.getOrNull(clip) ?: NO_LOOK }
+
+    /** Clip [clip]'s vignette and grain, after [effect]. */
+    fun texture(clip: Int) = VignetteGrain { adjusts.getOrNull(clip) ?: Adjust() }
 }
 
 private val NO_LOOK = glRgbMatrix(Adjust().filterMatrix())

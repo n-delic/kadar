@@ -545,6 +545,8 @@ private fun adjustFromJson(j: JSONObject) = Adjust(
     tint = j.optDouble("tint", 0.0).toFloat(),
     hue = j.optDouble("hue", 0.0).toFloat(),
     fade = j.optDouble("fade", 0.0).toFloat(),
+    vignette = j.optDouble("vignette", 0.0).toFloat(),
+    grain = j.optDouble("grain", 0.0).toFloat(),
 )
 
 private fun JSONObject.putAdjust(a: Adjust) {
@@ -557,6 +559,8 @@ private fun JSONObject.putAdjust(a: Adjust) {
     put("tint", a.tint.toDouble())
     put("hue", a.hue.toDouble())
     put("fade", a.fade.toDouble())
+    put("vignette", a.vignette.toDouble())
+    put("grain", a.grain.toDouble())
 }
 
 /** Write-then-rename, so a crash mid-save never leaves a half-written project. */

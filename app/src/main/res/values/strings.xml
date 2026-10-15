@@ -136,6 +136,8 @@
     <string name="tint">Tint</string>
     <string name="hue">Hue</string>
     <string name="fade">Fade</string>
+    <string name="vignette">Vignette</string>
+    <string name="grain">Grain</string>
     <string name="hold_to_compare">Hold to compare with the original</string>
     <string name="shadow">Shadow</string>
     <string name="spacing">Spacing</string>

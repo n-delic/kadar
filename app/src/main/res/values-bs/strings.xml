@@ -136,6 +136,8 @@
     <string name="tint">Ton</string>
     <string name="hue">Nijansa</string>
     <string name="fade">Blijeđenje</string>
+    <string name="vignette">Vinjeta</string>
+    <string name="grain">Zrnatost</string>
     <string name="hold_to_compare">Drži za poređenje s originalom</string>
     <string name="shadow">Sjenka</string>
     <string name="spacing">Razmak</string>

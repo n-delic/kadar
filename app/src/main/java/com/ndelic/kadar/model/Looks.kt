@@ -1,11 +1,23 @@
 package com.ndelic.kadar.model
 
+import android.graphics.Bitmap
+import android.graphics.BitmapShader
+import android.graphics.Color
+import android.graphics.Matrix
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.RadialGradient
+import android.graphics.Shader
 import androidx.annotation.StringRes
 import com.ndelic.kadar.R
 import com.ndelic.kadar.ui.editor.label
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.random.Random
 
 /** Rec. 709 luma weights: how much red, green and blue each add to perceived brightness. */
 val LUMA = floatArrayOf(0.2126f, 0.7152f, 0.0722f)
@@ -113,3 +125,63 @@ fun glRgbMatrix(m: FloatArray) = FloatArray(16) { i ->
         else -> 1f
     }
 }
+
+/**
+ * How far toward black a vignette of [strength] (0..1) takes a pixel at [d], its distance from the center in the
+ * ellipse that fits the picture (1 at the middle of each edge, about 1.41 in the corners): nothing in the middle, then
+ * a smooth falloff to the edges. The video shader (`VignetteGrain`) has the same curve.
+ */
+fun vignetteDarkness(d: Float, strength: Float): Float {
+    val t = ((d - VIGNETTE_INNER) / (VIGNETTE_OUTER - VIGNETTE_INNER)).coerceIn(0f, 1f)
+    return strength * VIGNETTE_MAX * t * t * (3 - 2 * t)
+}
+
+/** A full vignette darkens this much (0..1) where it is strongest, from [VIGNETTE_INNER] out to [VIGNETTE_OUTER] (past the corners). */
+const val VIGNETTE_MAX = 0.85f
+const val VIGNETTE_INNER = 0.45f
+const val VIGNETTE_OUTER = 1.45f
+
+/** Full grain takes a speck this much of the way to white or black, at most. */
+const val GRAIN_MAX = 0.3f
+
+/** A grain speck's size in pixels of a [width]×[height] picture: the same share of the picture at any resolution. */
+fun grainCell(width: Float, height: Float) = maxOf(1f, minOf(width, height) / GRAIN_ACROSS)
+
+private const val GRAIN_ACROSS = 540f
+
+/**
+ * This adjustment's vignette and grain as paints over a [width]×[height] picture centered on the origin, to draw over
+ * it: in SRC_ATOP, so its transparent pixels stay transparent. Each mixes the picture toward black (or white, for light
+ * specks) by its alpha, the same mix as the video shader. [seed] moves the grain pattern, for a preview that plays.
+ */
+fun Adjust.texturePaints(width: Float, height: Float, seed: Int = 0): List<Paint> = listOfNotNull(
+    if (vignette == 0f) null else Paint().apply {
+        val at = FloatArray(VIGNETTE_STOPS) { it / (VIGNETTE_STOPS - 1f) }
+        val colors = IntArray(VIGNETTE_STOPS) { Color.argb((vignetteDarkness(at[it] * VIGNETTE_OUTER, vignette) * 255).roundToInt(), 0, 0, 0) }
+        shader = RadialGradient(0f, 0f, VIGNETTE_OUTER, colors, at, Shader.TileMode.CLAMP).apply { setLocalMatrix(Matrix().apply { setScale(width / 2, height / 2) }) }
+        xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_ATOP)
+    },
+    if (grain == 0f) null else Paint(Paint.FILTER_BITMAP_FLAG).apply {
+        val cell = grainCell(width, height)
+        shader = BitmapShader(grainTile, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT).apply {
+            setLocalMatrix(Matrix().apply { setScale(cell, cell); postTranslate(-width / 2 + seed * 37 * cell, -height / 2 + seed * 61 * cell) })
+        }
+        alpha = (grain * GRAIN_MAX * 255).roundToInt()
+        xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_ATOP)
+    },
+)
+
+private const val VIGNETTE_STOPS = 24
+
+/** Grain specks, white or black, each as strong as two random values added and centered (-1..1), so most are faint. */
+private val grainTile by lazy {
+    val random = Random(GRAIN_TILE)
+    val pixels = IntArray(GRAIN_TILE * GRAIN_TILE) {
+        val n = random.nextFloat() + random.nextFloat() - 1
+        val c = if (n > 0) 255 else 0
+        Color.argb((abs(n) * 255).roundToInt(), c, c, c)
+    }
+    Bitmap.createBitmap(pixels, GRAIN_TILE, GRAIN_TILE, Bitmap.Config.ARGB_8888)
+}
+
+private const val GRAIN_TILE = 256

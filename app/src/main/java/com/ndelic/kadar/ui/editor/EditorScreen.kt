@@ -168,7 +168,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Presets, Font, Color, Stroke, Shadow, Glow, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Opacity, ImageOutline, Shape, ShapeFill, ShapeOutline, Transition, ColorClip, Blend }
+enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Presets, Font, Color, Stroke, Shadow, Glow, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Opacity, ImageOutline, Shape, ShapeFill, ShapeOutline, Transition, ColorClip, Blend, Effects }
 
 @Composable
 fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
@@ -429,6 +429,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         Panel.Opacity -> (selected as? ImageLayer)?.let { l -> KSlider(R.drawable.ic_opacity, l.opacity, 0.05f..1f, ::percent) { v -> vm.editImage { copy(opacity = v) } } }
                         Panel.ImageOutline -> (selected as? ImageLayer)?.let { ImageOutlinePanel(it, vm) }
                         Panel.Blend -> (selected as? ImageLayer)?.let { BlendPanel(it, vm) }
+                        Panel.Effects -> (selected as? ImageLayer)?.let { EffectsPanel(it, vm) }
                         Panel.Transition -> video?.let { v -> transitionAt?.takeIf { it in 1 until v.segments.size }?.let { TransitionPanel(v, it, vm) } }
                         Panel.Adjust -> when (val l = selected) {
                             is ImageLayer -> AdjustPanel(l.adjust, onCompare = compare, onDrag = drag) { a -> vm.editImage { copy(adjust = a) } }
@@ -629,6 +630,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         if (video == null) IconTool(R.drawable.ic_join, stringResource(R.string.tool_blend), panel == Panel.Blend) { toggle(Panel.Blend) }
                         IconTool(R.drawable.ic_tune, stringResource(R.string.tool_adjust), panel == Panel.Adjust) { toggle(Panel.Adjust) }
                         IconTool(R.drawable.ic_filter_vintage, stringResource(R.string.tool_filters), panel == Panel.Filters) { toggle(Panel.Filters) }
+                        IconTool(R.drawable.ic_auto_awesome, stringResource(R.string.tool_effects), panel == Panel.Effects) { toggle(Panel.Effects) }
                         if (video != null) IconTool(R.drawable.ic_animation, stringResource(R.string.tool_animate), panel == Panel.Animate) { toggle(Panel.Animate) }
                         timeTools()
                         IconTool(R.drawable.ic_library_add, stringResource(R.string.tool_save_sticker), onClick = vm::saveSticker)

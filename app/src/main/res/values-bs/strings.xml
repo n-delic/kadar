@@ -18,6 +18,15 @@
     <string name="previous_frame">Prethodni kadar</string>
     <string name="next_frame">Sljedeći kadar</string>
     <string name="tool_blend">Stapanje</string>
+    <string name="tool_effects">Efekti</string>
+    <string name="effect_blur">Zamućenje</string>
+    <string name="effect_pixelate">Pikselizacija</string>
+    <string name="effect_posterize">Posterizacija</string>
+    <string name="effect_duotone">Dvotonski</string>
+    <string name="effect_sharpen">Izoštravanje</string>
+    <string name="effect_glitch">Glitch</string>
+    <string name="effect_pop_art">Pop art</string>
+    <string name="effect_duotone_colors">Dvotonske boje %1$d</string>
     <string name="blend_normal">Normalno</string>
     <string name="blend_multiply">Množenje</string>
     <string name="blend_screen">Ekran</string>

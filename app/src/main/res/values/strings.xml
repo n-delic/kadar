@@ -19,6 +19,15 @@
     <string name="previous_frame">Previous frame</string>
     <string name="next_frame">Next frame</string>
     <string name="tool_blend">Blend</string>
+    <string name="tool_effects">Effects</string>
+    <string name="effect_blur">Blur</string>
+    <string name="effect_pixelate">Pixelate</string>
+    <string name="effect_posterize">Posterize</string>
+    <string name="effect_duotone">Duotone</string>
+    <string name="effect_sharpen">Sharpen</string>
+    <string name="effect_glitch">Glitch</string>
+    <string name="effect_pop_art">Pop art</string>
+    <string name="effect_duotone_colors">Duotone colors %1$d</string>
     <string name="blend_normal">Normal</string>
     <string name="blend_multiply">Multiply</string>
     <string name="blend_screen">Screen</string>

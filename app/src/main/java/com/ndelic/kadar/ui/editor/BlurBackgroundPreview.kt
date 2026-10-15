@@ -1,5 +1,9 @@
 package com.ndelic.kadar.ui.editor
 
+import com.ndelic.kadar.video.colorDips
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.runtime.LongState
 import android.graphics.Bitmap
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.RenderEffect
@@ -52,7 +56,7 @@ import kotlinx.coroutines.delay
  * background with Media3 (VideoClip.blurredBackground).
  */
 @Composable
-fun BlurBackgroundPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canvasWidth: Int, canvasHeight: Int, scale: Float, main: Player?) {
+fun BlurBackgroundPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canvasWidth: Int, canvasHeight: Int, scale: Float, main: Player?, clock: LongState) {
     val context = LocalContext.current
     // One playlist item per video clip, whole rather than trimmed, so positions are source time like the trims.
     val sources = clip.segments.filter { !it.isImage }.map { it.uri }
@@ -138,6 +142,15 @@ fun BlurBackgroundPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canva
             still?.let { Image(it, null, placed, contentScale = ContentScale.FillBounds) }
         }
     }
+    // A Black or White transition dips the whole canvas, like the export's colorDipEffect on its blurred copy.
+    val dips = remember(clip) { clip.transitionSpans.filter { !it.kind.overlaps } }
+    Box(
+        Modifier.fillMaxSize().drawBehind {
+            val (black, white) = colorDips(dips, clock.longValue)
+            val q = maxOf(black, white)
+            if (q > 0f) drawRect(if (white > black) Color.White else Color.Black, alpha = q)
+        },
+    )
 }
 
 private const val BLUR_SHARE = BLUR_SIGMA / 320

@@ -29,6 +29,22 @@ import com.ndelic.kadar.video.TransitionKind.Spin
 import com.ndelic.kadar.video.TransitionKind.White
 import com.ndelic.kadar.video.TransitionKind.Zoom
 
+/** The Black and White transitions among [spans] as one color effect, or null without them; the blurred canvas gets it too. */
+fun colorDipEffect(spans: List<TransitionSpan>): Effect? = spans.takeIf { s -> s.any { it.kind == Black || it.kind == White } }?.let { s ->
+    RgbMatrix { us, _ ->
+        val (black, white) = colorDips(s, us / 1000)
+        val q = maxOf(black, white)
+        // Column-major, multiplying (r, g, b, 1): every color scaled down, then white added for White.
+        FloatArray(16).apply {
+            this[0] = 1 - q
+            this[5] = 1 - q
+            this[10] = 1 - q
+            if (white > 0) for (i in 12..14) this[i] = q
+            this[15] = 1f
+        }
+    }
+}
+
 /**
  * The effects that play the centered transitions [spans] into and out of a [width]×[height] clip of the main track. Media3
  * hands an item's effects its frames at their time in the sequence, which for the main track is output time, in the
@@ -39,20 +55,7 @@ fun dipEffects(spans: List<TransitionSpan>, width: Int, height: Int): List<Effec
     fun progress(us: Long, kind: TransitionKind) = spans.firstOrNull { it.kind == kind && us / 1000 in it }?.progress(us / 1000)
     fun at(us: Long, kind: TransitionKind) = progress(us, kind)?.let(::dipAt) ?: 0f
     val kinds = spans.map { it.kind }.toSet()
-    if (Black in kinds || White in kinds) {
-        add(RgbMatrix { us, _ ->
-            val white = at(us, White)
-            val q = maxOf(at(us, Black), white)
-            // Column-major, multiplying (r, g, b, 1): every color scaled down, then white added for White.
-            FloatArray(16).apply {
-                this[0] = 1 - q
-                this[5] = 1 - q
-                this[10] = 1 - q
-                if (white > 0) for (i in 12..14) this[i] = q
-                this[15] = 1f
-            }
-        })
-    }
+    colorDipEffect(spans)?.let(::add)
     if (Zoom in kinds) {
         add(MatrixTransformation { us ->
             val s = 1 + ZOOM_PEAK * at(us, Zoom).let { it * it }

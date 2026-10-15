@@ -980,7 +980,7 @@ private fun Stage(
                 val base = project.blurBase()
                 val backdrop = remember(base?.bitmap, base?.adjust, base?.t?.flipX, base?.t?.flipY, project.width, project.height) { project.backdrop()?.asImageBitmap() }
                 backdrop?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds) }
-                project.video?.takeIf { it.blurred }?.let { BlurBackgroundPreview(it, stills, project.width, project.height, scale, player) }
+                project.video?.takeIf { it.blurred }?.let { BlurBackgroundPreview(it, stills, project.width, project.height, scale, player, clock) }
                 player?.let { p ->
                     VideoSurface(
                         p,

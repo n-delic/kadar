@@ -96,6 +96,12 @@ fun headTailsMs(spans: List<TransitionSpan>, tailMs: Long = HEAD_TAIL_MS) =
 /** How far into the cut a centered transition is at [p] (0 to 1 through it): 0 at its ends, 1 at the cut. */
 fun dipAt(p: Float) = 1 - abs(1 - 2 * p)
 
+/** How far into a Black and a White transition among [spans] output time [ms] is, each 0 outside it and 1 at its cut. */
+fun colorDips(spans: List<TransitionSpan>, ms: Long): Pair<Float, Float> {
+    fun at(kind: TransitionKind) = spans.firstOrNull { it.kind == kind && ms in it }?.let { dipAt(it.progress(ms)) } ?: 0f
+    return at(TransitionKind.Black) to at(TransitionKind.White)
+}
+
 /**
  * The incoming clip's sound at [p] (0 to 1 through an overlapping transition), the outgoing one's at 1 - [p]: an
  * equal-power crossfade, so the two together stay as loud as either alone instead of dipping in the middle.

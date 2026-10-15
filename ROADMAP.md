@@ -158,7 +158,8 @@ Feature parity with the big phone editors, built from how their features behave,
 - [ ] Precut: cut out the middle of a clip
 - [x] Mute a clip in one tap
 - [ ] The preview stalls at the start when the first clip is faster than 5x (on the emulator; on a G7 ThinQ the picture runs about 0.5 s behind the clock for a 6x first clip, then catches up; the export is right). Find the cause in CompositionPlayer
-- [ ] With the blurred canvas, Black, White, Zoom and Blur transitions change only the clip, not the blurred background around it (the export's `blurredBackground` items and the preview's `BlurBackgroundPreview` don't get the dip effects)
+- [x] With the blurred canvas, Black and White transitions dip the whole canvas, not just the clip
+- [ ] With the blurred canvas, Zoom, Blur, Spin, Flip, Glitch and Color split move or change only the clip, not the blurred background around it (decide whether they should)
 - [ ] Overlay clips with long frame gaps (screen recordings that only emit frames when the screen changes) make Media3's compositor draw a stretched copy of the overlay over the main clip during the gap. Constant-frame-rate clips (phone camera) are fine. Fix idea: re-time such overlays to a constant rate before compositing
 
 ### Photo

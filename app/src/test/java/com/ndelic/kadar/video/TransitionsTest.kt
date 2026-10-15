@@ -137,4 +137,13 @@ class TransitionsTest {
         assertEquals(listOf(TransitionSpan(1, Spin, 2700, 3300)), transitionSpans(listOf(3000L, 2000L), listOf(Transition(), Transition(Spin, 600))))
         assertEquals(listOf(0L, 0L), headsMs(listOf(3000L, 2000L), listOf(Transition(), Transition(Glitch, 600))))
     }
+
+    @Test
+    fun colorDipsPeakAtTheCut() {
+        val spans = listOf(TransitionSpan(1, Black, 1000, 2000), TransitionSpan(2, TransitionKind.White, 5000, 6000))
+        assertEquals(0f to 0f, colorDips(spans, 500))
+        assertEquals(1f to 0f, colorDips(spans, 1500))
+        assertEquals(0.5f, colorDips(spans, 1250).first, 0.001f)
+        assertEquals(0f to 1f, colorDips(spans, 5500))
+    }
 }

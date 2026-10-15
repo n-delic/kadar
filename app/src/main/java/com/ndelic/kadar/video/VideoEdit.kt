@@ -326,7 +326,11 @@ fun VideoClip.composition(
     }
     // The clips set the output's frame times only when they are sequence 0; with a frame clock its rate already holds.
     sequences += mainSequence(played, spans, dropFrames && sequences.isEmpty(), previewCopies, looks, volumes, frame)
-    if (blurred) sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItems(played.map { blurredBackground(it) }).build()
+    if (blurred) {
+        val dips = spans.filter { !it.kind.overlaps }
+        val items = played.mapIndexed { i, s -> blurredBackground(s, dips.filter { it.clip == i || it.clip == i + 1 }) }
+        sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItems(items).build()
+    }
     // Audio only, after every video sequence, so the compositor's input numbers above stay as they are.
     sequences += music.flatMapIndexed { i, m -> audioSequences(m.uri, m.startMs, m.durationMs, m.part, outputDurationMs, volumes?.music(i) ?: { m.part.volume }) }
     sequences += voices.flatMapIndexed { i, v -> audioSequences(Uri.fromFile(v.file), 0, v.durationMs, v.part, outputDurationMs, volumes?.voice(i) ?: { v.part.volume }) }
@@ -444,7 +448,7 @@ private fun VideoClip.segmentItem(s: Segment, effects: Effects, removeAudio: Boo
 }
 
 /** Clip [s] again, muted, with the same trim and speed so it stays in sync, cropped to fill the canvas, blurred and darkened. */
-private fun VideoClip.blurredBackground(s: Segment): EditedMediaItem {
+private fun VideoClip.blurredBackground(s: Segment, dips: List<TransitionSpan>): EditedMediaItem {
     val (w, h) = outputSize
     val (bw, bh) = blurSize(w, h)
     val effects = shapeEffects(s) + listOfNotNull(
@@ -454,6 +458,8 @@ private fun VideoClip.blurredBackground(s: Segment): EditedMediaItem {
         // Darker, so captions over the background stay readable.
         Brightness(-0.15f),
         Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_STRETCH_TO_FIT),
+        // A Black or White transition dips the whole canvas, not just the clip in front.
+        colorDipEffect(dips),
     )
     return segmentItem(s, Effects(emptyList(), effects), removeAudio = true)
 }

@@ -1,11 +1,15 @@
 package com.ndelic.kadar.video
 
+import androidx.media3.common.C
+import androidx.media3.common.audio.GainProcessor
 import com.ndelic.kadar.model.Adjust
 import com.ndelic.kadar.model.Look
 import com.ndelic.kadar.model.filterMatrix
 import com.ndelic.kadar.model.glRgbMatrix
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import java.io.File
 import org.junit.Test
 
 class VideoEditTest {
@@ -67,6 +71,37 @@ class VideoEditTest {
         looks.show(listOf(Adjust(vignette = 0.4f, grain = 0.2f)))
         assertEquals(Adjust(vignette = 0.4f, grain = 0.2f), first.adjust())
         assertEquals(Adjust(), looks.texture(1).adjust())
+    }
+
+    @Test
+    fun previewStructureLeavesOutWhatThePreviewTakesLive() {
+        // android.net.Uri can't be made in a JVM test, so no clips here: their volumes are checked on the device.
+        val video = VideoClip(emptyList(), voices = listOf(VoiceClip(File("v.m4a"), 1000, AudioPart(atMs = 200, volume = 0.3f))), canvas = 1f, blur = true)
+        val structure = video.previewStructure()
+        assertEquals(video.copy(voices = listOf(video.voices[0].copy(part = AudioPart(atMs = 200))), blur = false), structure)
+        // A new volume or the blurred canvas keeps the structure, so the preview doesn't reload; moving the part doesn't.
+        assertEquals(structure, video.withAudio(AudioRef(voice = true, index = 0)) { listOf(it.copy(volume = 0f)) }.copy(blur = false).previewStructure())
+        assertNotEquals(structure, video.withAudio(AudioRef(voice = true, index = 0)) { listOf(it.copy(atMs = 300)) }.previewStructure())
+    }
+
+    @Test
+    fun volumeGainReadsALiveVolumeOverTheFades() {
+        val volumes = LiveVolumes()
+        // A fade from 1 s on at a quarter, unity before it (48 kHz).
+        val fades = object : GainProcessor.GainProvider {
+            override fun getGainFactorAtSamplePosition(samplePosition: Long, sampleRate: Int) = if (samplePosition < 48_000) 1f else 0.25f
+            override fun isUnityUntil(samplePosition: Long, sampleRate: Int) = if (samplePosition < 48_000) 48_000L else C.TIME_UNSET
+        }
+        val gain = VolumeGain(fades, volumes.voice(0))
+        // Nothing shown yet: full volume, unity only up to a tenth of a second ahead or to the fade, never for good.
+        assertEquals(1f, gain.getGainFactorAtSamplePosition(0, 48_000))
+        assertEquals(4_800L, gain.isUnityUntil(0, 48_000))
+        assertEquals(48_000L, gain.isUnityUntil(45_000, 48_000))
+        assertEquals(50_001L, gain.isUnityUntil(50_000, 48_000))
+        volumes.show(VideoClip(emptyList(), voices = listOf(VoiceClip(File("v.m4a"), 1000, AudioPart(volume = 0.5f)))))
+        // The provider already in the composition hears the new volume, over the fade too.
+        assertEquals(0.5f, gain.getGainFactorAtSamplePosition(0, 48_000))
+        assertEquals(0.125f, gain.getGainFactorAtSamplePosition(50_000, 48_000))
     }
 
     private fun assertEquals(expected: Int, actual: Int, delta: Int) = assertEquals(expected.toDouble(), actual.toDouble(), delta.toDouble())

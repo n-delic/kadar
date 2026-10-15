@@ -111,6 +111,21 @@ data class VideoClip(
     /** Every clip without its look and color adjustment. */
     fun withoutAdjust() = copy(segments = segments.map { it.copy(adjust = Adjust()) })
 
+    /**
+     * What the preview's composition is built from: without what it takes live ([LiveLooks], [LiveVolumes]) or draws
+     * itself (the blurred canvas), so changing those doesn't reload it. The clips' volumes only say whether any has sound,
+     * which decides whether they get an audio track.
+     */
+    fun previewStructure(): VideoClip {
+        val volume = if (hasSound(segments)) 1f else 0f
+        return copy(
+            segments = segments.map { it.copy(adjust = Adjust(), volume = volume) },
+            music = music.map { it.copy(part = it.part.copy(volume = 1f)) },
+            voices = voices.map { it.copy(part = it.part.copy(volume = 1f)) },
+            blur = false,
+        )
+    }
+
     /** How much of each clip's start an overlapping transition plays over the clip before it (output time). */
     val headsMs get() = headsMs(segments.map { it.outputDurationMs }, segments.map { it.transition })
 
@@ -176,7 +191,8 @@ private const val BLUR_LONG_SIDE = 320
  * draws them itself, with IncomingClipPreview). [dropFrames] keeps sped-up clips at the clip's frame rate when they set
  * the output's frame times (the preview turns it off). [frameClock] times the output by the frame clock at [VideoClip.frameRate]
  * even without video layers or transitions, for an export at a chosen frame rate. With [looks] (the preview's) the clips
- * take their looks from it on every frame instead of each baking its own in. Call it on the main thread, like [timedOverlay].
+ * take their looks from it on every frame instead of each baking its own in, and with [volumes] the clips, songs and
+ * voiceovers their volumes. Call it on the main thread, like [timedOverlay].
  */
 fun VideoClip.composition(
     layers: List<Layer> = emptyList(),
@@ -186,6 +202,7 @@ fun VideoClip.composition(
     frameClock: Boolean = false,
     previewCopies: Map<Uri, Uri> = emptyMap(),
     looks: LiveLooks? = null,
+    volumes: LiveVolumes? = null,
 ): Composition {
     // Media3's compositor takes every output frame time from sequence 0 and draws it on top, then the others in order.
     // So sequence 0 is an invisible frame clock at the clip's rate, then the overlays (topmost layer first), each padded
@@ -224,11 +241,11 @@ fun VideoClip.composition(
         inputs += outgoingSettings(o, fps)
     }
     // The clips set the output's frame times only when they are sequence 0; with a frame clock its rate already holds.
-    sequences += mainSequence(played, spans, dropFrames && sequences.isEmpty(), previewCopies, looks)
+    sequences += mainSequence(played, spans, dropFrames && sequences.isEmpty(), previewCopies, looks, volumes)
     if (blurred) sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItems(played.map { blurredBackground(it) }).build()
     // Audio only, after every video sequence, so the compositor's input numbers above stay as they are.
-    sequences += music.flatMap { audioSequences(it.uri, it.startMs, it.durationMs, it.part, outputDurationMs) }
-    sequences += voices.flatMap { audioSequences(Uri.fromFile(it.file), 0, it.durationMs, it.part, outputDurationMs) }
+    sequences += music.flatMapIndexed { i, m -> audioSequences(m.uri, m.startMs, m.durationMs, m.part, outputDurationMs, volumes?.music(i) ?: { m.part.volume }) }
+    sequences += voices.flatMapIndexed { i, v -> audioSequences(Uri.fromFile(v.file), 0, v.durationMs, v.part, outputDurationMs, volumes?.voice(i) ?: { v.part.volume }) }
     return Composition.Builder(sequences)
         // Downscale after the overlay: the layers are rendered at full canvas size and must line up first.
         .setEffects(
@@ -269,7 +286,7 @@ private fun VideoClip.blankStill(effects: List<Effect> = emptyList()): EditedMed
  * handing the encoder speed times as many (300 fps at 10x). Media3 1.11's preview runs on past the end with the frame
  * drop effect, so the preview leaves it out; the frames it shows are the same.
  */
-private fun VideoClip.mainSequence(played: List<Segment>, spans: List<TransitionSpan>, dropFrames: Boolean, copies: Map<Uri, Uri>, looks: LiveLooks?): EditedMediaItemSequence {
+private fun VideoClip.mainSequence(played: List<Segment>, spans: List<TransitionSpan>, dropFrames: Boolean, copies: Map<Uri, Uri>, looks: LiveLooks?, volumes: LiveVolumes?): EditedMediaItemSequence {
     val sound = hasSound(played)
     val dips = spans.filter { !it.kind.overlaps }
     val items = played.mapIndexed { i, s ->
@@ -282,7 +299,7 @@ private fun VideoClip.mainSequence(played: List<Segment>, spans: List<Transition
         val into = spans.firstOrNull { it.clip == i + 1 }
         val outMs = into?.let { if (it.kind.overlaps) it.endMs - it.startMs else (it.endMs - it.startMs) / 2 } ?: 0
         val inMs = dips.firstOrNull { it.clip == i }?.let { (it.endMs - it.startMs) / 2 } ?: 0
-        val audio = audioEffects(s, sound, fadeInUs = inMs * 1000, fadeOutUs = outMs * 1000)
+        val audio = audioEffects(s, sound, fadeInUs = inMs * 1000, fadeOutUs = outMs * 1000, volume = volumes?.clip(i) ?: { s.volume })
         val look = looks?.let { listOf(it.effect(i), it.texture(i)) } ?: lookEffects(s.adjust)
         segmentItem(s.copy(uri = copy ?: s.uri), Effects(audio, videoEffects(s, effects, fit = copy != null, look)), removeAudio = !sound)
     }
@@ -315,10 +332,10 @@ private fun hasSound(clips: List<Segment>) = clips.any { !it.isImage && it.volum
 
 private fun tracks(sound: Boolean) = if (sound) setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO) else setOf(C.TRACK_TYPE_VIDEO)
 
-/** Clip [s]'s volume and pitch fix; crossfaded in over its first [fadeInUs] and out over its last [fadeOutUs], silent from [mutedFromUs] into it, if given. */
-private fun audioEffects(s: Segment, sound: Boolean, mutedFromUs: Long? = null, fadeInUs: Long = 0, fadeOutUs: Long = 0) =
+/** Clip [s]'s [volume] and pitch fix; crossfaded in over its first [fadeInUs] and out over its last [fadeOutUs], silent from [mutedFromUs] into it, if given. */
+private fun audioEffects(s: Segment, sound: Boolean, mutedFromUs: Long? = null, fadeInUs: Long = 0, fadeOutUs: Long = 0, volume: () -> Float = { s.volume }) =
     if (sound && !s.isImage) {
-        listOfNotNull(gain(s.volume, mutedFromUs, fadeInUs, fadeOutUs, s.outputDurationMs * 1000), pitchFix(s.speed).takeIf { s.keepPitch && s.speed != 1f })
+        listOfNotNull(gain(volume, mutedFromUs, fadeInUs, fadeOutUs, s.outputDurationMs * 1000), pitchFix(s.speed).takeIf { s.keepPitch && s.speed != 1f })
     } else {
         emptyList()
     }
@@ -362,20 +379,21 @@ private const val BLUR_SIGMA = 16f
 private const val BLANK_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAC0lEQVR4nGNgQAcAABIAAXfx+gAAAAAASUVORK5CYII="
 
 /**
- * Audio [part] of a source [durationMs] long that loops from [loopFromMs] to its end, cut at [totalMs]: one sequence per
- * repeat, a gap until it plays, that stretch of the source, then a gap to [totalMs]. Not a looping sequence: that restarts
- * its item's clock on every repeat, and the fades need to know where in the output each repeat plays.
+ * Audio [part] of a source [durationMs] long that loops from [loopFromMs] to its end, cut at [totalMs], at [volume] (the
+ * part's own or a live one): one sequence per repeat, a gap until it plays, that stretch of the source, then a gap to
+ * [totalMs]. Not a looping sequence: that restarts its item's clock on every repeat, and the fades need to know where in
+ * the output each repeat plays.
  */
-private fun audioSequences(uri: Uri, loopFromMs: Long, durationMs: Long, part: AudioPart, totalMs: Long): List<EditedMediaItemSequence> {
+private fun audioSequences(uri: Uri, loopFromMs: Long, durationMs: Long, part: AudioPart, totalMs: Long, volume: () -> Float): List<EditedMediaItemSequence> {
     val from = part.atMs
     val to = part.endMs(totalMs)
     val loopMs = durationMs - loopFromMs
     return repeats(from, to, part.offsetMs, loopMs).map { r ->
-        val gain = DefaultGainProvider.Builder(part.volume)
+        val fades = DefaultGainProvider.Builder(1f)
         fadeWindows(r.fromMs, r.toMs, from, to, part.fadeInMs, part.fadeOutMs).forEach { (start, end) ->
-            // The provider gets sample counts into the window, and inside it its gain replaces the default, so volume goes in here.
-            gain.addFadeAt(start * 1000, (end - start) * 1000) { samples, ofSamples ->
-                part.volume * fadeGain(r.fromMs + start + (end - start) * samples / ofSamples, from, to, part.fadeInMs, part.fadeOutMs)
+            // The provider gets sample counts into the window.
+            fades.addFadeAt(start * 1000, (end - start) * 1000) { samples, ofSamples ->
+                fadeGain(r.fromMs + start + (end - start) * samples / ofSamples, from, to, part.fadeInMs, part.fadeOutMs)
             }
         }
         val sourceFrom = loopFromMs + r.loopMs
@@ -383,7 +401,7 @@ private fun audioSequences(uri: Uri, loopFromMs: Long, durationMs: Long, part: A
         val sourceTo = if (r.loopMs + r.toMs - r.fromMs < loopMs) sourceFrom + r.toMs - r.fromMs else C.TIME_END_OF_SOURCE
         val item = EditedMediaItem.Builder(clipped(uri, sourceFrom, sourceTo))
             .setDurationUs(durationMs * 1000)
-            .setEffects(Effects(listOf(GainProcessor(gain.build())), emptyList()))
+            .setEffects(Effects(listOf(GainProcessor(VolumeGain(fades.build(), volume))), emptyList()))
             .build()
         EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO))
             .apply { if (r.fromMs > 0) addGap(r.fromMs * 1000) }
@@ -402,7 +420,7 @@ private fun VideoLayer.sequence(span: Pair<Long, Long>, totalMs: Long): EditedMe
         .setRemoveAudio(volume == 0f)
         // Its look, cropped, then presented at the layer's own size, so the compositor's scale is the layer's scale; then
         // its vignette and grain, which fit what it shows, like the preview's (VideoLayerPreview).
-        .setEffects(Effects(listOf(gain(volume)), listOfNotNull(adjustEffect(adjust), Crop(left, right, bottom, top), Presentation.createForWidthAndHeight(width.roundToInt(), height.roundToInt(), Presentation.LAYOUT_STRETCH_TO_FIT), textureEffect(adjust))))
+        .setEffects(Effects(listOf(gain({ volume })), listOfNotNull(adjustEffect(adjust), Crop(left, right, bottom, top), Presentation.createForWidthAndHeight(width.roundToInt(), height.roundToInt(), Presentation.LAYOUT_STRETCH_TO_FIT), textureEffect(adjust))))
         .build()
     val tracks = if (volume == 0f) setOf(C.TRACK_TYPE_VIDEO) else setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO)
     return EditedMediaItemSequence.Builder(tracks)
@@ -677,20 +695,60 @@ class LiveLooks {
 
 private val NO_LOOK = glRgbMatrix(Adjust().filterMatrix())
 
+/**
+ * The clips', songs' and voiceovers' volumes as the preview plays them, read on every audio sample: [show] swaps in new
+ * ones (a volume slider let go, an undo) without a new composition, so the preview doesn't reload.
+ */
+class LiveVolumes {
+    @Volatile private var video: VideoClip? = null
+
+    fun show(video: VideoClip) {
+        this.video = video
+    }
+
+    fun clip(i: Int): () -> Float = { video?.segments?.getOrNull(i)?.volume ?: 1f }
+
+    fun music(i: Int): () -> Float = { video?.music?.getOrNull(i)?.part?.volume ?: 1f }
+
+    fun voice(i: Int): () -> Float = { video?.voices?.getOrNull(i)?.part?.volume ?: 1f }
+}
+
+/**
+ * The gain of [fades] (built at 1) times [volume], read on every sample, so a live volume ([LiveVolumes]) changes while
+ * it plays. GainProcessor asks where the gain stays 1 only after reading a 1, and copies the samples up to there as they
+ * are; never "for good", or it drops out of the audio pipeline at the start and misses a later change.
+ */
+internal class VolumeGain(private val fades: GainProcessor.GainProvider, private val volume: () -> Float) : GainProcessor.GainProvider {
+    override fun getGainFactorAtSamplePosition(samplePosition: Long, sampleRate: Int) = volume() * fades.getGainFactorAtSamplePosition(samplePosition, sampleRate)
+
+    override fun isUnityUntil(samplePosition: Long, sampleRate: Int): Long {
+        // A tenth of a second at most, so a volume changed meanwhile is heard that soon.
+        val soon = samplePosition + sampleRate / 10
+        return when (val until = fades.isUnityUntil(samplePosition, sampleRate)) {
+            // Inside a fade that is at 1 right here: one sample at a time.
+            C.TIME_UNSET -> samplePosition + 1
+            C.TIME_END_OF_SOURCE -> soon
+            else -> minOf(until, soon)
+        }
+    }
+}
+
 private fun clipped(uri: Uri, startMs: Long, endMs: Long) = MediaItem.Builder()
     .setUri(uri)
     .setClippingConfiguration(MediaItem.ClippingConfiguration.Builder().setStartPositionMs(startMs).setEndPositionMs(endMs).build())
     .build()
 
-private fun gain(volume: Float, mutedFromUs: Long? = null, fadeInUs: Long = 0, fadeOutUs: Long = 0, lengthUs: Long = 0) =
+private fun gain(volume: () -> Float, mutedFromUs: Long? = null, fadeInUs: Long = 0, fadeOutUs: Long = 0, lengthUs: Long = 0) =
     GainProcessor(
-        DefaultGainProvider.Builder(volume).apply {
-            // Inside a fade its gain replaces the default, so volume goes in here.
-            if (fadeInUs > 0) addFadeAt(0, fadeInUs) { n, of -> volume * crossfadeGain(n.toFloat() / of) }
-            if (fadeOutUs > 0) addFadeAt(lengthUs - fadeOutUs, fadeOutUs) { n, of -> volume * crossfadeGain(1 - n.toFloat() / of) }
-            // A minute is past the end of anything muted this way (a head's tail).
-            mutedFromUs?.let { addFadeAt(it, 60_000_000) { _, _ -> 0f } }
-        }.build(),
+        VolumeGain(
+            DefaultGainProvider.Builder(1f).apply {
+                if (fadeInUs > 0) addFadeAt(0, fadeInUs) { n, of -> crossfadeGain(n.toFloat() / of) }
+                if (fadeOutUs > 0) addFadeAt(lengthUs - fadeOutUs, fadeOutUs) { n, of -> crossfadeGain(1 - n.toFloat() / of) }
+                // A minute is past the end of anything muted this way (a head's tail).
+                mutedFromUs?.let { addFadeAt(it, 60_000_000) { _, _ -> 0f } }
+            }.build(),
+            volume,
+        ),
     )
 
 /** The speed change scales every frequency by [speed]; shifting pitch by 1/[speed] cancels it without touching the length. */

@@ -83,6 +83,7 @@ import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.audioPart
 import com.ndelic.kadar.video.speedAt
 import com.ndelic.kadar.video.speedPosition
+import com.ndelic.kadar.video.withAudio
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -355,16 +356,16 @@ fun SmallIcon(icon: Int, description: String, onClick: () -> Unit) {
 
 /**
  * The selected music or voiceover track's [audio] settings; with none selected, clip [index]'s sound, adding music and
- * recording a voiceover.
+ * recording a voiceover. A volume slider's drag goes to [onDrag] as the clip would sound; the release commits it.
  */
 @Composable
-fun AudioPanel(clip: VideoClip, index: Int, audio: AudioRef?, vm: EditorViewModel, onAddMusic: () -> Unit, voiceover: @Composable () -> Unit) {
+fun AudioPanel(clip: VideoClip, index: Int, audio: AudioRef?, vm: EditorViewModel, onAddMusic: () -> Unit, onDrag: (VideoClip) -> Unit, voiceover: @Composable () -> Unit) {
     // Scrolls if it gets taller than the others, so the stage keeps its room.
     Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val part = audio?.let { clip.audioPart(it) }
         if (audio != null && part != null) {
             PanelLabel(stringResource(if (audio.voice) R.string.voiceover else R.string.music))
-            KSlider(R.drawable.ic_volume_up, part.volume, 0f..1f, ::percent) { v -> vm.editAudio { copy(volume = v) } }
+            KSlider(R.drawable.ic_volume_up, part.volume, 0f..1f, ::percent, onDrag = { v -> onDrag(clip.withAudio(audio) { listOf(it.copy(volume = v)) }) }) { v -> vm.editAudio { copy(volume = v) } }
             if (!audio.voice) {
                 val music = clip.music[audio.index]
                 // Leave at least a second of song, so a repeat is never empty.
@@ -385,7 +386,8 @@ fun AudioPanel(clip: VideoClip, index: Int, audio: AudioRef?, vm: EditorViewMode
             return@Column
         }
         PanelLabel(stringResource(R.string.video_sound))
-        KSlider(R.drawable.ic_volume_up, clip.segments[index].volume, 0f..1f, ::percent) { v -> vm.updateSegment(index) { copy(volume = v) } }
+        val onClipDrag = { v: Float -> onDrag(clip.copy(segments = clip.segments.mapIndexed { i, s -> if (i == index) s.copy(volume = v) else s })) }
+        KSlider(R.drawable.ic_volume_up, clip.segments[index].volume, 0f..1f, ::percent, onDrag = onClipDrag) { v -> vm.updateSegment(index) { copy(volume = v) } }
         PanelLabel(stringResource(R.string.music))
         Row(
             verticalAlignment = Alignment.CenterVertically,

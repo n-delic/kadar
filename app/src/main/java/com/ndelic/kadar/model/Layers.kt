@@ -159,21 +159,53 @@ data class ImageLayer(
     val opacity: Float = 1f,
     override val animInMs: Long? = null,
     override val animOutMs: Long? = null,
+    /** Drawn around the picture's shape as [outlineStyle] says, or null for none. */
+    val outline: Int? = null,
+    val outlineStyle: OutlineStyle = OutlineStyle.Solid,
+    /** How thick the outline is (or how far a glow or shadow spreads), as a part of the picture's longer side. */
+    val outlineWidth: Float = DEFAULT_OUTLINE_WIDTH,
 ) : Layer {
-    private val paint = if (adjust.isNone && opacity >= 1f) bitmapPaint else Paint(bitmapPaint).apply {
+    // With an outline the opacity goes on both at once (one offscreen layer), so the outline doesn't show through the picture.
+    private val pictureAlpha = if (outline == null) opacity else 1f
+    private val paint = if (adjust.isNone && pictureAlpha >= 1f) bitmapPaint else Paint(bitmapPaint).apply {
         if (!adjust.isNone) colorFilter = ColorMatrixColorFilter(adjust.filterMatrix())
-        alpha = (opacity * 255).roundToInt()
+        alpha = (pictureAlpha * 255).roundToInt()
     }
     private val texture = adjust.texturePaints(width, height)
+    private val outlinePaint = outline?.let { c ->
+        Paint(bitmapPaint).apply {
+            color = c
+            if (outlineStyle == OutlineStyle.Shadow) alpha = alpha * 3 / 5
+        }
+    }
+    private val mask by lazy { outline?.let { outlineMask(bitmap, outlineStyle, outlineWidth, t.stretch) } }
+    private val outlineSize get() = if (outline == null) 0f else outlineWidth * maxOf(width, height)
     override val width get() = bitmap.width.toFloat()
     override val height get() = bitmap.height.toFloat()
+    override val reach get() = hypot(width, height) / 2 + outlineSize * if (outlineStyle == OutlineStyle.Shadow) 2.5f else 1f
     override fun drawContent(canvas: Canvas) {
-        if (texture.isEmpty()) return canvas.drawBitmap(bitmap, -width / 2, -height / 2, paint)
-        // A layer of its own, so the vignette and grain (SRC_ATOP) land only on the picture's pixels.
-        val saved = canvas.saveLayer(-width / 2, -height / 2, width / 2, height / 2, null)
-        canvas.drawBitmap(bitmap, -width / 2, -height / 2, paint)
-        texture.forEach { canvas.drawRect(-width / 2, -height / 2, width / 2, height / 2, it) }
-        canvas.restoreToCount(saved)
+        val m = mask
+        // Down and right on the canvas whichever way the picture is flipped, as far across as down when it's stretched.
+        val dx = if (outlineStyle != OutlineStyle.Shadow) 0f else outlineSize / t.stretch * if (t.flipX) -1 else 1
+        val dy = if (outlineStyle != OutlineStyle.Shadow) 0f else outlineSize * if (t.flipY) -1 else 1
+        val count = if (m == null || opacity >= 1f) canvas.save() else {
+            val r = RectF(m.bounds).apply { union(left + dx, top + dy, right + dx, bottom + dy) }
+            canvas.saveLayerAlpha(r, (opacity * 255).roundToInt())
+        }
+        if (m != null) {
+            canvas.translate(dx, dy)
+            canvas.drawBitmap(m.bitmap, null, m.bounds, outlinePaint)
+            canvas.translate(-dx, -dy)
+        }
+        if (texture.isEmpty()) {
+            canvas.drawBitmap(bitmap, -width / 2, -height / 2, paint)
+        } else {
+            // A layer of its own, so the vignette and grain (SRC_ATOP) land only on the picture's pixels, not its outline.
+            canvas.saveLayer(-width / 2, -height / 2, width / 2, height / 2, null)
+            canvas.drawBitmap(bitmap, -width / 2, -height / 2, paint)
+            texture.forEach { canvas.drawRect(-width / 2, -height / 2, width / 2, height / 2, it) }
+        }
+        canvas.restoreToCount(count)
     }
     override fun withTransform(t: Transform) = copy(t = t)
     override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = endMs)

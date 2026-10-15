@@ -771,6 +771,19 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         loadPreviewCopy(dir, segment)
     }
 
+    /** Adds a clip of plain [color], canvas-sized, as a still of [PHOTO_CLIP_MS] after the last clip, and picks it. */
+    fun addColorClip(color: Int) = work(R.string.busy_adding_clip) {
+        val dir = _uiState.value.projectDir ?: return@work
+        val (w, h) = _uiState.value.project?.video?.outputSize ?: return@work
+        val scale = minOf(1f, MAX_PHOTO / maxOf(w, h).toFloat())
+        val bitmap = Bitmap.createBitmap((w * scale).roundToInt().coerceAtLeast(2), (h * scale).roundToInt().coerceAtLeast(2), Bitmap.Config.ARGB_8888).apply { eraseColor(color) }
+        val file = withContext(Dispatchers.IO) { store.writeImage(dir, bitmap) }
+        val segment = Segment(Uri.fromFile(File(dir, file)), MAX_PHOTO_CLIP_MS, bitmap.width, bitmap.height, endMs = PHOTO_CLIP_MS, isImage = true)
+        updateClip { copy(segments = segments + segment) }
+        _uiState.value.project?.video?.let { selectClip(it.segments.lastIndex) }
+        loadFilmstrip(dir, segment)
+    }
+
     /**
      * Puts the video or photo at [uri] in clip [index]'s place, keeping its length (as far as the new one goes), speed,
      * volume, look and transition.

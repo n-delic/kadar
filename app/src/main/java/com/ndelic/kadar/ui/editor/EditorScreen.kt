@@ -168,7 +168,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Presets, Font, Color, Stroke, Shadow, Glow, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Opacity, ImageOutline, Shape, ShapeFill, ShapeOutline, Transition }
+enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Presets, Font, Color, Stroke, Shadow, Glow, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Opacity, ImageOutline, Shape, ShapeFill, ShapeOutline, Transition, ColorClip }
 
 @Composable
 fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
@@ -412,6 +412,10 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         Panel.ShapeOutline -> (selected as? ShapeLayer)?.let { ShapeOutlinePanel(it, vm) }
                         Panel.Layers -> LayersPanel(project.layers, state.selectedId, vm)
                         Panel.VideoCanvas -> video?.let { VideoCanvasPanel(project, it, state.settings.exportSize, vm) }
+                        Panel.ColorClip -> ColorRow(null, allowNone = false) { c ->
+                            c?.let(vm::addColorClip)
+                            panel = null
+                        }
                         Panel.Style -> (selected as? TextLayer)?.let { TextStylePanel(it, vm) }
                         Panel.Overlay -> (selected as? VideoLayer)?.let { VideoLayerPanel(it, vm) }
                         Panel.Animate -> selected?.let { AnimationPanel(it, vm) }
@@ -497,6 +501,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                             IconTool(R.drawable.ic_tune, stringResource(R.string.tool_adjust), panel == Panel.Adjust) { toggleClip(Panel.Adjust) }
                             IconTool(R.drawable.ic_filter_vintage, stringResource(R.string.tool_filters), panel == Panel.Filters) { toggleClip(Panel.Filters) }
                             IconTool(R.drawable.ic_music_note, stringResource(R.string.tool_audio), panel == Panel.Audio) { toggleClip(Panel.Audio) }
+                            IconTool(R.drawable.ic_format_color_fill, stringResource(R.string.tool_color_clip), panel == Panel.ColorClip) { toggle(Panel.ColorClip) }
                         } else {
                             IconTool(R.drawable.ic_aspect_ratio, stringResource(R.string.tool_canvas), panel == Panel.Canvas) { toggle(Panel.Canvas) }
                         }

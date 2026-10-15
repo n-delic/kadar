@@ -1,9 +1,12 @@
+@file:OptIn(UnstableApi::class)
+
 package com.ndelic.kadar.ui.editor
 
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.os.SystemClock
 import android.view.TextureView
+import androidx.annotation.OptIn
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +34,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.model.filterMatrix
@@ -51,10 +55,14 @@ fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Play
     val context = LocalContext.current
     val current by rememberUpdatedState(layer)
     val keyed = layer.key != null
-    // Keyed, it runs the export's key on its frames (a new player, since effects are set before it prepares).
-    val player = remember(layer.uri, keyed) {
+    // Once keyed, its player runs the export's key on its frames for good (no key passes them unchanged): effects take
+    // only when set before the player prepares, and a new player for every switch left its view blank while paused.
+    val everKeyed = remember(layer.uri) { booleanArrayOf(false) }
+    if (keyed) everKeyed[0] = true
+    val keying = everKeyed[0]
+    val player = remember(layer.uri, keying) {
         ExoPlayer.Builder(context).build().apply {
-            if (keyed) setVideoEffects(listOf(ChromaKey(premultiply = true) { current }))
+            if (keying) setVideoEffects(listOf(ChromaKey(premultiply = true) { current }))
             setMediaItem(MediaItem.fromUri(layer.uri))
             prepare()
         }
@@ -67,7 +75,7 @@ fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Play
     var grainFrame by remember { mutableIntStateOf(0) }
     // Paused, the key reads its new settings only on a new frame.
     LaunchedEffect(player, layer.key, layer.keyStrength, layer.keySoftness) {
-        if (keyed && !player.isPlaying && player.playbackState == Player.STATE_READY) player.seekTo(gate.nudge(player, player.currentPosition))
+        if (keying && !player.isPlaying && player.playbackState == Player.STATE_READY) player.seekTo(gate.nudge(player, player.currentPosition))
     }
     LaunchedEffect(player, main, totalMs) {
         if (main == null) return@LaunchedEffect

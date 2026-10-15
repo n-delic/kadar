@@ -2,6 +2,8 @@ package com.ndelic.kadar.model
 
 import android.graphics.Bitmap
 import android.graphics.BitmapShader
+import android.graphics.Canvas
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
@@ -11,7 +13,6 @@ import android.graphics.RadialGradient
 import android.graphics.Shader
 import androidx.annotation.StringRes
 import com.ndelic.kadar.R
-import com.ndelic.kadar.ui.editor.label
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -154,6 +155,20 @@ private const val GRAIN_ACROSS = 540f
  * it: in SRC_ATOP, so its transparent pixels stay transparent. Each mixes the picture toward black (or white, for light
  * specks) by its alpha, the same mix as the video shader. [seed] moves the grain pattern, for a preview that plays.
  */
+/** [picture] with this look, adjustment, vignette and grain drawn in, as an image layer draws them: a still of a clip as it plays. */
+fun Adjust.appliedTo(picture: Bitmap): Bitmap {
+    if (isNone && !hasTexture) return picture
+    val out = Bitmap.createBitmap(picture.width, picture.height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(out)
+    canvas.drawBitmap(picture, 0f, 0f, Paint(Paint.FILTER_BITMAP_FLAG).apply { if (!isNone) colorFilter = ColorMatrixColorFilter(filterMatrix()) })
+    // The texture paints are laid out around the picture's center, like an image layer's.
+    val w = picture.width.toFloat()
+    val h = picture.height.toFloat()
+    canvas.translate(w / 2, h / 2)
+    texturePaints(w, h).forEach { canvas.drawRect(-w / 2, -h / 2, w / 2, h / 2, it) }
+    return out
+}
+
 fun Adjust.texturePaints(width: Float, height: Float, seed: Int = 0): List<Paint> = listOfNotNull(
     if (vignette == 0f) null else Paint().apply {
         val at = FloatArray(VIGNETTE_STOPS) { it / (VIGNETTE_STOPS - 1f) }

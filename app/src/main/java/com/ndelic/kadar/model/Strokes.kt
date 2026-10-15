@@ -30,7 +30,9 @@ class PenStroke(val color: Int, val width: Float, val points: FloatArray, val st
  * around the line, from a seed taken from the points, so the same stroke always gets the same dots.
  */
 fun sprayDots(points: FloatArray, width: Float): FloatArray {
-    val random = Random(points.contentHashCode())
+    // One seed for every spray, not one from the points: then adding points keeps the dots already drawn, and moving the
+    // stroke (Apply re-centers it) doesn't reshuffle them.
+    val random = Random(SPRAY_SEED)
     val step = width * 0.2f
     val out = ArrayList<Float>()
     fun spray(x: Float, y: Float) = repeat(SPRAY_DOTS) {
@@ -59,6 +61,7 @@ fun sprayDots(points: FloatArray, width: Float): FloatArray {
 }
 
 private const val SPRAY_DOTS = 6
+private const val SPRAY_SEED = 7
 
 /**
  * Quadratic segments through the midpoints between the finger's samples, so strokes come out smooth instead of jagged.

@@ -21,7 +21,7 @@ import androidx.media3.effect.GlShaderProgram
  * alpha is first scaled by [alpha] at its time (a clip's fade, [clipAnimEffects]). Left see-through, the colors come out
  * [premultiplied] by alpha if asked: the preview's TextureView blends them that way, Media3's compositor straight.
  */
-class BarFill(val alpha: (Long) -> Float = { 1f }, val premultiplied: Boolean = false, val color: () -> Int) : GlEffect {
+class BarFill(val alpha: (Long) -> Float = { 1f }, val premultiplied: Boolean = false, val color: (Long) -> Int) : GlEffect {
     override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram = Program(useHdr)
 
     private inner class Program(useHdr: Boolean) : BaseGlShaderProgram(useHdr, 1) {
@@ -36,7 +36,7 @@ class BarFill(val alpha: (Long) -> Float = { 1f }, val premultiplied: Boolean = 
         override fun configure(inputWidth: Int, inputHeight: Int) = Size(inputWidth, inputHeight)
 
         override fun drawFrame(inputTexId: Int, presentationTimeUs: Long) {
-            val c = color()
+            val c = color(presentationTimeUs)
             try {
                 program.use()
                 program.setSamplerTexIdUniform("uTexSampler", inputTexId, 0)

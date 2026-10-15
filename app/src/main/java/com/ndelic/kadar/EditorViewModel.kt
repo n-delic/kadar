@@ -33,6 +33,7 @@ import com.ndelic.kadar.media.turnBitmap
 import com.ndelic.kadar.media.videoFrame
 import com.ndelic.kadar.media.shapedBitmap
 import com.ndelic.kadar.media.videoStill
+import com.ndelic.kadar.model.appliedTo
 import com.ndelic.kadar.model.Anim
 import com.ndelic.kadar.model.AppSettings
 import com.ndelic.kadar.model.CensorLayer
@@ -903,25 +904,29 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val bitmap = clipStill(s, at, MAX_PHOTO)
         val file = withContext(Dispatchers.IO) { store.writeImage(dir, bitmap) }
         val still = Segment(Uri.fromFile(File(dir, file)), MAX_PHOTO_CLIP_MS, bitmap.width, bitmap.height, endMs = PHOTO_CLIP_MS, isImage = true, adjust = s.adjust, crop = s.crop, flipX = s.flipX, flipY = s.flipY, turns = s.turns)
-        val parts = when {
-            splitPoint(s.startMs, s.endMs, s.speed, into) != null -> listOf(s.copy(endMs = at, animOut = ClipAnimation()), still, s.copy(startMs = at, transition = Transition(), animIn = ClipAnimation()))
+        // The parts and where the still is among them.
+        val (parts, at0) = when {
+            splitPoint(s.startMs, s.endMs, s.speed, into) != null -> listOf(s.copy(endMs = at, animOut = ClipAnimation()), still, s.copy(startMs = at, transition = Transition(), animIn = ClipAnimation())) to 1
             // At the clip's start the still takes its transition and entrance; at its end it comes right after it, with its exit.
-            into < s.outputDurationMs / 2 -> listOf(still.copy(transition = s.transition, animIn = s.animIn), s.copy(transition = Transition(), animIn = ClipAnimation()))
-            else -> listOf(s.copy(animOut = ClipAnimation()), still.copy(animOut = s.animOut))
+            into < s.outputDurationMs / 2 -> listOf(still.copy(transition = s.transition, animIn = s.animIn), s.copy(transition = Transition(), animIn = ClipAnimation())) to 0
+            else -> listOf(s.copy(animOut = ClipAnimation()), still.copy(animOut = s.animOut)) to 1
         }
         updateClip { copy(segments = segments.take(i) + parts + segments.drop(i + 1)) }
-        selectClip(i + parts.indexOf(still))
+        selectClip(i + at0)
         loadFilmstrip(dir, still)
     }
 
-    /** Saves the frame under the playhead ([atMs], output time), as its clip has it (no layers), to the gallery as a JPEG. */
+    /**
+     * Saves the frame under the playhead ([atMs], output time), as its clip has it (crop, turn, look; no layers or blur areas),
+     * to the gallery as a JPEG.
+     */
     fun saveFrame(atMs: Long) = work(R.string.busy_saving_frame) {
         val v = _uiState.value.project?.video ?: return@work
         val (i, into) = v.segmentAt(atMs)
         val s = v.segments[i]
         if (s.isImage) return@work
         val bitmap = clipStill(s, sourceMs(s.startMs, s.speed, into).coerceIn(s.startMs, s.endMs), Int.MAX_VALUE)
-        val uri = withContext(Dispatchers.IO) { saveToGallery(app, "image/jpeg") { s.shaped(bitmap).compress(Bitmap.CompressFormat.JPEG, 95, it) } }
+        val uri = withContext(Dispatchers.IO) { saveToGallery(app, "image/jpeg") { s.adjust.appliedTo(s.shaped(bitmap)).compress(Bitmap.CompressFormat.JPEG, 95, it) } }
         _effects.send(EditorEffect.Saved(uri, "image/jpeg", share = false))
     }
 

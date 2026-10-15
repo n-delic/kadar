@@ -316,7 +316,8 @@ fun VideoClip.composition(
     }
     val overlay = groups.last().takeIf { it.isNotEmpty() }?.let { timedOverlay(w, h, it, outputDurationMs) }
     val played = this.played
-    val frame = looks?.frameEffects() ?: frameEffects(placement, barFill(background), censors)
+    val colorDipSpans = spans.filter { it.kind == TransitionKind.Black || it.kind == TransitionKind.White }
+    val frame = looks?.frameEffects(colorDipSpans) ?: frameEffects(placement, barFill(background), censors, colorDipSpans)
     overlapping?.let { o ->
         val tails = headTailsMs(o)
         val fps = outputFrameRate(frameRate)
@@ -771,10 +772,13 @@ private fun shapeEffects(s: Segment) = listOfNotNull(
     } else null,
 )
 
-/** The clips' [placement] (a transformation after the fit, which Media3 draws in the same pass), then the bars' [fill], then the blur areas. */
-private fun frameEffects(placement: ClipPlacement, fill: Int?, censors: List<CensorLayer>) = listOfNotNull(
+/**
+ * The clips' [placement] (a transformation after the fit, which Media3 draws in the same pass), then the bars' [fill], dipped
+ * with the clips through the Black and White transitions [dips], then the blur areas.
+ */
+private fun frameEffects(placement: ClipPlacement, fill: Int?, censors: List<CensorLayer>, dips: List<TransitionSpan>) = listOfNotNull(
     placement.takeUnless { it.isFit }?.let { p -> MatrixTransformation { p.matrix() } },
-    fill?.let { c -> BarFill { c } },
+    fill?.let { c -> BarFill { us -> dipped(c, colorDips(dips, us / 1000)) } },
     censors.takeIf { it.isNotEmpty() }?.let { c -> Censor { c } },
 )
 
@@ -826,7 +830,7 @@ class LiveLooks {
      * Like the export's placement, bars and blur areas, but always there, so a new placement, color or blur area comes in
      * live; see-through pixels (a fading clip over the blurred canvas) come out premultiplied, as the preview's view blends them.
      */
-    fun frameEffects() = listOf(MatrixTransformation { placement.matrix() }, BarFill(premultiplied = true) { fill }, Censor { censors })
+    fun frameEffects(dips: List<TransitionSpan>) = listOf(MatrixTransformation { placement.matrix() }, BarFill(premultiplied = true) { us -> dipped(fill, colorDips(dips, us / 1000)) }, Censor { censors })
 }
 
 private val NO_LOOK = glRgbMatrix(Adjust().filterMatrix())

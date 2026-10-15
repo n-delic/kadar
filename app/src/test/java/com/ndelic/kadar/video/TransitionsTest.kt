@@ -146,4 +146,15 @@ class TransitionsTest {
         assertEquals(0.5f, colorDips(spans, 1250).first, 0.001f)
         assertEquals(0f to 1f, colorDips(spans, 5500))
     }
+
+    @Test
+    fun barsDipLikeTheClip() {
+        val red = 0xFFFF0000.toInt()
+        assertEquals(red, dipped(red, 0f to 0f))
+        assertEquals(0xFF000000.toInt(), dipped(red, 1f to 0f))
+        assertEquals(0xFFFFFFFF.toInt(), dipped(red, 0f to 1f))
+        assertEquals(0x80, dipped(red, 0.5f to 0f) shr 16 and 0xFF)
+        // A see-through fill (the blurred canvas) keeps its alpha of 0.
+        assertEquals(0, dipped(0, 1f to 0f) ushr 24)
+    }
 }

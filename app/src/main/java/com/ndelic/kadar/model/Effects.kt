@@ -68,7 +68,8 @@ fun effected(picture: Bitmap, effect: Effect): Bitmap {
     if (effect.kind == EffectKind.None || effect.kind == EffectKind.Duotone || effect.amount <= 0f) return picture
     return synchronized(done) {
         val built = done.getOrPut(picture) { LinkedHashMap() }
-        built.getOrPut(effect) { build(picture, effect) }.also { if (built.size > 2) built.remove(built.keys.first()) }
+        // A result that is the picture itself isn't kept: a WeakHashMap value pointing at its own key never lets it go.
+        built[effect] ?: build(picture, effect).also { if (it !== picture) built[effect] = it; if (built.size > 2) built.remove(built.keys.first()) }
     }
 }
 

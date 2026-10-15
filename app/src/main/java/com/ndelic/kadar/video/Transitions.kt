@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import com.ndelic.kadar.R
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -95,6 +96,18 @@ fun headTailsMs(spans: List<TransitionSpan>, tailMs: Long = HEAD_TAIL_MS) =
 
 /** How far into the cut a centered transition is at [p] (0 to 1 through it): 0 at its ends, 1 at the cut. */
 fun dipAt(p: Float) = 1 - abs(1 - 2 * p)
+
+/**
+ * [color] at a point [dips] (how far into a Black and a White transition, from [colorDips]) the way the clip's color dip
+ * changes the picture, alpha kept: the bars around the clips dip with them.
+ */
+fun dipped(color: Int, dips: Pair<Float, Float>): Int {
+    val (black, white) = dips
+    val q = maxOf(black, white)
+    if (q == 0f) return color
+    fun channel(shift: Int) = ((color shr shift and 0xFF) * (1 - q) + if (white > 0f) 255 * q else 0f).roundToInt().coerceIn(0, 255) shl shift
+    return (color and 0xFF000000.toInt()) or channel(16) or channel(8) or channel(0)
+}
 
 /** How far into a Black and a White transition among [spans] output time [ms] is, each 0 outside it and 1 at its cut. */
 fun colorDips(spans: List<TransitionSpan>, ms: Long): Pair<Float, Float> {

@@ -205,6 +205,7 @@
     <string name="bubble_shout">Shout</string>
     <string name="bubble_pill">Pill</string>
     <string name="bubble_double">Double</string>
+    <string name="gradient">Gradient</string>
     <string name="fill">Fill</string>
     <string name="outline">Outline</string>
     <string name="outline_width">Width</string>

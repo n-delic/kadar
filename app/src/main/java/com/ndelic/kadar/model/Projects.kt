@@ -234,6 +234,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                 align = runCatching { TextAlign.valueOf(j.optString("align")) }.getOrDefault(TextAlign.Center),
                 glow = if (j.has("glow")) j.getInt("glow") else null,
                 glowSize = j.optDouble("glowSize", 0.5).toFloat(),
+                gradient = if (j.has("gradient")) j.getInt("gradient") else null,
                 opacity = j.optDouble("opacity", 1.0).toFloat(),
                 lineSpacing = j.optDouble("lineSpacing", 1.0).toFloat(),
                 wrap = if (j.has("wrap")) j.getDouble("wrap").toFloat() else null,
@@ -441,6 +442,7 @@ private fun Layer.toJson() = JSONObject().apply {
             put("spacing", layer.spacing.toDouble())
             put("align", layer.align.name)
             layer.glow?.let { put("glow", it) }
+            layer.gradient?.let { put("gradient", it) }
             put("glowSize", layer.glowSize.toDouble())
             put("opacity", layer.opacity.toDouble())
             put("lineSpacing", layer.lineSpacing.toDouble())

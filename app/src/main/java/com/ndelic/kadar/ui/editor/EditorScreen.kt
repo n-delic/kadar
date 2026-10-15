@@ -390,7 +390,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         Panel.Presets -> if (selected is TextLayer) TextPresetsPanel(state.fonts, vm)
                         Panel.Font -> (selected as? TextLayer)?.let { FontPanel(it, state.fonts, defaultTextSize(project.width, project.height), vm) }
                         Panel.Glow -> (selected as? TextLayer)?.let { GlowPanel(it, vm) }
-                        Panel.Color -> (selected as? TextLayer)?.let { t -> ColorRow(t.color, allowNone = false) { c -> c?.let { vm.editText { copy(color = it) } } } }
+                        Panel.Color -> (selected as? TextLayer)?.let { TextColorPanel(it, vm) }
                         Panel.Stroke -> (selected as? TextLayer)?.let { OutlinePanel(it, vm) }
                         Panel.Shadow -> (selected as? TextLayer)?.let { ShadowPanel(it, vm) }
                         Panel.Box -> (selected as? TextLayer)?.let { BubblePanel(it, vm) }

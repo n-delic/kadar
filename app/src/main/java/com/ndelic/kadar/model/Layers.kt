@@ -5,9 +5,11 @@ import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.DashPathEffect
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.icu.text.BreakIterator
 import android.net.Uri
@@ -388,6 +390,8 @@ data class TextLayer(
     val align: TextAlign = TextAlign.Center,
     /** Glow color around the letters, or null for none; [glowSize] (0 to 1) is how far it spreads. */
     val glow: Int? = null,
+    /** The color the letters fade into from [color] at the top to this at the bottom, or null for one color. */
+    val gradient: Int? = null,
     val glowSize: Float = 0.5f,
     /** 0 to 1, the whole layer (box included). */
     val opacity: Float = 1f,
@@ -524,7 +528,9 @@ data class TextLayer(
         }
         paint.style = Paint.Style.FILL
         paint.color = color
+        if (gradient != null) paint.shader = LinearGradient(0f, 0f, 0f, layout.height.toFloat(), color, gradient, Shader.TileMode.CLAMP)
         draw()
+        paint.shader = null
         paint.clearShadowLayer()
         canvas.restoreToCount(count)
     }

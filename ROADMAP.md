@@ -152,7 +152,8 @@ Feature parity with the big phone editors, built from how their features behave,
 - [ ] Green screen: remove a picked color from a video layer, with strength and edge-shadow sliders
 - [ ] Video layers: blend modes (multiply, screen, overlay, darken, lighten) and shaped masks (linear, radial, rectangle, heart, star) with a soft edge
 - [ ] More transitions: spin, flip, glitch, color split
-- [ ] Precut: cut out the middle of a clip, and step one frame back or forward while trimming
+- [x] Step one frame back or forward while trimming
+- [ ] Precut: cut out the middle of a clip
 - [x] Mute a clip in one tap
 - [ ] The preview stalls at the start when the first clip is faster than 5x (on the emulator; on a G7 ThinQ the picture runs about 0.5 s behind the clock for a 6x first clip, then catches up; the export is right). Find the cause in CompositionPlayer
 - [ ] Overlay clips with long frame gaps (screen recordings that only emit frames when the screen changes) make Media3's compositor draw a stretched copy of the overlay over the main clip during the gap. Constant-frame-rate clips (phone camera) are fine. Fix idea: re-time such overlays to a constant rate before compositing

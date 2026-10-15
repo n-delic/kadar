@@ -90,6 +90,7 @@ import com.ndelic.kadar.model.Layer
 import com.ndelic.kadar.model.ShapeLayer
 import com.ndelic.kadar.model.TextLayer
 import com.ndelic.kadar.model.VideoLayer
+import com.ndelic.kadar.ui.common.CircleButton
 import com.ndelic.kadar.ui.common.Ink
 import com.ndelic.kadar.ui.common.KIcon
 import com.ndelic.kadar.ui.common.PanelLabel
@@ -113,7 +114,7 @@ import kotlin.math.roundToInt
  * works in output time (after trim and speed, the clip starting at [offsetMs]), so seeking converts between the two.
  */
 @Composable
-fun TrimStrip(clip: Segment, offsetMs: Long, frames: List<Bitmap>, positionMs: Long, onSeek: (Long) -> Unit, onTrim: (Long, Long) -> Unit, onDone: () -> Unit) {
+fun TrimStrip(clip: Segment, offsetMs: Long, frameMs: Long, frames: List<Bitmap>, positionMs: Long, onSeek: (Long) -> Unit, onTrim: (Long, Long) -> Unit, onDone: () -> Unit) {
     var start by remember(clip.startMs) { mutableLongStateOf(clip.startMs) }
     var end by remember(clip.endMs) { mutableLongStateOf(clip.endMs) }
     val clipState by rememberUpdatedState(clip)
@@ -121,6 +122,12 @@ fun TrimStrip(clip: Segment, offsetMs: Long, frames: List<Bitmap>, positionMs: L
         Row(Modifier.fillMaxWidth().padding(start = TIMELINE_PAD, end = 16.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             PanelLabel(stringResource(R.string.tool_trim))
             Spacer(Modifier.weight(1f))
+            // One frame back or forward, within the kept part, to set a cut exactly.
+            fun step(by: Long) = onSeek((positionMs + by).coerceIn(offsetMs, offsetMs + outputMs(start, end, clip.speed) - 1))
+            CircleButton(R.drawable.ic_chevron_left, stringResource(R.string.previous_frame)) { step(-frameMs) }
+            Spacer(Modifier.size(8.dp))
+            CircleButton(R.drawable.ic_chevron_right, stringResource(R.string.next_frame)) { step(frameMs) }
+            Spacer(Modifier.size(8.dp))
             Text(stringResource(R.string.done), color = Ink.accent, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onDone).padding(8.dp))
         }
         // Full width, so the handles in the padding still get touches, and those touches aren't taken by the

@@ -15,6 +15,8 @@
     <string name="busy_saving_frame">Snimam kadar</string>
     <string name="tool_replace">Zamijeni</string>
     <string name="tool_color_clip">Klip boje</string>
+    <string name="previous_frame">Prethodni kadar</string>
+    <string name="next_frame">Sljedeći kadar</string>
     <string name="duplicate">Dupliraj</string>
     <string name="edit">Uredi</string>
     <string name="save">Spremi</string>

@@ -639,6 +639,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                 TrimStrip(
                     clip = segment,
                     offsetMs = video.segmentStart(i),
+                    frameMs = 1000L / outputFrameRate(video.frameRate),
                     frames = state.filmstrip[segment.uri].orEmpty(),
                     positionMs = positionMs,
                     onSeek = { currentPlayer?.seekTo(it) },

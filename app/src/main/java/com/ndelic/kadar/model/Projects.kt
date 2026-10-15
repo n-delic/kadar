@@ -17,6 +17,7 @@ import com.ndelic.kadar.video.Transition
 import com.ndelic.kadar.video.TransitionKind
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.VoiceClip
+import com.ndelic.kadar.video.VoiceEffect
 import java.io.File
 import java.security.MessageDigest
 import java.io.OutputStream
@@ -132,6 +133,9 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
     /** A new, not yet existing file in the project folder for a voice recording (AAC in MP4, so `.m4a`). */
     fun newVoiceFile(dir: File) = File(dir, "${System.nanoTime()}$VOICE_EXTENSION")
 
+    /** The same for text to speech, which the engine writes as WAV. */
+    fun newSpeechFile(dir: File) = File(dir, "${System.nanoTime()}$SPEECH_EXTENSION")
+
     /** Where the preview copy of the video at [uri] goes in the project folder (see `needsPreviewCopy`). */
     fun previewCopyFile(dir: File, uri: Uri): File {
         val hash = MessageDigest.getInstance("SHA-1").digest(uri.toString().toByteArray()).joinToString("") { "%02x".format(it) }
@@ -145,7 +149,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
             project.video?.segments.orEmpty().filter { it.isImage }.map { File(it.uri.path!!).name } +
             project.video?.segments.orEmpty().filter { !it.isImage }.map { previewCopyFile(dir, it.uri).name } + THUMB
         dir.listFiles().orEmpty()
-            .filter { (it.name.endsWith(".png") || it.name.endsWith(".jpg") || it.name.endsWith(VOICE_EXTENSION) || it.name.startsWith(PREVIEW_COPY_PREFIX)) && it.name !in used }
+            .filter { (it.name.endsWith(".png") || it.name.endsWith(".jpg") || it.name.endsWith(VOICE_EXTENSION) || it.name.endsWith(SPEECH_EXTENSION) || it.name.startsWith(PREVIEW_COPY_PREFIX)) && it.name !in used }
             .forEach { it.delete() }
     }
 
@@ -359,7 +363,9 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
             (0 until a.length()).mapNotNull { i ->
                 val v = a.getJSONObject(i)
                 val durationMs = v.getLong("durationMs")
-                File(dir, v.getString("file")).takeIf { it.exists() }?.let { VoiceClip(it, durationMs, audioPartFromJson(v, v.getLong("startMs"), durationMs)) }
+                File(dir, v.getString("file")).takeIf { it.exists() }?.let {
+                    VoiceClip(it, durationMs, audioPartFromJson(v, v.getLong("startMs"), durationMs), enumOr(v.optString("effect"), VoiceEffect.Normal))
+                }
             }
         }.orEmpty(),
     )
@@ -404,6 +410,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
         const val PROJECT = "project.json"
         const val THUMB = "thumb.jpg"
         const val VOICE_EXTENSION = ".m4a"
+        const val SPEECH_EXTENSION = ".wav"
         const val PREVIEW_COPY_PREFIX = "preview_"
     }
 }
@@ -610,6 +617,7 @@ private fun VideoClip.toJson() = JSONObject().apply {
             put("file", v.file.name)
             put("startMs", v.part.atMs)
             put("durationMs", v.durationMs)
+            if (v.effect != VoiceEffect.Normal) put("effect", v.effect.name)
             putAudioPart(v.part)
         }
     }))

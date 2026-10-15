@@ -71,8 +71,11 @@ import kotlinx.coroutines.launch
 /** A song on its own track: [part] says where it plays. It loops from [startMs] into the song to the song's end. */
 data class Music(val uri: Uri, val name: String, val durationMs: Long, val startMs: Long = 0, val part: AudioPart = AudioPart())
 
-/** A voiceover recorded in the editor: an audio [file] in the project folder [durationMs] long, played as [part] says. */
-data class VoiceClip(val file: File, val durationMs: Long, val part: AudioPart)
+/**
+ * A voiceover recorded or spoken (text to speech) in the editor: an audio [file] in the project folder [durationMs] long,
+ * played as [part] says, through [effect].
+ */
+data class VoiceClip(val file: File, val durationMs: Long, val part: AudioPart, val effect: VoiceEffect = VoiceEffect.Normal)
 
 /**
  * One clip of the main track: [startMs]..[endMs] of its source (source time) played at [speed]. A photo ([isImage],
@@ -333,7 +336,7 @@ fun VideoClip.composition(
     }
     // Audio only, after every video sequence, so the compositor's input numbers above stay as they are.
     sequences += music.flatMapIndexed { i, m -> audioSequences(m.uri, m.startMs, m.durationMs, m.part, outputDurationMs, volumes?.music(i) ?: { m.part.volume }) }
-    sequences += voices.flatMapIndexed { i, v -> audioSequences(Uri.fromFile(v.file), 0, v.durationMs, v.part, outputDurationMs, volumes?.voice(i) ?: { v.part.volume }) }
+    sequences += voices.flatMapIndexed { i, v -> audioSequences(Uri.fromFile(v.file), 0, v.durationMs, v.part, outputDurationMs, volumes?.voice(i) ?: { v.part.volume }, v.effect) }
     return Composition.Builder(sequences)
         // Downscale after the overlay: the layers are rendered at full canvas size and must line up first.
         .setEffects(
@@ -472,11 +475,11 @@ private const val BLANK_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAI
 
 /**
  * Audio [part] of a source [durationMs] long that loops from [loopFromMs] to its end, cut at [totalMs], at [volume] (the
- * part's own or a live one): one sequence per repeat, a gap until it plays, that stretch of the source, then a gap to
- * [totalMs]. Not a looping sequence: that restarts its item's clock on every repeat, and the fades need to know where in
- * the output each repeat plays.
+ * part's own or a live one), through [effect] (a picture is left out, so a video's sound plays as a song): one sequence
+ * per repeat, a gap until it plays, that stretch of the source, then a gap to [totalMs]. Not a looping sequence: that
+ * restarts its item's clock on every repeat, and the fades need to know where in the output each repeat plays.
  */
-private fun audioSequences(uri: Uri, loopFromMs: Long, durationMs: Long, part: AudioPart, totalMs: Long, volume: () -> Float): List<EditedMediaItemSequence> {
+private fun audioSequences(uri: Uri, loopFromMs: Long, durationMs: Long, part: AudioPart, totalMs: Long, volume: () -> Float, effect: VoiceEffect = VoiceEffect.Normal): List<EditedMediaItemSequence> {
     val from = part.atMs
     val to = part.endMs(totalMs)
     val loopMs = durationMs - loopFromMs
@@ -493,7 +496,8 @@ private fun audioSequences(uri: Uri, loopFromMs: Long, durationMs: Long, part: A
         val sourceTo = if (r.loopMs + r.toMs - r.fromMs < loopMs) sourceFrom + r.toMs - r.fromMs else C.TIME_END_OF_SOURCE
         val item = EditedMediaItem.Builder(clipped(uri, sourceFrom, sourceTo))
             .setDurationUs(durationMs * 1000)
-            .setEffects(Effects(listOf(GainProcessor(VolumeGain(fades.build(), volume))), emptyList()))
+            .setRemoveVideo(true)
+            .setEffects(Effects(listOf(GainProcessor(VolumeGain(fades.build(), volume))) + effect.processors(), emptyList()))
             .build()
         EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO))
             .apply { if (r.fromMs > 0) addGap(r.fromMs * 1000) }

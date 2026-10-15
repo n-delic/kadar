@@ -2,6 +2,7 @@ package com.ndelic.kadar.ui.editor
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -82,6 +83,7 @@ import com.ndelic.kadar.video.AudioRef
 import com.ndelic.kadar.video.ClipPlacement
 import com.ndelic.kadar.video.MAX_FADE_MS
 import com.ndelic.kadar.video.VideoClip
+import com.ndelic.kadar.video.VoiceEffect
 import com.ndelic.kadar.video.audioPart
 import com.ndelic.kadar.video.speedAt
 import com.ndelic.kadar.video.speedPosition
@@ -377,18 +379,30 @@ fun SmallIcon(icon: Int, description: String, onClick: () -> Unit) {
 }
 
 /**
- * The selected music or voiceover track's [audio] settings; with none selected, clip [index]'s sound, adding music and
- * recording a voiceover. A volume slider's drag goes to [onDrag] as the clip would sound; the release commits it.
+ * The selected music or voiceover track's [audio] settings; with none selected, clip [index]'s sound, adding music or a
+ * video's sound and recording a voiceover. A volume slider's drag goes to [onDrag] as the clip would sound; the release
+ * commits it.
  */
 @Composable
-fun AudioPanel(clip: VideoClip, index: Int, audio: AudioRef?, vm: EditorViewModel, onAddMusic: () -> Unit, onDrag: (VideoClip) -> Unit, voiceover: @Composable () -> Unit) {
+fun AudioPanel(
+    clip: VideoClip,
+    index: Int,
+    audio: AudioRef?,
+    vm: EditorViewModel,
+    onAddMusic: () -> Unit,
+    onAddVideoSound: () -> Unit,
+    onDrag: (VideoClip) -> Unit,
+    voiceover: @Composable () -> Unit,
+) {
     // Scrolls if it gets taller than the others, so the stage keeps its room.
     Column(Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val part = audio?.let { clip.audioPart(it) }
         if (audio != null && part != null) {
             PanelLabel(stringResource(if (audio.voice) R.string.voiceover else R.string.music))
             KSlider(R.drawable.ic_volume_up, part.volume, 0f..1f, ::percent, onDrag = { v -> onDrag(clip.withAudio(audio) { listOf(it.copy(volume = v)) }) }) { v -> vm.editAudio { copy(volume = v) } }
-            if (!audio.voice) {
+            if (audio.voice) {
+                TextTabs(VoiceEffect.entries, clip.voices[audio.index].effect, label = { stringResource(it.label) }, onSelect = vm::setVoiceEffect)
+            } else {
                 val music = clip.music[audio.index]
                 // Leave at least a second of song, so a repeat is never empty.
                 KSlider(R.drawable.ic_play_arrow, music.startMs.toFloat(), 0f..maxOf(0f, music.durationMs - 1000f), { formatMs(it.toLong()) }) { v -> vm.setSongStart(v.toLong()) }
@@ -411,16 +425,23 @@ fun AudioPanel(clip: VideoClip, index: Int, audio: AudioRef?, vm: EditorViewMode
         val onClipDrag = { v: Float -> onDrag(clip.copy(segments = clip.segments.mapIndexed { i, s -> if (i == index) s.copy(volume = v) else s })) }
         KSlider(R.drawable.ic_volume_up, clip.segments[index].volume, 0f..1f, ::percent, onDrag = onClipDrag) { v -> vm.updateSegment(index) { copy(volume = v) } }
         PanelLabel(stringResource(R.string.music))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onAddMusic).padding(vertical = 8.dp, horizontal = 4.dp),
-        ) {
-            KIcon(R.drawable.ic_add, Modifier.size(22.dp), Ink.accent)
-            Spacer(Modifier.size(8.dp))
-            Text(stringResource(R.string.music_add), color = Ink.accent, fontWeight = FontWeight.SemiBold)
-        }
+        ActionRow(R.drawable.ic_add, stringResource(R.string.music_add), onAddMusic)
+        ActionRow(R.drawable.ic_movie, stringResource(R.string.video_sound_add), onAddVideoSound)
         voiceover()
         if (clip.music.isNotEmpty() || clip.voices.isNotEmpty()) Text(stringResource(R.string.audio_hint), color = Ink.dim, fontSize = 12.sp)
+    }
+}
+
+/** A tappable line of the Audio panel: an accent [icon] and [text]. */
+@Composable
+fun ActionRow(@DrawableRes icon: Int, text: String, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).padding(vertical = 8.dp, horizontal = 4.dp),
+    ) {
+        KIcon(icon, Modifier.size(22.dp), Ink.accent)
+        Spacer(Modifier.size(8.dp))
+        Text(text, color = Ink.accent, fontWeight = FontWeight.SemiBold)
     }
 }
 

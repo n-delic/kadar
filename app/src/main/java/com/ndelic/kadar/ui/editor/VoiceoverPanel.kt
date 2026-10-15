@@ -2,6 +2,7 @@ package com.ndelic.kadar.ui.editor
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.speech.tts.Voice
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.compose.foundation.clickable
@@ -38,12 +39,14 @@ import kotlinx.coroutines.delay
 
 /**
  * Voiceover part of the Audio panel: record from the playhead while the preview plays (muted, so the speaker isn't
- * recorded too). Each recording gets a track of its own on the timeline.
+ * recorded too), or have a typed text spoken there by one of the phone's offline [speechVoices] (the dialog's, while
+ * it's open). Each recording gets a track of its own on the timeline.
  */
 @Composable
 fun VoiceoverSection(
     clip: VideoClip,
     recordingFromMs: Long?,
+    speechVoices: List<Voice>?,
     positionMs: Long,
     playing: Boolean,
     player: Player?,
@@ -98,4 +101,6 @@ fun VoiceoverSection(
         )
     }
     Text(stringResource(if (denied) R.string.voice_permission_denied else R.string.voice_hint), color = Ink.dim, fontSize = 12.sp)
+    if (!recording) ActionRow(R.drawable.ic_text_fields, stringResource(R.string.speech), vm::openSpeech)
+    speechVoices?.let { SpeechDialog(it, onAdd = { text, voice -> vm.addSpeech(text, voice, positionMs) }, onDismiss = vm::closeSpeech) }
 }

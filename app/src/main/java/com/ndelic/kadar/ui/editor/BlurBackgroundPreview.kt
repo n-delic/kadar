@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.SystemClock
 import android.view.TextureView
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.wrapContentSize
@@ -115,24 +116,27 @@ fun BlurBackgroundPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canva
             RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(m)),
         ).asComposeRenderEffect()
     }
-    val placed = Modifier.fillMaxSize().wrapContentSize(Alignment.Center, unbounded = true).requiredSize(size)
-    key(player) {
-        AndroidView(
-            factory = { TextureView(it).also(player::setVideoTextureView) },
-            modifier = placed.graphicsLayer {
-                renderEffect = effect
-                alpha = if (s.isImage) 0f else 1f
-                scaleX = BLUR_DOWNSCALE
-                scaleY = BLUR_DOWNSCALE
-            },
-        )
+    // Clipped to the canvas before the blur, like the export, which crops and then blurs: colors from past the canvas's
+    // edges would otherwise bleed into the bars.
+    val canvasSize = with(LocalDensity.current) { DpSize((canvasWidth * scale / BLUR_DOWNSCALE).toDp(), (canvasHeight * scale / BLUR_DOWNSCALE).toDp()) }
+    Box(
+        Modifier.fillMaxSize().wrapContentSize(Alignment.Center, unbounded = true).requiredSize(canvasSize).graphicsLayer {
+            renderEffect = effect
+            scaleX = BLUR_DOWNSCALE
+            scaleY = BLUR_DOWNSCALE
+            this.clip = true
+        },
+    ) {
+        val placed = Modifier.fillMaxSize().wrapContentSize(Alignment.Center, unbounded = true).requiredSize(size)
+        key(player) {
+            AndroidView(
+                factory = { TextureView(it).also(player::setVideoTextureView) },
+                modifier = placed.graphicsLayer { alpha = if (s.isImage) 0f else 1f },
+            )
+        }
+        val still = remember(s.isImage, stills[s.uri]) { stills[s.uri]?.firstOrNull()?.takeIf { s.isImage }?.asImageBitmap() }
+        still?.let { Image(it, null, placed, contentScale = ContentScale.FillBounds) }
     }
-    val still = remember(s.isImage, stills[s.uri]) { stills[s.uri]?.firstOrNull()?.takeIf { s.isImage }?.asImageBitmap() }
-    still?.let { Image(it, null, placed.graphicsLayer {
-        renderEffect = effect
-        scaleX = BLUR_DOWNSCALE
-        scaleY = BLUR_DOWNSCALE
-    }, contentScale = ContentScale.FillBounds) }
 }
 
 private const val BLUR_SHARE = BLUR_SIGMA / 320

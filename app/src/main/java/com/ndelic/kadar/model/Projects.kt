@@ -412,7 +412,10 @@ private fun Project.toJson() = JSONObject().apply {
     // 2: the video's clips are a list ("clips"); version 1 had the one clip's fields on the video.
     // 3: music is a list of parts ("music" an array), music and voices have offsets, lengths and fade lengths.
     // 4: "photoId", the photo the project was opened with (absent before: no layer crops the canvas).
-    put("version", 4)
+    // 5: "censor" layers (blur areas); optional fields: text curve and gradient, layer stretch, image outline, effect and
+    // blend, pen styles, adjust vignette and grain, video layer key, clip crop, flips, turns and animations, the video
+    // canvas's blur strength and clip placement. All read with defaults, so a version 4 file reads the same as before.
+    put("version", 5)
     put("width", width)
     put("height", height)
     put("originalHeight", originalHeight)

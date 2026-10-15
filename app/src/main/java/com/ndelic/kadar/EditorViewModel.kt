@@ -191,6 +191,8 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     /** One preview copy at a time: each is a Transformer run with a hardware decoder and encoder. */
     private val copyLock = Mutex()
     private var videoFrame: Bitmap? = null
+    /** The clip and source time [videoFrame] shows; when the first clip is another one, the thumbnail reads it again. */
+    private var videoFrameOf: Pair<Uri, Long>? = null
     /** What's on disk for the open project, so just opening one doesn't rewrite it (and bump it to the top). */
     private var lastSaved: Project? = null
     private var nextId = 1L
@@ -322,6 +324,8 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     private fun open(dir: File, project: Project, frame: Bitmap? = null, saved: Boolean = false) {
         videoFrame = frame
+        // Read at the first clip's start, whether new (0) or reopened.
+        videoFrameOf = project.video?.segments?.firstOrNull()?.let { it.uri to it.startMs }
         lastSaved = if (saved) project else null
         nextId = (project.layers.maxOfOrNull { it.id } ?: 0) + 1
         undoStack.clear()
@@ -382,8 +386,13 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** True when the project is on disk. */
     private suspend fun save(dir: File, project: Project): Boolean {
-        // The first clip as it shows now: it may have been cropped or turned since the frame was read.
-        val frame = videoFrame?.let { f -> project.video?.segments?.first()?.shaped(f) ?: f }
+        // The first clip as it shows now: it may have been replaced, moved, trimmed, cropped or turned since the frame was read.
+        val first = project.video?.segments?.firstOrNull()
+        if (first != null && first.uri to first.startMs != videoFrameOf) {
+            videoFrame = withContext(Dispatchers.IO) { segmentFrame(first, first.startMs) }
+            videoFrameOf = first.uri to first.startMs
+        }
+        val frame = videoFrame?.let { f -> first?.shaped(f) ?: f }
         val thumb = renderLayers(project.width, project.height, project.background, project.layers, THUMB_SIZE / max(project.width, project.height), frame, project.backdrop(), frame?.let { project.video?.frameRect(it.width, it.height) })
         try {
             saveLock.withLock { withContext(Dispatchers.IO) { store.save(dir, project, thumb) } }

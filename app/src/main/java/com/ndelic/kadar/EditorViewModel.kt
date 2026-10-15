@@ -764,7 +764,36 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     /** Adds a video, or a photo as a still of [PHOTO_CLIP_MS], after the last clip and picks it. */
     fun addClip(uri: Uri) = work(R.string.busy_adding_clip) {
         val dir = _uiState.value.projectDir ?: return@work
-        val segment = if (app.contentResolver.getType(uri)?.startsWith("image/") == true) {
+        val segment = newSegment(dir, uri)
+        updateClip { copy(segments = segments + segment) }
+        _uiState.value.project?.video?.let { selectClip(it.segments.lastIndex) }
+        loadFilmstrip(dir, segment)
+        loadPreviewCopy(dir, segment)
+    }
+
+    /**
+     * Puts the video or photo at [uri] in clip [index]'s place, keeping its length (as far as the new one goes), speed,
+     * volume, look and transition.
+     */
+    fun replaceClip(index: Int, uri: Uri) = work(R.string.busy_adding_clip) {
+        val dir = _uiState.value.projectDir ?: return@work
+        val old = _uiState.value.project?.video?.segments?.getOrNull(index) ?: return@work
+        val new = newSegment(dir, uri)
+        val length = old.outputDurationMs
+        val segment = if (new.isImage) {
+            new.copy(endMs = length.coerceAtMost(MAX_PHOTO_CLIP_MS), volume = old.volume, adjust = old.adjust, transition = old.transition)
+        } else {
+            val speed = if (old.isImage) 1f else old.speed
+            new.copy(endMs = minOf(new.durationMs, (length * speed).toLong()), speed = speed, volume = old.volume, keepPitch = old.keepPitch, adjust = old.adjust, transition = old.transition)
+        }
+        updateSegment(index) { segment }
+        loadFilmstrip(dir, segment)
+        loadPreviewCopy(dir, segment)
+    }
+
+    /** A clip of the video at [uri], whole, or of the photo there as a still of [PHOTO_CLIP_MS], copied into [dir]. */
+    private suspend fun newSegment(dir: File, uri: Uri): Segment =
+        if (app.contentResolver.getType(uri)?.startsWith("image/") == true) {
             // Copied into the project like image layers, decoded upright and at a size the encoder takes.
             val bitmap = withContext(Dispatchers.IO) { loadBitmap(app, uri, MAX_PHOTO) }
             val file = withContext(Dispatchers.IO) { store.writeImage(dir, bitmap) }
@@ -775,11 +804,6 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             if (info.width == 0 || info.durationMs == 0L) throw UserError(R.string.error_read_video)
             Segment(uri, info.durationMs, info.width, info.height)
         }
-        updateClip { copy(segments = segments + segment) }
-        _uiState.value.project?.video?.let { selectClip(it.segments.lastIndex) }
-        loadFilmstrip(dir, segment)
-        loadPreviewCopy(dir, segment)
-    }
 
     /** Cuts the clip under the playhead ([atMs], output time) in two there; a message when too close to its ends. */
     fun splitClip(atMs: Long) {

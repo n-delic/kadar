@@ -139,7 +139,7 @@ Feature parity with the big phone editors, built from how their features behave,
 
 ### Video
 
-- [ ] Replace a clip with another video or photo, keeping its place and settings
+- [x] Replace a clip with another video or photo, keeping its place and settings
 - [x] Clip tools: freeze frame, capture the frame as a photo
 - [ ] Clip tools: reverse, rotate and flip, crop the main clip, a blank color clip
 - [ ] Canvas: 1:2; zoom and move the clip inside the canvas; background color, blur strength or an image

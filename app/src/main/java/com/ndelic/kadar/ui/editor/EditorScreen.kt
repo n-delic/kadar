@@ -190,6 +190,9 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     val music = rememberLauncherForActivityResult(OpenDocument()) { it?.let { uri -> vm.addMusic(uri, positionMs) } }
     val overlayVideo = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let { uri -> vm.addVideo(uri, positionMs) } }
     val newClip = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::addClip) }
+    // The clip being replaced, by index, while the picker is open.
+    var replacing by rememberSaveable { mutableStateOf<Int?>(null) }
+    val replacement = rememberLauncherForActivityResult(PickVisualMedia()) { uri -> replacing?.let { i -> uri?.let { vm.replaceClip(i, it) } } }
     // The clip being trimmed, by index.
     var trimming by rememberSaveable { mutableStateOf<Int?>(null) }
     // The clip whose transition in the Transition panel shows, by index.
@@ -569,6 +572,10 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         }
                         IconTool(R.drawable.ic_tune, stringResource(R.string.tool_adjust), panel == Panel.Adjust) { toggle(Panel.Adjust) }
                         IconTool(R.drawable.ic_filter_vintage, stringResource(R.string.tool_filters), panel == Panel.Filters) { toggle(Panel.Filters) }
+                        IconTool(R.drawable.ic_swap_horiz, stringResource(R.string.tool_replace)) {
+                            replacing = clipIndex
+                            replacement.launch(PickVisualMediaRequest(PickVisualMedia.ImageAndVideo))
+                        }
                         IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate)) { vm.duplicateClip(clipIndex) }
                         if (video != null && video.segments.size > 1) IconTool(R.drawable.ic_delete, stringResource(R.string.delete)) { vm.deleteClip(clipIndex) }
                     }

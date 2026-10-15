@@ -157,7 +157,7 @@ data class VideoClip(
     val blurred get() = blur && canvas != null
 
     /** Whether the output has sound: from a clip, the music or a voiceover. */
-    val hasSound get() = hasSound(segments) || music != null || voices.isNotEmpty()
+    val hasSound get() = hasSound(segments) || music.isNotEmpty() || voices.isNotEmpty()
 }
 
 /**

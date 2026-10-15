@@ -275,7 +275,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             val first = v.segments.firstOrNull { !it.isImage } ?: return@withContext p
             p.copy(video = v.copy(frameRate = runCatching { mediaInfo(app, first.uri).frameRate }.getOrDefault(0f)))
         }
-        val frame = project.video?.segments?.first()?.let { s -> withContext(Dispatchers.IO) { segmentFrame(s, s.startMs)?.let { s.shaped(it) } } }
+        val frame = project.video?.segments?.first()?.let { s -> withContext(Dispatchers.IO) { segmentFrame(s, s.startMs) } }
         if (project.video != null && frame == null) _effects.send(EditorEffect.Message(UiText.Res(R.string.error_video_missing)))
         open(dir, project, frame, saved = true)
     }
@@ -377,7 +377,9 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** True when the project is on disk. */
     private suspend fun save(dir: File, project: Project): Boolean {
-        val thumb = renderLayers(project.width, project.height, project.background, project.layers, THUMB_SIZE / max(project.width, project.height), videoFrame, project.backdrop(), videoFrame?.let { project.video?.frameRect(it.width, it.height) })
+        // The first clip as it shows now: it may have been cropped or turned since the frame was read.
+        val frame = videoFrame?.let { f -> project.video?.segments?.first()?.shaped(f) ?: f }
+        val thumb = renderLayers(project.width, project.height, project.background, project.layers, THUMB_SIZE / max(project.width, project.height), frame, project.backdrop(), frame?.let { project.video?.frameRect(it.width, it.height) })
         try {
             saveLock.withLock { withContext(Dispatchers.IO) { store.save(dir, project, thumb) } }
             lastSaved = project

@@ -22,6 +22,25 @@ class ShapesTest {
     }
 
     @Test
+    fun cutShapesFillTheirBox() {
+        for (p in listOf(trianglePoints(100f, 60f), diamondPoints(100f, 60f), heartPoints(100f, 60f))) {
+            assertArrayEquals(floatArrayOf(-50f, -30f, 50f, 30f), polygonBounds(p), 0.001f)
+        }
+    }
+
+    @Test
+    fun heartPointsDownAndHasTwoLobes() {
+        val p = heartPoints(100f, 100f)
+        // The first point (t = 0) is the dip between the lobes, on the middle line, below the top.
+        assertEquals(0f, p[0], 0.001f)
+        assertTrue(p[1] > -50f + 1f)
+        // The lowest point is the tip, in the middle.
+        val tip = (0 until p.size / 2).maxBy { p[2 * it + 1] }
+        assertEquals(0f, p[2 * tip], 0.5f)
+        assertEquals(50f, p[2 * tip + 1], 0.001f)
+    }
+
+    @Test
     fun arrowSpansItsBoxAndPointsRight() {
         val p = arrowPoints(300f, 100f)
         assertArrayEquals(floatArrayOf(-150f, -50f, 150f, 50f), polygonBounds(p), 0.001f)

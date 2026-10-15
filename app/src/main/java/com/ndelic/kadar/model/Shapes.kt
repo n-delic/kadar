@@ -4,6 +4,7 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -24,6 +25,24 @@ fun arrowPoints(w: Float, h: Float): FloatArray {
     val neck = w / 2 - head
     val shaft = h / 6
     return floatArrayOf(-w / 2, -shaft, neck, -shaft, neck, -h / 2, w / 2, 0f, neck, h / 2, neck, shaft, -w / 2, shaft)
+}
+
+/** A triangle filling a [w]×[h] box, pointing up. */
+fun trianglePoints(w: Float, h: Float) = floatArrayOf(0f, -h / 2, w / 2, h / 2, -w / 2, h / 2)
+
+/** A diamond touching the middle of each side of a [w]×[h] box. */
+fun diamondPoints(w: Float, h: Float) = floatArrayOf(0f, -h / 2, w / 2, 0f, 0f, h / 2, -w / 2, 0f)
+
+/** A heart filling a [w]×[h] box, point down: the curve x = 16 sin³t, y = 13 cos t - 5 cos 2t - 2 cos 3t - cos 4t, sampled. */
+fun heartPoints(w: Float, h: Float, steps: Int = 120): FloatArray {
+    val raw = FloatArray(steps * 2) { i ->
+        val t = 2 * PI * (i / 2) / steps
+        if (i % 2 == 0) (16 * sin(t).pow(3)).toFloat() else (-(13 * cos(t) - 5 * cos(2 * t) - 2 * cos(3 * t) - cos(4 * t))).toFloat()
+    }
+    val b = polygonBounds(raw)
+    return FloatArray(raw.size) { i ->
+        if (i % 2 == 0) (raw[i] - b[0]) / (b[2] - b[0]) * w - w / 2 else (raw[i] - b[1]) / (b[3] - b[1]) * h - h / 2
+    }
 }
 
 /**

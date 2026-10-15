@@ -731,6 +731,22 @@ enum class ShapeKind(@StringRes val label: Int) {
     Arrow(R.string.shape_arrow), Star(R.string.shape_star), Line(R.string.shape_line),
 }
 
+/** Shapes the crop tool can cut a picture to; the cut bakes the shape into the picture's alpha, so nothing is stored. */
+enum class CutShape(@StringRes val label: Int) {
+    Circle(R.string.shape_circle), RoundRect(R.string.shape_round_rect), Heart(R.string.shape_heart),
+    Star(R.string.shape_star), Triangle(R.string.shape_triangle), Diamond(R.string.shape_diamond),
+}
+
+/** [shape] filling a [w]×[h] box around the origin; a circle is the ellipse of the box, round at 1:1. */
+fun cutShapePath(shape: CutShape, w: Float, h: Float): Path = when (shape) {
+    CutShape.Circle -> Path().apply { addOval(-w / 2, -h / 2, w / 2, h / 2, Path.Direction.CW) }
+    CutShape.RoundRect -> Path().apply { addRoundRect(-w / 2, -h / 2, w / 2, h / 2, minOf(w, h) * 0.2f, minOf(w, h) * 0.2f, Path.Direction.CW) }
+    CutShape.Heart -> polygon(heartPoints(w, h))
+    CutShape.Star -> polygon(starPoints(w, h))
+    CutShape.Triangle -> polygon(trianglePoints(w, h))
+    CutShape.Diamond -> polygon(diamondPoints(w, h))
+}
+
 /**
  * A [kind] of shape [w]×[h] in its own pixels, with a [fill] and an [outline] [stroke] wide (either null for none) and an
  * [opacity] (0 to 1). A line runs across [w] in the outline color (the fill if it has none); [h] doesn't apply to it.

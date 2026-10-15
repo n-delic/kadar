@@ -45,10 +45,13 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
@@ -64,7 +67,9 @@ import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ndelic.kadar.R
+import com.ndelic.kadar.model.CutShape
 import com.ndelic.kadar.model.ImageLayer
+import com.ndelic.kadar.model.cutShapePath
 import com.ndelic.kadar.model.straightenedFit
 import com.ndelic.kadar.ui.common.CircleButton
 import com.ndelic.kadar.ui.common.Ink
@@ -295,12 +300,12 @@ private val CROP_RATIOS = listOf(
  * With [turnable], the picture also turns in quarter turns and straightens by up to 45° either way. [onDone] gets
  * `[left, top, right, bottom)`, the quarter turns and the straightening angle. Unturned, the rectangle is in [bitmap]'s
  * pixels (a flipped view mirrored back); turned, it's in the frame as shown (the flipped picture's box after the
- * quarter turns, same center).
+ * quarter turns, same center). With [shapes], the crop can be cut to a [CutShape] filling the rectangle, as shown.
  */
 @Composable
 fun CropScreen(
-    bitmap: Bitmap, onDone: (IntArray, Int, Float) -> Unit, onCancel: () -> Unit, initial: Rect? = null,
-    flipX: Boolean = false, flipY: Boolean = false, turnable: Boolean = false,
+    bitmap: Bitmap, onDone: (IntArray, Int, Float, CutShape?) -> Unit, onCancel: () -> Unit, initial: Rect? = null,
+    flipX: Boolean = false, flipY: Boolean = false, turnable: Boolean = false, shapes: Boolean = false,
 ) {
     var turns by remember { mutableIntStateOf(0) }
     var angle by remember { mutableFloatStateOf(0f) }
@@ -308,6 +313,7 @@ fun CropScreen(
     val bh = (if (turns % 2 == 0) bitmap.height else bitmap.width).toFloat()
     var rect by remember { mutableStateOf(initial ?: Rect(0f, 0f, bw, bh)) }
     var ratio by remember { mutableStateOf<Pair<String?, Float?>>(CROP_RATIOS.first()) }
+    var shape by remember { mutableStateOf<CutShape?>(null) }
     BackHandler(onBack = onCancel)
 
     Column(Modifier.fillMaxSize().background(Ink.bg).blockTouches()) {
@@ -316,7 +322,7 @@ fun CropScreen(
                 // [rect] is in the picture as shown; mirror it back onto the bitmap.
                 Rect(if (flipX) bw - rect.right else rect.left, if (flipY) bh - rect.bottom else rect.top, if (flipX) bw - rect.left else rect.right, if (flipY) bh - rect.top else rect.bottom)
             }
-            onDone(intArrayOf(r.left.roundToInt(), r.top.roundToInt(), r.right.roundToInt(), r.bottom.roundToInt()), turns, angle)
+            onDone(intArrayOf(r.left.roundToInt(), r.top.roundToInt(), r.right.roundToInt(), r.bottom.roundToInt()), turns, angle, shape)
         })
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(24.dp)) {
             val fit = min(constraints.maxWidth / bw, constraints.maxHeight / bh)
@@ -364,6 +370,11 @@ fun CropScreen(
                 drawRect(dim, Offset(full.left, r.bottom), Size(full.width, full.bottom - r.bottom))
                 drawRect(dim, Offset(full.left, r.top), Size(r.left - full.left, r.height))
                 drawRect(dim, Offset(r.right, r.top), Size(full.right - r.right, r.height))
+                shape?.let {
+                    val outline = cutShapePath(it, r.width, r.height).apply { offset(r.center.x, r.center.y) }.asComposePath()
+                    clipPath(outline, ClipOp.Difference) { drawRect(dim, r.topLeft, r.size) }
+                    drawPath(outline, Color.White, style = Stroke(2.dp.toPx()))
+                }
                 drawRect(Color.White, r.topLeft, r.size, style = Stroke(1.5.dp.toPx()))
                 for (i in 1..2) {
                     val x = r.left + r.width * i / 3
@@ -383,6 +394,16 @@ fun CropScreen(
             TextTabs(CROP_RATIOS, ratio, label = { it.first ?: stringResource(R.string.crop_free) }) { r ->
                 ratio = r
                 rect = centeredFit(bw, bh, angle, r.second)
+            }
+            if (shapes) {
+                TextTabs(listOf(null) + CutShape.entries, shape, label = { stringResource(it?.label ?: R.string.shape_rect) }) { s ->
+                    shape = s
+                    // Shapes start even (a true circle); another ratio stretches them.
+                    if (s != null && ratio.second == null) {
+                        ratio = CROP_RATIOS[1]
+                        rect = centeredFit(bw, bh, angle, 1f)
+                    }
+                }
             }
             if (turnable) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

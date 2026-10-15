@@ -162,6 +162,8 @@ import com.ndelic.kadar.video.drawnGroups
 import com.ndelic.kadar.video.frameStartMs
 import com.ndelic.kadar.video.outgoingOffset
 import com.ndelic.kadar.video.outputFrameRate
+import com.ndelic.kadar.video.turnedCrop
+import com.ndelic.kadar.video.unturnedCrop
 import kotlin.math.atan2
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -211,6 +213,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     var erasing by remember { mutableStateOf<Pair<ImageLayer, Bitmap?>?>(null) }
     var cropping by remember { mutableStateOf<ImageLayer?>(null) }
     var croppingVideo by remember { mutableStateOf<Pair<VideoLayer, Bitmap>?>(null) }
+    var croppingClip by remember { mutableStateOf<Pair<Int, Bitmap>?>(null) }
     // Open draw screen: the drawing to add to (null for a new one) and the video frame under the playhead.
     var drawing by remember { mutableStateOf<Pair<Long?, Bitmap?>?>(null) }
     val scope = rememberCoroutineScope()
@@ -586,6 +589,14 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         }
                         IconTool(R.drawable.ic_tune, stringResource(R.string.tool_adjust), panel == Panel.Adjust) { toggle(Panel.Adjust) }
                         IconTool(R.drawable.ic_filter_vintage, stringResource(R.string.tool_filters), panel == Panel.Filters) { toggle(Panel.Filters) }
+                        IconTool(R.drawable.ic_crop, stringResource(R.string.tool_crop)) {
+                            playing = false
+                            val i = clipIndex
+                            scope.launch { vm.clipFrame(i, positionMs)?.let { croppingClip = i to it } }
+                        }
+                        IconTool(R.drawable.ic_rotate_right, stringResource(R.string.rotate_90)) { vm.updateSegment(clipIndex) { turned() } }
+                        IconTool(R.drawable.ic_flip, stringResource(R.string.tool_mirror)) { vm.updateSegment(clipIndex) { mirrored(horizontal = true) } }
+                        IconTool(R.drawable.ic_flip_vertical, stringResource(R.string.tool_flip)) { vm.updateSegment(clipIndex) { mirrored(horizontal = false) } }
                         IconTool(R.drawable.ic_swap_horiz, stringResource(R.string.tool_replace)) {
                             replacing = clipIndex
                             replacement.launch(PickVisualMediaRequest(PickVisualMedia.ImageAndVideo))
@@ -725,6 +736,21 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                 vm.cropVideo(layer.id, CropRect(r[0] / fw, r[1] / fh, r[2] / fw, r[3] / fh))
             },
             onCancel = { croppingVideo = null },
+        )
+    }
+    croppingClip?.let { (i, frame) ->
+        val s = video?.segments?.getOrNull(i) ?: return@let
+        // [frame] shows the whole source mirrored and turned, so the crop is turned the same way on it and back.
+        val fw = frame.width.toFloat()
+        val fh = frame.height.toFloat()
+        CropScreen(
+            bitmap = frame,
+            initial = turnedCrop(s.crop, s.turns, s.flipX, s.flipY).run { Rect(left * fw, top * fh, right * fw, bottom * fh) },
+            onDone = { r, _, _ ->
+                croppingClip = null
+                vm.cropClip(i, unturnedCrop(CropRect(r[0] / fw, r[1] / fh, r[2] / fw, r[3] / fh), s.turns, s.flipX, s.flipY))
+            },
+            onCancel = { croppingClip = null },
         )
     }
     drawing?.let { (target, under) ->

@@ -98,11 +98,9 @@ fun BlurBackgroundPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canva
         }
     }
     val s = clip.segments.getOrElse(index) { clip.segments.first() }
-    // Cover: the clip scaled until it fills the canvas both ways, centered, the overflow clipped by the stage.
-    val cover = maxOf(canvasWidth / s.width.toFloat(), canvasHeight / s.height.toFloat()) * scale
-    // Drawn and blurred at 1/BLUR_DOWNSCALE of its size, then scaled up: a blur costs its pixels times its radius, and a
-    // blurred picture loses nothing by being small.
-    val size = with(LocalDensity.current) { DpSize((s.width * cover / BLUR_DOWNSCALE).toDp(), (s.height * cover / BLUR_DOWNSCALE).toDp()) }
+    // Cover: the clip as it shows (cropped and turned) scaled until it fills the canvas both ways, centered, the overflow clipped by the stage.
+    val (sw, sh) = s.shownSize
+    val cover = maxOf(canvasWidth / sw.toFloat(), canvasHeight / sh.toFloat()) * scale
     // The export blurs at 320 px on the long side with sigma BLUR_SIGMA times the strength; the same share of the stage here. Android turns a
     // blur radius into sigma = 0.57735 * radius + 0.5, so the radius is scaled up to match.
     val radius = BLUR_SHARE * clip.blurStrength * maxOf(canvasWidth, canvasHeight) * scale / 0.57735f / BLUR_DOWNSCALE
@@ -127,15 +125,18 @@ fun BlurBackgroundPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canva
             this.clip = true
         },
     ) {
-        val placed = Modifier.fillMaxSize().wrapContentSize(Alignment.Center, unbounded = true).requiredSize(size)
-        key(player) {
-            AndroidView(
-                factory = { TextureView(it).also(player::setVideoTextureView) },
-                modifier = placed.graphicsLayer { alpha = if (s.isImage) 0f else 1f },
-            )
+        // Drawn and blurred at 1/BLUR_DOWNSCALE of its size, then scaled up: a blur costs its pixels times its radius, and a
+        // blurred picture loses nothing by being small.
+        ShapedClip(s, cover / BLUR_DOWNSCALE) { placed ->
+            key(player) {
+                AndroidView(
+                    factory = { TextureView(it).also(player::setVideoTextureView) },
+                    modifier = placed.graphicsLayer { alpha = if (s.isImage) 0f else 1f },
+                )
+            }
+            val still = remember(s.isImage, stills[s.uri]) { stills[s.uri]?.firstOrNull()?.takeIf { s.isImage }?.asImageBitmap() }
+            still?.let { Image(it, null, placed, contentScale = ContentScale.FillBounds) }
         }
-        val still = remember(s.isImage, stills[s.uri]) { stills[s.uri]?.firstOrNull()?.takeIf { s.isImage }?.asImageBitmap() }
-        still?.let { Image(it, null, placed, contentScale = ContentScale.FillBounds) }
     }
 }
 

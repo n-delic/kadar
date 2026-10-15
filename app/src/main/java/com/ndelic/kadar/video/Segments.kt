@@ -1,5 +1,6 @@
 package com.ndelic.kadar.video
 
+import com.ndelic.kadar.model.CropRect
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.ln
@@ -76,3 +77,21 @@ fun <T> List<T>.moved(from: Int, to: Int) = toMutableList().apply { add(to, remo
 
 /** The shortest a clip or a layer can be trimmed to; the encoder can't do an empty one. */
 const val MIN_CLIP_MS = 300L
+
+/** A [w]×[h] picture's size after [turns] quarter turns. */
+fun turnedSize(w: Int, h: Int, turns: Int) = if (turns % 2 == 0) w to h else h to w
+
+/** Crop [c] of a source as fractions of the whole source mirrored ([flipX], [flipY]) and then turned [turns] quarter turns clockwise. */
+fun turnedCrop(c: CropRect, turns: Int, flipX: Boolean, flipY: Boolean): CropRect {
+    var r = CropRect(if (flipX) 1 - c.right else c.left, if (flipY) 1 - c.bottom else c.top, if (flipX) 1 - c.left else c.right, if (flipY) 1 - c.top else c.bottom)
+    // A clockwise quarter turn takes the point (x, y) to (1 - y, x).
+    repeat(turns % 4) { r = CropRect(1 - r.bottom, r.left, 1 - r.top, r.right) }
+    return r
+}
+
+/** The source crop that [turnedCrop] turns into [c]. */
+fun unturnedCrop(c: CropRect, turns: Int, flipX: Boolean, flipY: Boolean): CropRect {
+    // Three more quarter turns are a whole turn back, and mirroring again undoes the mirror.
+    val r = turnedCrop(c, (4 - turns % 4) % 4, flipX = false, flipY = false)
+    return turnedCrop(r, 0, flipX, flipY)
+}

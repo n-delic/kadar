@@ -11,8 +11,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.requiredSize
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -24,7 +22,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -37,9 +34,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
@@ -143,9 +138,9 @@ fun IncomingClipPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canvasW
     }
     val shown = span ?: spans.firstOrNull() ?: return
     val s = clip.segments.getOrElse(shown.clip) { clip.segments.first() }
-    // Fitted into the canvas, centered: the export's Presentation.LAYOUT_SCALE_TO_FIT.
-    val fit = minOf(canvasWidth / s.width.toFloat(), canvasHeight / s.height.toFloat()) * scale
-    val frame = with(LocalDensity.current) { DpSize((s.width * fit).toDp(), (s.height * fit).toDp()) }
+    // Fitted into the canvas as it shows (cropped and turned), centered: the export's Presentation.LAYOUT_SCALE_TO_FIT.
+    val (sw, sh) = s.shownSize
+    val fit = minOf(canvasWidth / sw.toFloat(), canvasHeight / sh.toFloat()) * scale
     val filter = remember(s.adjust) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || s.adjust.isNone) null
         else RenderEffect.createColorFilterEffect(ColorMatrixColorFilter(s.adjust.filterMatrix())).asComposeRenderEffect()
@@ -163,21 +158,22 @@ fun IncomingClipPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canvasW
         }.then(if (fill != null) Modifier.background(Color(fill)) else Modifier),
     ) {
         val p = clip.placement
-        val placed = Modifier.fillMaxSize().wrapContentSize(Alignment.Center, unbounded = true).requiredSize(frame).graphicsLayer {
+        ShapedClip(s, fit, layer = {
             renderEffect = filter
             scaleX = p.zoom
             scaleY = p.zoom
             translationX = p.x * canvasWidth * scale
             translationY = p.y * canvasHeight * scale
+        }) { placed ->
+            key(player) {
+                AndroidView(
+                    factory = { TextureView(it).also(player::setVideoTextureView) },
+                    modifier = placed.graphicsLayer { alpha = if (s.isImage) 0f else 1f },
+                )
+            }
+            val still = remember(s.isImage, stills[s.uri]) { stills[s.uri]?.firstOrNull()?.takeIf { s.isImage }?.asImageBitmap() }
+            still?.let { Image(it, null, placed, contentScale = ContentScale.FillBounds) }
         }
-        key(player) {
-            AndroidView(
-                factory = { TextureView(it).also(player::setVideoTextureView) },
-                modifier = placed.graphicsLayer { alpha = if (s.isImage) 0f else 1f },
-            )
-        }
-        val still = remember(s.isImage, stills[s.uri]) { stills[s.uri]?.firstOrNull()?.takeIf { s.isImage }?.asImageBitmap() }
-        still?.let { Image(it, null, placed, contentScale = ContentScale.FillBounds) }
     }
 }
 

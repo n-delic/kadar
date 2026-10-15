@@ -275,7 +275,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                 endMs = end,
                 opacity = j.optDouble("opacity", 1.0).toFloat(),
                 clipStartMs = j.optLong("clipStartMs"),
-                crop = j.optJSONArray("crop")?.let { c -> CropRect(c.getDouble(0).toFloat(), c.getDouble(1).toFloat(), c.getDouble(2).toFloat(), c.getDouble(3).toFloat()) } ?: CropRect(),
+                crop = cropFromJson(j),
                 adjust = adjustFromJson(j),
             )
             // Versions before drawings skip this type too.
@@ -372,6 +372,10 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
             TransitionKind.entries.firstOrNull { it.name == j.optString("transition") } ?: TransitionKind.None,
             j.optLong("transitionMs", DEFAULT_TRANSITION_MS),
         ),
+        crop = cropFromJson(j),
+        flipX = j.optBoolean("flipX"),
+        flipY = j.optBoolean("flipY"),
+        turns = j.optInt("turns"),
     )
 
     private companion object {
@@ -485,7 +489,7 @@ private fun Layer.toJson() = JSONObject().apply {
             put("opacity", layer.opacity.toDouble())
             put("clipStartMs", layer.clipStartMs)
             putAdjust(layer.adjust)
-            layer.crop.run { put("crop", JSONArray(listOf(left.toDouble(), top.toDouble(), right.toDouble(), bottom.toDouble()))) }
+            putCrop(layer.crop)
         }
         is DrawLayer -> {
             put("type", "draw")
@@ -523,6 +527,10 @@ private fun Segment.toJson() = JSONObject().apply {
     put("volume", volume.toDouble())
     put("keepPitch", keepPitch)
     putAdjust(adjust)
+    if (crop != CropRect()) putCrop(crop)
+    if (flipX) put("flipX", true)
+    if (flipY) put("flipY", true)
+    if (turns != 0) put("turns", turns)
     if (transition.kind != TransitionKind.None) {
         put("transition", transition.kind.name)
         put("transitionMs", transition.durationMs)
@@ -568,6 +576,11 @@ private fun JSONObject.putAudioPart(p: AudioPart) {
     put("fadeInMs", p.fadeInMs)
     put("fadeOutMs", p.fadeOutMs)
 }
+
+private fun JSONObject.putCrop(c: CropRect) = put("crop", JSONArray(listOf(c.left.toDouble(), c.top.toDouble(), c.right.toDouble(), c.bottom.toDouble())))
+
+private fun cropFromJson(j: JSONObject) =
+    j.optJSONArray("crop")?.let { c -> CropRect(c.getDouble(0).toFloat(), c.getDouble(1).toFloat(), c.getDouble(2).toFloat(), c.getDouble(3).toFloat()) } ?: CropRect()
 
 private fun adjustFromJson(j: JSONObject) = Adjust(
     j.optDouble("brightness", 0.0).toFloat(),

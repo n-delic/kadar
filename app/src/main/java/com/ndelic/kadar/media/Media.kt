@@ -27,6 +27,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
 import com.ndelic.kadar.R
+import com.ndelic.kadar.model.CropRect
 import com.ndelic.kadar.model.UiText
 import com.ndelic.kadar.model.UserError
 import com.ndelic.kadar.model.opaqueBounds
@@ -138,6 +139,16 @@ fun turnBitmap(bitmap: Bitmap, degrees: Float, outW: Int, outH: Int, dx: Float =
         // Quarter turns of an opaque photo leave no empty corners: keep it a JPEG in the project.
         if (degrees % 90f == 0f && !bitmap.hasAlpha()) it.setHasAlpha(false)
     }
+
+/** [crop] of [bitmap], mirrored ([flipX], [flipY]) and then turned [turns] quarter turns clockwise, like a clip of the main track shows it. */
+fun shapedBitmap(bitmap: Bitmap, crop: CropRect, flipX: Boolean, flipY: Boolean, turns: Int): Bitmap {
+    val x = (crop.left * bitmap.width).roundToInt().coerceIn(0, bitmap.width - 1)
+    val y = (crop.top * bitmap.height).roundToInt().coerceIn(0, bitmap.height - 1)
+    val cut = Bitmap.createBitmap(bitmap, x, y, (crop.width * bitmap.width).roundToInt().coerceIn(1, bitmap.width - x), (crop.height * bitmap.height).roundToInt().coerceIn(1, bitmap.height - y))
+    if (!flipX && !flipY && turns == 0) return cut
+    val odd = turns % 2 == 1
+    return turnBitmap(cut, 90f * turns, if (odd) cut.height else cut.width, if (odd) cut.width else cut.height, flipX = flipX, flipY = flipY)
+}
 
 /** Crops away transparent borders. Returns the crop and its `[left, top, right, bottom)` in [src], or null if nothing is visible. */
 fun trimTransparent(src: Bitmap): Pair<Bitmap, IntArray>? {

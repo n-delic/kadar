@@ -1,5 +1,6 @@
 package com.ndelic.kadar.video
 
+import com.ndelic.kadar.model.CropRect
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -96,5 +97,41 @@ class SegmentsTest {
         assertEquals(0.3f, speedAt(speedPosition(0.301f)))
         // Old projects' fixed steps keep their place.
         listOf(0.25f, 0.75f, 1.5f, 3f, 4f).forEach { assertEquals(it, speedAt(speedPosition(it)), 0.001f) }
+    }
+
+    @Test
+    fun aQuarterTurnSwapsTheSize() {
+        assertEquals(1920 to 1080, turnedSize(1920, 1080, 0))
+        assertEquals(1080 to 1920, turnedSize(1920, 1080, 1))
+        assertEquals(1920 to 1080, turnedSize(1920, 1080, 2))
+        assertEquals(1080 to 1920, turnedSize(1920, 1080, 3))
+    }
+
+    @Test
+    fun cropsTurnWithThePicture() {
+        // The left half of the source: turned clockwise, it's the top half; upside down, the right half.
+        val left = CropRect(0f, 0f, 0.5f, 1f)
+        assertCrop(CropRect(0f, 0f, 1f, 0.5f), turnedCrop(left, 1, flipX = false, flipY = false))
+        assertCrop(CropRect(0.5f, 0f, 1f, 1f), turnedCrop(left, 2, flipX = false, flipY = false))
+        assertCrop(CropRect(0f, 0.5f, 1f, 1f), turnedCrop(left, 3, flipX = false, flipY = false))
+        // Mirrored first, it's the right half, which a clockwise turn puts at the bottom.
+        assertCrop(CropRect(0f, 0.5f, 1f, 1f), turnedCrop(left, 1, flipX = true, flipY = false))
+        // The top-left quarter's corner goes to the top right after a clockwise turn.
+        assertCrop(CropRect(0.75f, 0f, 1f, 0.25f), turnedCrop(CropRect(0f, 0f, 0.25f, 0.25f), 1, flipX = false, flipY = false))
+    }
+
+    @Test
+    fun unturnedCropUndoesTurnedCrop() {
+        val c = CropRect(0.1f, 0.2f, 0.6f, 0.9f)
+        for (turns in 0..3) for (fx in listOf(false, true)) for (fy in listOf(false, true)) {
+            assertCrop(c, unturnedCrop(turnedCrop(c, turns, fx, fy), turns, fx, fy))
+        }
+    }
+
+    private fun assertCrop(expected: CropRect, actual: CropRect) {
+        assertEquals(expected.left, actual.left, 1e-6f)
+        assertEquals(expected.top, actual.top, 1e-6f)
+        assertEquals(expected.right, actual.right, 1e-6f)
+        assertEquals(expected.bottom, actual.bottom, 1e-6f)
     }
 }

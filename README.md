@@ -13,7 +13,7 @@
 
 <p align="center">
   <b>A free, open-source photo and video editor for Android.</b><br>
-  Cut-outs, captions, stickers, filters, video over video, voiceover, music and a real layer timeline. No account, no subscription, no watermark, no ads.
+  Cut-outs, captions, stickers, effects, transitions, video over video, voiceover, music and a real layer timeline. No account, no subscription, no watermark, no ads.
 </p>
 
 <p align="center">
@@ -35,42 +35,53 @@ phone.
 
 ### Photo
 
-- **Layers.** Photos, images, text, emoji and stickers stack as layers. Drag to move, pinch to resize,
-  twist to rotate, or use the corner handle to scale and rotate with one finger.
+- **Layers.** Photos, images, text, emoji, shapes and stickers stack as layers. Drag to move, pinch to
+  resize, twist to rotate, use the corner handle to scale and rotate with one finger, or stretch one way
+  with the handle on each side. Mirror, flip and fade any picture.
 - **Background remover.** One tap cuts the subject out of any image, on the device. The cut-out stays
-  exactly where it was on the canvas.
-- **Eraser and restore brush.** Clean up the edges by hand; restore paints the original image back in
+  exactly where it was on the canvas, and can get a solid, glow or shadow outline around its shape.
+- **Eraser and restore brush** with a soft or hard edge. Restore paints the original image back in
   place. Two fingers zoom and pan while you work.
-- **Crop** any image layer, freely or at 1:1, 4:5, 9:16 or 16:9.
-- **Filters and adjust.** Eight looks (Mono, Noir, Sepia, Warm, Cool, Vivid, Fade, Teal & Orange) with a
-  strength slider, plus brightness, contrast and saturation, per image.
-- **Draw.** Circle things, draw arrows or scribble with a marker or a see-through highlighter. Each
-  drawing is a layer you can move, resize and draw more onto.
-- **Text.** A classic meme font, eight more free caption fonts (tall, condensed, heavy, comic, marker,
-  casual, retro script, horror) and the system fonts, fill and outline colors, a caption box behind the
-  text, shadow, letter spacing and alignment. Double-tap text to edit it.
+- **Crop** any image freely or at a fixed ratio, turn and straighten it, or cut it to a circle, heart,
+  star, triangle or diamond. Cropping the photo you started from crops the whole canvas.
+- **Filters, adjust and effects.** Eight looks with a strength slider; brightness, contrast, saturation,
+  warmth, tint, hue, fade, vignette and grain; blur, pixelate, posterize, duotone, sharpen, glitch and
+  pop art; blend modes (multiply, screen, overlay and more). Hold to compare with the original.
+- **Draw.** Marker, highlighter, neon, dotted, spray and soft pens. Each drawing is a layer you can move,
+  resize and draw more onto.
+- **Shapes.** Rectangles, rounded rectangles, ellipses, arrows, stars and lines, with fill and outline.
+- **Text.** A classic meme font, eight more free caption fonts, the system fonts and your own (.ttf or
+  .otf). Fill, gradient, outline, shadow and glow; bold, italic, underline and capitals; curved text;
+  a caption box or a speech, thought, shout, pill or double-outline bubble with a tail you can point;
+  one-tap style presets. Double-tap text to edit it.
 - **Snapping.** Layers snap to the center of the canvas and to 0° and 90°, with guide lines.
-- **Canvas.** Original size or 1:1, 4:5, 9:16, 16:9, on white, black or a transparent background
-  (exported as PNG).
+- **Canvas.** Original size or 1:1, 4:5, 9:16, 16:9 and more, on a color, a blurred copy of the photo or a
+  transparent background (exported as PNG). Start from a photo or a blank canvas.
 - **My stickers.** Save any cut-out and reuse it in every project.
 
 ### Video
 
+- **Clips in a row.** Add videos and photos, trim them by their ends (step frame by frame), split,
+  duplicate, reorder, replace, mute, freeze a frame, save a frame as a photo, add a plain color clip, and
+  crop, rotate, mirror or flip a clip. Each clip has its own speed, volume, look and entrance and exit
+  animation.
+- **Speed** from 0.2x to 10x, with the voice pitch kept natural (or not, for the chipmunk effect).
+- **Transitions** between clips: dissolve, dip to black or white, zoom, blur, spin, flip, glitch, color
+  split, and wipes, slides and pushes, with the sound crossfaded.
 - **A timeline with layer tracks.** Every caption, sticker, drawing and clip on top gets its own track
   above the main clip. Drag its ends to choose when it appears and disappears, drag the middle to move it,
-  long-press to reorder, and hide or lock it from the left. Pinch to zoom in on long videos.
-- **Video over video.** Put more clips on top, picture-in-picture style: move, resize, rotate, fade them,
-  start them from the middle, with their own volume.
-- **Animations.** Captions and stickers can fade, pop or slide in and out.
-- **Trim** the clip with handles on a strip of frames.
-- **Speed** from 0.25x to 4x, with the voice pitch kept natural (or not, for the chipmunk effect).
-- **Music.** Add a song, set its volume and where it starts, fade it in and out; it loops or is cut to
-  fit. The video's own sound has its own volume.
-- **Voiceover.** Record your voice from the playhead while the video plays, as many takes as you like,
-  each with its own volume.
-- **Canvas.** Turn a landscape clip into 9:16 for reels and stories, or 1:1 and 4:5 for feeds, with black
-  bars or a blurred copy of the video behind it.
-- **Filters and adjust** for the whole video, the same looks as for photos.
+  split it, long-press to reorder, and hide or lock it from the left. Pinch to zoom in on long videos.
+- **Video over video.** Put more clips on top, picture-in-picture style: move, resize, rotate, crop and
+  fade them, start them from the middle, give them their own volume and look, or key out a green screen.
+- **Blur areas.** Blur or pixelate faces and usernames with a rectangle, ellipse or heart on its own track.
+- **Animations.** Captions, stickers and shapes fade, pop, zoom or slide in and out, type out letter by
+  letter, or wiggle, pulse and bounce.
+- **Music and sound.** Add songs or the sound of another video, move and trim them on their own tracks,
+  set their volume and fades; they loop to fill their part. Record a voiceover from the playhead, or have
+  the phone's offline voice read a line, with higher, deeper, chipmunk or robot voice effects.
+- **Canvas.** Turn a landscape clip into 9:16 for reels and stories, 1:1, 4:5 or 1:2, zoom and move the
+  clip inside it, with colored bars or a blurred copy of the video behind it.
+- **Filters and adjust** per clip, the same looks as for photos, shown live while you drag.
 - **What you see is what you export.** The preview runs the same edit the exporter does.
 
 ### Everywhere
@@ -80,8 +91,9 @@ phone.
 - **Images from the web.** A built-in browser: search, long-press an image, and it goes straight into
   the project. It never lands in your gallery.
 - **Share to Kadar** from the gallery or any app to start a project.
-- **Export** to `Pictures/Kadar` and `Movies/Kadar` (JPEG, PNG, H.264 MP4), or straight to the share sheet.
-  Video exports show their progress and can be cancelled; pick Standard or High quality in Settings.
+- **Export** to `Pictures/Kadar` and `Movies/Kadar` (JPEG, PNG, H.264 MP4 or GIF), or straight to the
+  share sheet. Pick the frame rate and quality of a video and see its size before saving; exports show
+  their progress and can be cancelled.
 - **English and Bosnian**, following the phone's language.
 
 <p align="center">
@@ -98,7 +110,7 @@ Kadar has no accounts, analytics, ads or tracking, and it never uploads your pho
 - Background removal uses Google ML Kit on the device. The first time, Google Play services downloads
   the model (a few MB); after that it works offline. Your images are not sent anywhere.
 - The microphone is used only while you record a voiceover, and Android asks first. Recordings stay
-  inside the project.
+  inside the project. Text to speech uses only the voices installed on the phone that work offline.
 - Projects live in the app's private storage. Uninstalling the app deletes them; your exports in the
   gallery stay.
 

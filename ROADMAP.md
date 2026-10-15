@@ -125,6 +125,17 @@
 - Cropping the photo a project was opened with makes the canvas the cropped picture; the other layers keep their spot on it
 - Images, stickers, shapes and drawings stretch one way with a handle in the middle of each side; the corner handle and pinching still resize evenly
 
+## v0.8.0: done
+
+- Volume changes and the blurred canvas no longer reload the video preview
+- Video clips: freeze frame, save a frame as a photo, replace, plain color clips, mute in one tap, crop, rotate, mirror and flip, entrance and exit animations; step one frame while trimming
+- Video canvas: 1:2, bar color, blur strength, zoom and move the clip
+- Transitions: spin, flip, glitch and color split; Black and White dip the blurred canvas too; the preview shows the incoming clip with its look and blur areas
+- Blur areas that blur or pixelate part of the video; green screen for video layers
+- Audio: sound from a video, voice effects, offline text to speech
+- Photo: effects (blur, pixelate, posterize, duotone, sharpen, glitch, pop art), blend modes, vignette and grain, outlines around cut-outs, cutting a picture to a shape
+- Text: curved text, gradient fill, pill and double-outline bubbles; Draw: neon, dotted, spray and soft pens
+
 ## Next
 
 Feature parity with the big phone editors, built from how their features behave, never from their code, assets or look (AGENTS.md rules 14 and 15). Offline only: no cloud AI.

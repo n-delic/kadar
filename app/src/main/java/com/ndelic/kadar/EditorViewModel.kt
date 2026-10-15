@@ -807,7 +807,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val s = v.segments[i]
         if (s.isImage) return@work
         val at = sourceMs(s.startMs, s.speed, into).coerceIn(s.startMs, s.endMs)
-        val bitmap = withContext(Dispatchers.IO) { runCatching { videoStill(app, s.uri, at, minOf(MAX_PHOTO, maxOf(s.width, s.height))) }.getOrNull() } ?: throw UserError(R.string.error_read_video)
+        val bitmap = clipStill(s, at, MAX_PHOTO)
         val file = withContext(Dispatchers.IO) { store.writeImage(dir, bitmap) }
         val still = Segment(Uri.fromFile(File(dir, file)), MAX_PHOTO_CLIP_MS, bitmap.width, bitmap.height, endMs = PHOTO_CLIP_MS, isImage = true, adjust = s.adjust)
         val parts = when {
@@ -820,6 +820,22 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         selectClip(i + parts.indexOf(still))
         loadFilmstrip(dir, still)
     }
+
+    /** Saves the frame under the playhead ([atMs], output time), as its clip has it (no layers), to the gallery as a JPEG. */
+    fun saveFrame(atMs: Long) = work(R.string.busy_saving_frame) {
+        val v = _uiState.value.project?.video ?: return@work
+        val (i, into) = v.segmentAt(atMs)
+        val s = v.segments[i]
+        if (s.isImage) return@work
+        val bitmap = clipStill(s, sourceMs(s.startMs, s.speed, into).coerceIn(s.startMs, s.endMs), Int.MAX_VALUE)
+        val uri = withContext(Dispatchers.IO) { saveToGallery(app, "image/jpeg") { bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it) } }
+        _effects.send(EditorEffect.Saved(uri, "image/jpeg", share = false))
+    }
+
+    /** Video clip [s]'s frame at source time [ms], at its own size but at most [maxSide] long. Call from [work]. */
+    private suspend fun clipStill(s: Segment, ms: Long, maxSide: Int) = withContext(Dispatchers.IO) {
+        runCatching { videoStill(app, s.uri, ms, minOf(maxSide, maxOf(s.width, s.height))) }.getOrNull()
+    } ?: throw UserError(R.string.error_read_video)
 
     /** Sets the transition into clip [index] from the one before it, or with [all] into every clip after the first. */
     fun setTransition(index: Int, transition: Transition, all: Boolean = false) =

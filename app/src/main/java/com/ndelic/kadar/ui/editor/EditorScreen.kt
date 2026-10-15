@@ -553,6 +553,10 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                                 playing = false
                                 vm.freezeFrame(positionMs)
                             }
+                            IconTool(R.drawable.ic_photo_camera, stringResource(R.string.tool_save_frame)) {
+                                playing = false
+                                vm.saveFrame(positionMs)
+                            }
                         }
                         IconTool(R.drawable.ic_speed, stringResource(R.string.tool_speed), panel == Panel.Speed) { toggle(Panel.Speed) }
                         IconTool(R.drawable.ic_music_note, stringResource(R.string.tool_audio), panel == Panel.Audio) { toggle(Panel.Audio) }

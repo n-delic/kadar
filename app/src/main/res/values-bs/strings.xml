@@ -10,7 +10,9 @@
     <string name="mute">Utišaj</string>
     <string name="unmute">Vrati zvuk</string>
     <string name="tool_freeze">Zamrzni</string>
-    <string name="busy_freezing">Zamrzavam kadar…</string>
+    <string name="busy_freezing">Zamrzavam kadar</string>
+    <string name="tool_save_frame">Snimi kadar</string>
+    <string name="busy_saving_frame">Snimam kadar</string>
     <string name="duplicate">Dupliraj</string>
     <string name="edit">Uredi</string>
     <string name="save">Spremi</string>

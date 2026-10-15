@@ -261,7 +261,7 @@ fun KSlider(
 
 /** Canvas shapes (width / height) for photos, videos and a blank canvas. */
 val CANVAS_RATIOS = listOf(
-    "1:1" to 1f, "4:5" to 0.8f, "3:4" to 0.75f, "2:3" to 2f / 3, "9:16" to 9f / 16,
+    "1:1" to 1f, "4:5" to 0.8f, "3:4" to 0.75f, "2:3" to 2f / 3, "9:16" to 9f / 16, "1:2" to 0.5f,
     "16:9" to 16f / 9, "4:3" to 4f / 3, "3:2" to 1.5f, "2:1" to 2f, "2.35:1" to 2.35f,
 )
 

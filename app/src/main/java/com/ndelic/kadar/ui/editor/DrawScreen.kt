@@ -190,7 +190,7 @@ fun DrawScreen(project: Project, layers: List<Layer>, under: Bitmap?, target: Dr
                     if (project.background == android.graphics.Color.TRANSPARENT) checker(Size(w, h), 24f) else drawRect(Color(project.background), size = Size(w, h))
                     drawIntoCanvas { canvas ->
                         canvas.nativeCanvas.withClip(0f, 0f, w, h) {
-                            under?.let { drawBitmap(it, null, fitRect(it.width, it.height, project.width, project.height), framePaint) }
+                            under?.let { drawBitmap(it, null, project.video?.frameRect(it.width, it.height) ?: fitRect(it.width, it.height, project.width, project.height), framePaint) }
                             layers.forEach { drawLayer(it) }
                             drawLayer(drawn)
                             current?.let { drawLayer(DrawLayer(0, Transform(0f, 0f), listOf(it))) }

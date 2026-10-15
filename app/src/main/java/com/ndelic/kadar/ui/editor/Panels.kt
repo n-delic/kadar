@@ -78,6 +78,7 @@ import com.ndelic.kadar.ui.common.KToggle
 import com.ndelic.kadar.ui.common.PanelLabel
 import com.ndelic.kadar.ui.common.TextTabs
 import com.ndelic.kadar.video.AudioRef
+import com.ndelic.kadar.video.ClipPlacement
 import com.ndelic.kadar.video.MAX_FADE_MS
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.audioPart
@@ -169,7 +170,10 @@ private fun BlurDot(active: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** Video canvas: reshape to a social-media ratio (9:16 for reels and stories) with black bars. */
+/**
+ * Video canvas: reshape to a social-media ratio (9:16 for reels and stories), with bars in a color or the blurred clip.
+ * While it's open, a drag or pinch on the stage moves or zooms the clips in the canvas.
+ */
 @Composable
 fun VideoCanvasPanel(project: Project, clip: VideoClip, defaultExport: ExportSize, vm: EditorViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -179,7 +183,22 @@ fun VideoCanvasPanel(project: Project, clip: VideoClip, defaultExport: ExportSiz
                 AspectTile(label ?: stringResource(R.string.original), ratio ?: (clip.width / clip.height.toFloat()), active) { vm.setVideoCanvas(ratio) }
             }
         }
-        if (clip.canvas != null) TextTabs(listOf(false, true), clip.blur, label = { stringResource(if (it) R.string.canvas_blur else R.string.canvas_black) }) { b -> vm.updateClip { copy(blur = b) } }
+        // One height with or without Reset, so the stage (and a drag on it) doesn't jump when it shows.
+        Row(Modifier.height(36.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.canvas_place_hint), color = Ink.dim, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            if (!clip.placement.isFit) {
+                Text(stringResource(R.string.reset), color = Ink.accent, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { vm.updateClip { copy(placement = ClipPlacement()) } }.padding(6.dp))
+            }
+        }
+        PanelLabel(stringResource(R.string.background))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (clip.canvas != null) {
+                BlurDot(clip.blurred) { vm.updateClip { copy(blur = true) } }
+                Spacer(Modifier.width(10.dp))
+            }
+            Box(Modifier.weight(1f)) { ColorRow(project.background.takeUnless { clip.blurred }, allowNone = false) { c -> c?.let(vm::setBackground) } }
+        }
+        if (clip.blurred) LabeledSlider(stringResource(R.string.canvas_blur), clip.blurStrength, 0.25f..3f, ::percent) { v -> vm.updateClip { copy(blurStrength = v) } }
         ExportSizeRow(project, defaultExport, vm)
     }
 }

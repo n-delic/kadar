@@ -322,7 +322,7 @@
     <string name="error_not_image">Taj link nije slika koju Kadar može otvoriti</string>
     <string name="error_gallery_file">Nije moguće napraviti fajl u galeriji</string>
     <string name="error_bg_model">Alat za uklanjanje pozadine se još preuzima. Provjeri internet i pokušaj ponovo.</string>
-    <string name="canvas_black">Crno</string>
+    <string name="canvas_place_hint">Povuci ili raširi video prstima da ga pomjeriš ili uvećaš</string>
     <string name="canvas_blur">Zamućeno</string>
     <string name="discard_title">Odbaciti promjene?</string>
     <string name="discard_text">Ovo što si uradio ovdje još nije primijenjeno.</string>

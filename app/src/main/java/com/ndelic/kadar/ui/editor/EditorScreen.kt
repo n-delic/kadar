@@ -261,6 +261,12 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             // A paused player keeps its frame; its replayable cache draws it again through the new look.
             if (!player.isPlaying) player.experimentalRedrawLastFrame()
         }
+        // So do the clips' placement and the bars' color, live while the clip is dragged or pinched.
+        val fill = previewed.barFill(project.background)
+        LaunchedEffect(player, previewed.placement, fill) {
+            looks.showFrame(previewed.placement, fill)
+            if (!player.isPlaying) player.experimentalRedrawLastFrame()
+        }
         val levels = remember(previewed) { previewed.segments.map { it.volume } + previewed.music.map { it.part.volume } + previewed.voices.map { it.part.volume } }
         LaunchedEffect(player, levels) {
             volumes.show(previewed)
@@ -351,6 +357,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                 dropper?.second?.invoke(c)
                 dropper = null
             },
+            placingClip = panel == Panel.VideoCanvas,
             Modifier.weight(1f).fillMaxWidth(),
         )
 
@@ -779,7 +786,7 @@ private val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF2DE1C2
  * The canvas: video preview underneath, layers drawn on top at screen scale.
  * Drag, pinch and twist move the selected layer; the corner handles delete it or scale and rotate it with one finger;
  * double-tap a text layer to edit it. With [picking] (the stage picture) a touch on the canvas picks a color from it for
- * [onPicked] instead.
+ * [onPicked] instead; with [placingClip] (the video Canvas panel open) a drag or pinch on it moves or zooms the clips.
  */
 @Composable
 private fun Stage(
@@ -792,6 +799,7 @@ private fun Stage(
     onEditText: (TextLayer) -> Unit,
     picking: Bitmap?,
     onPicked: (Int) -> Unit,
+    placingClip: Boolean,
     modifier: Modifier,
 ) {
     // In a video only the layers on screen at the playhead show (and can be grabbed); the selected one always does, to edit it.
@@ -836,6 +844,7 @@ private fun Stage(
         val editText by rememberUpdatedState(onEditText)
         val picture by rememberUpdatedState(picking)
         val picked by rememberUpdatedState(onPicked)
+        val placing by rememberUpdatedState(placingClip && project.video != null)
         // The eyedropper's finger and the color under it, while it touches.
         var loupe by remember { mutableStateOf<Pair<Offset, Int>?>(null) }
         val lastTap = remember { longArrayOf(-1, 0) } // layer id, time
@@ -921,7 +930,7 @@ private fun Stage(
                         },
                     )
                 }
-                project.video?.takeIf { overlapping.isNotEmpty() }?.let { IncomingClipPreview(it, stills, project.width, project.height, scale, player, clock) }
+                project.video?.takeIf { overlapping.isNotEmpty() }?.let { IncomingClipPreview(it, stills, project.width, project.height, scale, player, clock, it.barFill(project.background)) }
                 // Over the main video and under the top canvas (handles and the layers above every video layer), bottom
                 // layer first, each over the layers drawn under it, like the export.
                 if (videoEnd != null) {
@@ -953,6 +962,23 @@ private fun Stage(
                                 }
                                 loupe = null
                                 picked(colorAt(at))
+                                return@awaitEachGesture
+                            }
+                            if (placing) {
+                                var first = true
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    if (event.changes.none { it.pressed }) break
+                                    val pan = event.calculatePan()
+                                    val zoom = event.calculateZoom()
+                                    if (pan != Offset.Zero || zoom != 1f) {
+                                        val dx = pan.x / scale / project.width
+                                        val dy = pan.y / scale / project.height
+                                        vm.updateClip(record = first) { copy(placement = placement.moved(dx, dy, zoom)) }
+                                        first = false
+                                    }
+                                    event.changes.forEach { it.consume() }
+                                }
                                 return@awaitEachGesture
                             }
                             val sel = current?.takeUnless { it.locked }

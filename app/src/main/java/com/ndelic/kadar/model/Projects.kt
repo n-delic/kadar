@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.net.Uri
 import com.ndelic.kadar.video.AudioPart
+import com.ndelic.kadar.video.ClipPlacement
 import com.ndelic.kadar.video.MUSIC_FADE_MS
 import com.ndelic.kadar.video.Music
 import com.ndelic.kadar.video.DEFAULT_TRANSITION_MS
@@ -320,6 +321,8 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
         height = j.optInt("videoHeight", projectHeight),
         canvas = if (j.has("canvas")) j.getDouble("canvas").toFloat() else null,
         blur = j.optBoolean("blur"),
+        blurStrength = j.optDouble("blurStrength", 1.0).toFloat(),
+        placement = ClipPlacement(j.optDouble("clipZoom", 1.0).toFloat(), j.optDouble("clipX", 0.0).toFloat(), j.optDouble("clipY", 0.0).toFloat()),
         // Before version 3 a project had at most one song, from the start of the video to its end.
         music = (j.optJSONArray("music")?.let { a -> (0 until a.length()).map { a.getJSONObject(it) } } ?: listOfNotNull(j.optJSONObject("music"))).map {
             Music(Uri.parse(it.getString("uri")), it.getString("name"), it.getLong("durationMs"), it.getLong("startMs"), audioPartFromJson(it, it.optLong("atMs"), Long.MAX_VALUE))
@@ -519,6 +522,10 @@ private fun VideoClip.toJson() = JSONObject().apply {
     put("videoHeight", height)
     canvas?.let { put("canvas", it.toDouble()) }
     put("blur", blur)
+    put("blurStrength", blurStrength.toDouble())
+    put("clipZoom", placement.zoom.toDouble())
+    put("clipX", placement.x.toDouble())
+    put("clipY", placement.y.toDouble())
     if (music.isNotEmpty()) put("music", JSONArray(music.map { m ->
         JSONObject().apply {
             put("uri", m.uri.toString())

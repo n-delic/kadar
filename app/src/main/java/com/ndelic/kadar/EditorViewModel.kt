@@ -373,7 +373,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** True when the project is on disk. */
     private suspend fun save(dir: File, project: Project): Boolean {
-        val thumb = renderLayers(project.width, project.height, project.background, project.layers, THUMB_SIZE / max(project.width, project.height), videoFrame, project.backdrop())
+        val thumb = renderLayers(project.width, project.height, project.background, project.layers, THUMB_SIZE / max(project.width, project.height), videoFrame, project.backdrop(), videoFrame?.let { project.video?.frameRect(it.width, it.height) })
         try {
             saveLock.withLock { withContext(Dispatchers.IO) { store.save(dir, project, thumb) } }
             lastSaved = project
@@ -612,7 +612,8 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val p = _uiState.value.project ?: return null
         // shortcut: video layers and the blurred canvas are left out (players draw them); render their frames if users pick from them.
         val layers = if (p.video == null) p.layers else p.layers.filter { it.visibleAt(positionMs) }
-        return renderLayers(p.width, p.height, p.background, layers, min(1f, PICK_SIZE / max(p.width, p.height)), frameAt(positionMs))
+        val frame = frameAt(positionMs)
+        return renderLayers(p.width, p.height, p.background, layers, min(1f, PICK_SIZE / max(p.width, p.height)), frame, underAt = frame?.let { p.video?.frameRect(it.width, it.height) })
     }
 
     /** The video frame under the playhead ([positionMs], output time), as a guide for the draw screen; null for photos. */
@@ -742,14 +743,14 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         p.copy(height = h, layers = p.layers.map { it.withTransform(it.t.copy(y = it.t.y + dy)) })
     }
 
-    fun setBackground(color: Int) = updateProject { it.copy(background = color, blur = false) }
+    fun setBackground(color: Int) = updateProject { it.copy(background = color, blur = false, video = it.video?.copy(blur = false)) }
 
     /** Photos: the canvas shows the bottom picture blurred behind everything, until a color is picked. */
     fun setBlur() = updateProject { it.copy(blur = true) }
 
     // Video
 
-    fun updateClip(change: VideoClip.() -> VideoClip) = updateProject { p -> p.copy(video = p.video?.change()) }
+    fun updateClip(record: Boolean = true, change: VideoClip.() -> VideoClip) = updateProject(record) { p -> p.copy(video = p.video?.change()) }
 
     /** Changes clip [index] of the main track (trim, speed, volume, adjust). */
     fun updateSegment(index: Int, change: Segment.() -> Segment) =
@@ -985,7 +986,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val (w, h) = video.outputSize
         val bitrate = if (quality == ExportQuality.High) highBitrate(w, h, shortSide, clip.frameRate) else null
         saveRendered("mp4", "video/mp4", R.string.busy_saving_video, share) { out ->
-            exportVideo(app, clip.composition(p.layers, shortSide, frameClock = forced), out, bitrate) { pct -> _uiState.update { it.copy(progress = pct) } }
+            exportVideo(app, clip.composition(p.layers, shortSide, frameClock = forced, background = p.background), out, bitrate) { pct -> _uiState.update { it.copy(progress = pct) } }
         }
     }
 
@@ -1001,7 +1002,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         try {
             saveRendered("gif", "image/gif", R.string.busy_saving_gif, share) { out ->
                 // Rendered small by Media3 first, so the GIF shows exactly what the MP4 export would; half the ring each.
-                exportVideo(app, clip.composition(p.layers, shortSide, frameClock = true), mp4, highBitrate(w, h, shortSide, clip.frameRate)) { pct ->
+                exportVideo(app, clip.composition(p.layers, shortSide, frameClock = true, background = p.background), mp4, highBitrate(w, h, shortSide, clip.frameRate)) { pct ->
                     _uiState.update { it.copy(progress = pct / 2) }
                 }
                 out.outputStream().buffered().use { o -> mp4ToGif(mp4, o) { f -> _uiState.update { it.copy(progress = 50 + (f * 50).toInt()) } } }

@@ -400,9 +400,19 @@ private fun VideoClip.mainSequence(played: List<Segment>, spans: List<Transition
 /**
  * The heads of the clips coming in through the overlapping transitions [spans], each at its transition's time with
  * gaps between and to the end, over the main track: faded, moved or wiped in by [incomingSettings] and [WipeMask].
- * Each plays on for its [tails] past the cut, the same picture as the main track there, muted.
+ * Each plays on for its [tails] past the cut, the same picture as the main track there, muted. With [looks] and
+ * [volumes] (the preview's) each takes its look and volume from them, and a preview copy from [copies] in place of its source.
  */
-private fun VideoClip.incomingSequence(spans: List<TransitionSpan>, tails: List<Long>, played: List<Segment>, fps: Int, frame: List<Effect>): EditedMediaItemSequence {
+private fun VideoClip.incomingSequence(
+    spans: List<TransitionSpan>,
+    tails: List<Long>,
+    played: List<Segment>,
+    fps: Int,
+    frame: List<Effect>,
+    looks: LiveLooks? = null,
+    volumes: LiveVolumes? = null,
+    copies: Map<Uri, Uri> = emptyMap(),
+): EditedMediaItemSequence {
     val heads = spans.mapIndexed { k, span -> segments[span.clip].let { it.copy(endMs = played[span.clip].startMs + (tails[k] * it.speed).toLong()) } }
     val sound = hasSound(heads)
     val builder = EditedMediaItemSequence.Builder(tracks(sound))
@@ -413,10 +423,27 @@ private fun VideoClip.incomingSequence(spans: List<TransitionSpan>, tails: List<
         at = maxOf(at, span.startMs) + s.outputDurationMs
         val wipe = listOfNotNull(WipeMask(span, fps).takeIf { span.kind.wipes })
         val spanUs = (span.endMs - span.startMs) * 1000
-        builder.addItem(segmentItem(s, Effects(audioEffects(s, sound, mutedFromUs = spanUs, fadeInUs = spanUs), videoEffects(s, frame = frame) + wipe), removeAudio = !sound))
+        val look = looks?.let { listOf(it.effect(span.clip), it.texture(span.clip)) } ?: lookEffects(s.adjust)
+        val audio = audioEffects(s, sound, mutedFromUs = spanUs, fadeInUs = spanUs, volume = volumes?.clip(span.clip) ?: { s.volume })
+        val copy = copies[s.uri]
+        builder.addItem(segmentItem(s.copy(uri = copy ?: s.uri), Effects(audio, videoEffects(s, fit = copy != null, look = look, frame = frame) + wipe), removeAudio = !sound))
     }
     if (outputDurationMs > at) builder.addGap((outputDurationMs - at) * 1000)
     return builder.build()
+}
+
+/**
+ * The heads of the overlapping transitions alone, for the preview, which leaves them out of its composition (IncomingClipPreview
+ * plays this in a player of its own and fades and moves its view): the export's [incomingSequence], each head [PREVIEW_TAIL_MS]
+ * past its cut, its look, the clips' placement, the bars and the blur areas from [looks] and its volume from [volumes], so
+ * those change live. Its frame times are output time, like the export's heads. Null without overlapping transitions.
+ */
+fun VideoClip.headsComposition(looks: LiveLooks, volumes: LiveVolumes, copies: Map<Uri, Uri>): Composition? {
+    val spans = transitionSpans
+    val overlapping = spans.filter { it.kind.overlaps }.takeIf { it.isNotEmpty() } ?: return null
+    val frame = looks.frameEffects(spans.filter { it.kind == TransitionKind.Black || it.kind == TransitionKind.White })
+    val heads = incomingSequence(overlapping, headTailsMs(overlapping, PREVIEW_TAIL_MS), played, outputFrameRate(frameRate), frame, looks, volumes, copies)
+    return Composition.Builder(listOf(heads)).setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL).build()
 }
 
 private fun hasSound(clips: List<Segment>) = clips.any { !it.isImage && it.volume > 0f }

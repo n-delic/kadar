@@ -70,11 +70,11 @@ fun overlaySourceMs(clipStartMs: Long, span: Pair<Long, Long>?, positionMs: Long
 
 /**
  * Whether a preview player at [actualMs] must seek to [targetMs]: paused, to show the exact frame; playing, only once
- * it drifts past [MAX_DRIFT_MS], since every seek stalls it for a moment, and at most once per [SEEK_GAP_MS] (counted
+ * it drifts past [maxDriftMs], since every seek stalls it for a moment, and at most once per [SEEK_GAP_MS] (counted
  * by [sinceSeekMs]), so a decoder slower than real time still plays between corrections instead of seeking forever.
  */
-fun overlayNeedsSeek(actualMs: Long, targetMs: Long, playing: Boolean, sinceSeekMs: Long) =
-    if (playing) sinceSeekMs >= SEEK_GAP_MS && abs(actualMs - targetMs) > MAX_DRIFT_MS else actualMs != targetMs
+fun overlayNeedsSeek(actualMs: Long, targetMs: Long, playing: Boolean, sinceSeekMs: Long, maxDriftMs: Long = MAX_DRIFT_MS) =
+    if (playing) sinceSeekMs >= SEEK_GAP_MS && abs(actualMs - targetMs) > maxDriftMs else actualMs != targetMs
 
 private const val MIN_OVERLAY_MS = 100L
 private const val MAX_DRIFT_MS = 80L

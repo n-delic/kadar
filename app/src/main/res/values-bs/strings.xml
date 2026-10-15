@@ -201,6 +201,8 @@
     <string name="bubble_speech">Govor</string>
     <string name="bubble_thought">Misao</string>
     <string name="bubble_shout">Uzvik</string>
+    <string name="bubble_pill">Kapsula</string>
+    <string name="bubble_double">Dvostruki</string>
     <string name="fill">Ispuna</string>
     <string name="outline">Obrub</string>
     <string name="outline_width">Debljina</string>

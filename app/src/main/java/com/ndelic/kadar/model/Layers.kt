@@ -312,7 +312,7 @@ data class Adjust(
 enum class TextAlign(@StringRes val label: Int) { Left(R.string.align_left), Center(R.string.align_center), Right(R.string.align_right) }
 
 /** The shape of a text layer's box: the rounded caption box, or a bubble with a tail. */
-enum class Bubble(@StringRes val label: Int) { Box(R.string.bubble_box), Speech(R.string.bubble_speech), Thought(R.string.bubble_thought), Shout(R.string.bubble_shout) }
+enum class Bubble(@StringRes val label: Int) { Box(R.string.bubble_box), Speech(R.string.bubble_speech), Thought(R.string.bubble_thought), Shout(R.string.bubble_shout), Pill(R.string.bubble_pill), Double(R.string.bubble_double) }
 
 /** A new text's size on a [width]×[height] canvas, and 100% on the size slider. */
 fun defaultTextSize(width: Int, height: Int) = minOf(width, height) * 0.1f
@@ -387,12 +387,14 @@ data class TextLayer(
     // Per layer, like [paint]: the video export draws copies of animated layers off the main thread.
     private val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val isBubble get() = box != null && bubble != Bubble.Box
+    // A pill keeps the lines as typed, like the caption box; the round bubbles wrap into a rounder block.
+    private val roundWrap get() = isBubble && bubble != Bubble.Pill
     private val layout: StaticLayout = run {
         // Italic letters lean past their measured width; the room keeps the last one inside the box.
         val line = shown.lines().maxOf { paint.measureText(it) } + if (italic) size * 0.3f else 0f
         // Bubbles wrap long text into a rounder block; the caption box keeps the lines as typed.
-        val word = if (isBubble && wrap == null) shown.split(' ', '\n').maxOf { paint.measureText(it) } else 0f
-        val w = wrap?.roundToInt()?.coerceAtLeast(1) ?: ((if (isBubble) bubbleWrapWidth(line, paint.fontSpacing, word) else line).toInt() + 1)
+        val word = if (roundWrap && wrap == null) shown.split(' ', '\n').maxOf { paint.measureText(it) } else 0f
+        val w = wrap?.roundToInt()?.coerceAtLeast(1) ?: ((if (roundWrap) bubbleWrapWidth(line, paint.fontSpacing, word) else line).toInt() + 1)
         val alignment = when (align) {
             TextAlign.Left -> Layout.Alignment.ALIGN_NORMAL
             TextAlign.Center -> Layout.Alignment.ALIGN_CENTER
@@ -418,7 +420,8 @@ data class TextLayer(
     private val boxPadX get() = if (box == null) 0f else size * 0.3f
     private val boxPadY get() = if (box == null) 0f else size * 0.12f
 
-    private val boxStroke get() = if (boxOutline == null) 0f else size * 0.07f
+    // A double outline is two lines with a gap, drawn as one wide stroke with the fill color down its middle.
+    private val boxStroke get() = if (boxOutline == null) 0f else size * if (bubble == Bubble.Double && isBubble) 0.2f else 0.07f
     /** Half the size of the ellipse a bubble's text sits in. */
     private val oval = ellipseAround(layout.width + stroke + size * 0.5f, layout.height + stroke + size * 0.4f)
     private val bubbleHalf by lazy { bubbleHalfSize(bubble, oval[0], oval[1]) }
@@ -452,6 +455,11 @@ data class TextLayer(
             boxPaint.color = boxOutline
             if (isBubble) {
                 canvas.drawPath(bubblePath, boxPaint)
+                if (bubble == Bubble.Double) {
+                    boxPaint.strokeWidth = boxStroke * 0.4f
+                    boxPaint.color = box
+                    canvas.drawPath(bubblePath, boxPaint)
+                }
             } else {
                 // Inside the caption box, so adding an outline doesn't change its size.
                 val i = boxStroke / 2
@@ -534,6 +542,7 @@ private fun bubblePath(bubble: Bubble, rx: Float, ry: Float, half: FloatArray, t
     val body = when (bubble) {
         Bubble.Thought -> oval.apply { op(circles(cloudBumps(rx, ry)), Path.Op.UNION) }
         Bubble.Shout -> polygon(spikyPoints(rx, ry))
+        Bubble.Pill -> Path().apply { addRoundRect(-half[0], -half[1], half[0], half[1], half[1], half[1], Path.Direction.CW) }
         else -> oval
     }
     val tail = when {

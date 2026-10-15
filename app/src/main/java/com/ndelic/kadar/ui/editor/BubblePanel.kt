@@ -14,7 +14,7 @@ import com.ndelic.kadar.ui.common.ColorRow
 import com.ndelic.kadar.ui.common.PanelLabel
 import com.ndelic.kadar.ui.common.TextTabs
 
-/** The box or bubble behind the selected text: its shape (none, caption box, speech, thought, shout), fill, its opacity and outline. */
+/** The box or bubble behind the selected text: its shape (none, caption box, speech, thought, shout, pill, double outline), fill, its opacity and outline. */
 @Composable
 fun BubblePanel(layer: TextLayer, vm: EditorViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

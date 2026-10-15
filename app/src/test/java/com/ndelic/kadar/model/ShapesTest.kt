@@ -91,6 +91,9 @@ class ShapesTest {
     @Test
     fun bubbleSizeCoversItsBody() {
         assertArrayEquals(floatArrayOf(100f, 60f), bubbleHalfSize(Bubble.Speech, 100f, 60f), 0.001f)
+        assertArrayEquals(floatArrayOf(100f, 60f), bubbleHalfSize(Bubble.Double, 100f, 60f), 0.001f)
+        // The pill's round ends reach past the text box's corners: half width = box half width + box half height.
+        assertArrayEquals(floatArrayOf(160f / 1.4142135f, 60f / 1.4142135f), bubbleHalfSize(Bubble.Pill, 100f, 60f), 0.001f)
         val cloud = bubbleHalfSize(Bubble.Thought, 100f, 60f)
         val c = cloudBumps(100f, 60f)
         assertTrue(cloud[0] > 100f && cloud[1] > 60f)

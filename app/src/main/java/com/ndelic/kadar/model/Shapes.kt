@@ -106,7 +106,9 @@ fun spikyPoints(rx: Float, ry: Float, spikes: Int = 14): FloatArray = FloatArray
 
 /** Half the width and height of a [bubble]'s body around the ellipse ([rx], [ry]), without its tail. */
 fun bubbleHalfSize(bubble: Bubble, rx: Float, ry: Float): FloatArray = when (bubble) {
-    Bubble.Box, Bubble.Speech -> floatArrayOf(rx, ry)
+    Bubble.Box, Bubble.Speech, Bubble.Double -> floatArrayOf(rx, ry)
+    // The text's box (the ellipse is the box times √2), with round ends as wide as it is tall, so its corners stay inside.
+    Bubble.Pill -> floatArrayOf((rx + ry) / SQRT2, ry / SQRT2)
     Bubble.Thought -> cloudBumps(rx, ry).let { c ->
         val n = c.size / 3
         floatArrayOf((0 until n).maxOf { abs(c[it * 3]) + c[it * 3 + 2] }, (0 until n).maxOf { abs(c[it * 3 + 1]) + c[it * 3 + 2] })

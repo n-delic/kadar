@@ -7,6 +7,8 @@
     <string name="apply">Primijeni</string>
     <string name="close">Zatvori</string>
     <string name="delete">Obriši</string>
+    <string name="mute">Utišaj</string>
+    <string name="unmute">Vrati zvuk</string>
     <string name="duplicate">Dupliraj</string>
     <string name="edit">Uredi</string>
     <string name="save">Spremi</string>

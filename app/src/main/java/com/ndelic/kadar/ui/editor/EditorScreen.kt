@@ -549,6 +549,13 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_split_scene, stringResource(R.string.tool_split)) { vm.splitClip(positionMs) }
                         IconTool(R.drawable.ic_speed, stringResource(R.string.tool_speed), panel == Panel.Speed) { toggle(Panel.Speed) }
                         IconTool(R.drawable.ic_music_note, stringResource(R.string.tool_audio), panel == Panel.Audio) { toggle(Panel.Audio) }
+                        video?.segments?.getOrNull(clipIndex)?.takeIf { !it.isImage }?.let { s ->
+                            // Unmuting goes back to full volume: a clip doesn't remember the level it had.
+                            val muted = s.volume == 0f
+                            IconTool(if (muted) R.drawable.ic_volume_up else R.drawable.ic_volume_off, stringResource(if (muted) R.string.unmute else R.string.mute)) {
+                                vm.updateSegment(clipIndex) { copy(volume = if (muted) 1f else 0f) }
+                            }
+                        }
                         IconTool(R.drawable.ic_tune, stringResource(R.string.tool_adjust), panel == Panel.Adjust) { toggle(Panel.Adjust) }
                         IconTool(R.drawable.ic_filter_vintage, stringResource(R.string.tool_filters), panel == Panel.Filters) { toggle(Panel.Filters) }
                         IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate)) { vm.duplicateClip(clipIndex) }

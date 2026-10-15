@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.media.MediaRecorder
 import android.net.Uri
+import android.speech.tts.Voice
 import androidx.annotation.OptIn
 import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
@@ -23,10 +24,12 @@ import com.ndelic.kadar.media.importFont
 import com.ndelic.kadar.media.loadBitmap
 import com.ndelic.kadar.media.loadFont
 import com.ndelic.kadar.media.mediaInfo
+import com.ndelic.kadar.media.offlineVoices
 import com.ndelic.kadar.media.renderEmoji
 import com.ndelic.kadar.media.saveToGallery
 import com.ndelic.kadar.media.scaleDown
 import com.ndelic.kadar.media.startVoiceRecording
+import com.ndelic.kadar.media.synthesizeSpeech
 import com.ndelic.kadar.media.trackMimes
 import com.ndelic.kadar.media.trimTransparent
 import com.ndelic.kadar.media.turnBitmap
@@ -78,6 +81,7 @@ import com.ndelic.kadar.video.ClipAnimation
 import com.ndelic.kadar.video.GIF_FPS
 import com.ndelic.kadar.video.GIF_MAX_MS
 import com.ndelic.kadar.video.Music
+import com.ndelic.kadar.video.VoiceEffect
 import com.ndelic.kadar.video.Segment
 import com.ndelic.kadar.video.Transition
 import com.ndelic.kadar.video.VideoClip
@@ -151,6 +155,8 @@ data class EditorUiState(
     val selectedAudio: AudioRef? = null,
     /** Output time the running voice recording started at; null when not recording. */
     val recordingFromMs: Long? = null,
+    /** The offline voices the text-to-speech dialog offers while it's open; null when it's closed. */
+    val speechVoices: List<Voice>? = null,
     /** The bundled fonts, then the imported ones by name. */
     val fonts: List<Font> = emptyList(),
 ) {
@@ -965,11 +971,15 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         selectClip(to)
     }
 
-    /** Adds a song on a track of its own from [atMs] (output time; the start when under a second is left) to the end. */
+    /**
+     * Adds a song on a track of its own from [atMs] (output time; the start when under a second is left) to the end. A
+     * video works too: its sound plays as the song.
+     */
     fun addMusic(uri: Uri, atMs: Long) = work(R.string.busy_adding_music) {
         keepAccess(uri)
         val (info, name) = withContext(Dispatchers.IO) { mediaInfo(app, uri) to displayName(app, uri) }
         if (info.durationMs == 0L) throw UserError(R.string.error_read_audio)
+        if (withContext(Dispatchers.IO) { trackMimes(app, uri) }.none { it.startsWith("audio/") }) throw UserError(R.string.error_no_sound)
         updateClip { copy(music = music + Music(uri, name, info.durationMs, part = AudioPart(atMs = audioStartMs(atMs, outputDurationMs)))) }
         selectAudio(AudioRef(voice = false, index = _uiState.value.project?.video?.music?.lastIndex ?: 0))
     }
@@ -1003,6 +1013,39 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         }
         updateClip { withAudio(ref) { parts.toList() } }
         selectAudio(ref.copy(index = ref.index + 1))
+    }
+
+    /** Changes how the selected voiceover track sounds. */
+    fun setVoiceEffect(effect: VoiceEffect) {
+        val ref = _uiState.value.selectedAudio?.takeIf { it.voice } ?: return
+        updateClip { copy(voices = voices.mapIndexed { i, v -> if (i == ref.index) v.copy(effect = effect) else v }) }
+    }
+
+    /** Opens the text-to-speech dialog with the phone's offline voices, or says how to get one when there are none. */
+    fun openSpeech() = work(R.string.busy_loading_voices) {
+        val voices = offlineVoices(app)
+        if (voices.isEmpty()) throw UserError(R.string.speech_no_voices)
+        _uiState.update { it.copy(speechVoices = voices) }
+    }
+
+    fun closeSpeech() = _uiState.update { it.copy(speechVoices = null) }
+
+    /** Speaks [text] in [voice] into the project folder and adds it as a voiceover track from [atMs] (output time). */
+    fun addSpeech(text: String, voice: Voice, atMs: Long) = work(R.string.busy_speaking) {
+        val dir = _uiState.value.projectDir ?: return@work
+        val file = store.newSpeechFile(dir)
+        var added = false
+        try {
+            synthesizeSpeech(app, text, voice, file)
+            val durationMs = withContext(Dispatchers.IO) { mediaInfo(app, Uri.fromFile(file)).durationMs }
+            if (durationMs <= 0 || file.parentFile != _uiState.value.projectDir) throw UserError(R.string.error_speech)
+            updateClip { copy(voices = voices + VoiceClip(file, durationMs, AudioPart(atMs = audioStartMs(atMs, outputDurationMs), lengthMs = durationMs))) }
+            added = true
+            closeSpeech()
+            selectAudio(AudioRef(voice = true, index = _uiState.value.project?.video?.voices?.lastIndex ?: 0))
+        } finally {
+            if (!added) file.delete()
+        }
     }
 
     fun deleteAudio() {

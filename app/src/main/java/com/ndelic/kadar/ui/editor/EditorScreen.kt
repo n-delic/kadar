@@ -191,6 +191,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     var playing by remember { mutableStateOf(false) }
     var positionMs by remember { mutableLongStateOf(0L) }
     val music = rememberLauncherForActivityResult(OpenDocument()) { it?.let { uri -> vm.addMusic(uri, positionMs) } }
+    val videoSound = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let { uri -> vm.addMusic(uri, positionMs) } }
     val overlayVideo = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let { uri -> vm.addVideo(uri, positionMs) } }
     val newClip = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::addClip) }
     // The clip being replaced, by index, while the picker is open.
@@ -413,8 +414,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         Panel.Canvas -> CanvasPanel(project, state.settings.exportSize, vm)
                         Panel.Speed -> video?.let { SpeedPanel(it, clipIndex, vm) }
                         Panel.Audio -> video?.let { v ->
-                            AudioPanel(v, clipIndex, audio, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }, onDrag = volumes::show) {
-                                VoiceoverSection(v, state.recordingFromMs, positionMs, playing, player, vm, onPlay = { playing = it })
+                            AudioPanel(v, clipIndex, audio, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }, onAddVideoSound = { videoSound.launch(PickVisualMediaRequest(PickVisualMedia.VideoOnly)) }, onDrag = volumes::show) {
+                                VoiceoverSection(v, state.recordingFromMs, state.speechVoices, positionMs, playing, player, vm, onPlay = { playing = it })
                             }
                         }
                         Panel.Presets -> if (selected is TextLayer) TextPresetsPanel(state.fonts, vm)

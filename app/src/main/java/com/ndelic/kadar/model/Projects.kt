@@ -207,6 +207,12 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                         outline = if (j.has("outline")) j.getInt("outline") else null,
                         outlineStyle = enumOr(j.optString("outlineStyle"), OutlineStyle.Solid),
                         blend = enumOr(j.optString("blend"), LayerBlend.Normal),
+                        effect = Effect(
+                            enumOr(j.optString("effect"), EffectKind.None),
+                            j.optDouble("effectAmount", 0.5).toFloat(),
+                            j.optInt("duotoneDark", DUOTONES[0].first),
+                            j.optInt("duotoneLight", DUOTONES[0].second),
+                        ),
                         outlineWidth = j.optDouble("outlineWidth", DEFAULT_OUTLINE_WIDTH.toDouble()).toFloat(),
                     )
                 }
@@ -412,6 +418,12 @@ private fun Layer.toJson() = JSONObject().apply {
         is ImageLayer -> {
             put("type", "image")
             if (layer.blend != LayerBlend.Normal) put("blend", layer.blend.name)
+            if (layer.effect.kind != EffectKind.None) {
+                put("effect", layer.effect.kind.name)
+                put("effectAmount", layer.effect.amount.toDouble())
+                put("duotoneDark", layer.effect.dark)
+                put("duotoneLight", layer.effect.light)
+            }
             put("file", layer.file)
             putAdjust(layer.adjust)
             put("opacity", layer.opacity.toDouble())

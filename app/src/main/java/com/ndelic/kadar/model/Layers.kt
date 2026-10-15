@@ -167,11 +167,14 @@ data class ImageLayer(
     val outlineWidth: Float = DEFAULT_OUTLINE_WIDTH,
     /** How the picture mixes with what's under it (photo projects; a video's layers are drawn apart from the video). */
     val blend: LayerBlend = LayerBlend.Normal,
+    val effect: Effect = Effect(),
 ) : Layer {
     // With an outline the opacity goes on both at once (one offscreen layer), so the outline doesn't show through the picture.
     private val pictureAlpha = if (outline == null) opacity else 1f
-    private val paint = if (adjust.isNone && pictureAlpha >= 1f) bitmapPaint else Paint(bitmapPaint).apply {
-        if (!adjust.isNone) colorFilter = ColorMatrixColorFilter(adjust.filterMatrix())
+    private val effectMatrix = effect.matrix()
+    private val paint = if (adjust.isNone && effectMatrix == null && pictureAlpha >= 1f) bitmapPaint else Paint(bitmapPaint).apply {
+        // The effect works on the picture's own colors, so the look and sliders go after it.
+        if (!adjust.isNone || effectMatrix != null) colorFilter = ColorMatrixColorFilter(effectMatrix?.let { concat(adjust.filterMatrix(), it) } ?: adjust.filterMatrix())
         alpha = (pictureAlpha * 255).roundToInt()
     }
     private val texture = adjust.texturePaints(width, height)
@@ -182,6 +185,9 @@ data class ImageLayer(
         }
     }
     private val mask by lazy { outline?.let { outlineMask(bitmap, outlineStyle, outlineWidth, t.stretch) } }
+    // A blur comes back smaller than the picture, so it's drawn over the picture's bounds.
+    private val picture by lazy { effected(bitmap, effect) }
+    private val bounds = RectF(-width / 2, -height / 2, width / 2, height / 2)
     private val outlineSize get() = if (outline == null) 0f else outlineWidth * maxOf(width, height)
     override val width get() = bitmap.width.toFloat()
     override val height get() = bitmap.height.toFloat()
@@ -203,11 +209,11 @@ data class ImageLayer(
             canvas.translate(-dx, -dy)
         }
         if (texture.isEmpty()) {
-            canvas.drawBitmap(bitmap, -width / 2, -height / 2, paint)
+            canvas.drawBitmap(picture, null, bounds, paint)
         } else {
             // A layer of its own, so the vignette and grain (SRC_ATOP) land only on the picture's pixels, not its outline.
             canvas.saveLayer(-width / 2, -height / 2, width / 2, height / 2, null)
-            canvas.drawBitmap(bitmap, -width / 2, -height / 2, paint)
+            canvas.drawBitmap(picture, null, bounds, paint)
             texture.forEach { canvas.drawRect(-width / 2, -height / 2, width / 2, height / 2, it) }
         }
         canvas.restoreToCount(blended ?: count)

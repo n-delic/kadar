@@ -85,6 +85,26 @@ class VideoEditTest {
     }
 
     @Test
+    fun clipPlacementStaysInRangeAndPlacesTheFittedBox() {
+        // No zooming out past the fit or in past the cap; the center stays on the canvas.
+        assertEquals(ClipPlacement(1f, 0.5f, -0.5f), ClipPlacement().moved(0.8f, -0.9f, 0.5f))
+        assertEquals(MAX_CLIP_ZOOM, ClipPlacement(4f).moved(0f, 0f, 2f).zoom)
+        // A 1080×608 frame fitted into a 1080×1920 canvas, zoomed twice about the center, moved a quarter canvas down.
+        val placed = ClipPlacement(2f, 0f, 0.25f).place(floatArrayOf(0f, 656f, 1080f, 1264f), 1080, 1920)
+        assertArrayEquals(floatArrayOf(-540f, 832f, 1620f, 2048f), placed, 0.01f)
+    }
+
+    @Test
+    fun placementBlurStrengthAndBarsKeepThePreviewStructure() {
+        val video = VideoClip(emptyList(), canvas = 0.5f)
+        assertEquals(video.previewStructure(), video.copy(placement = ClipPlacement(2f, 0.1f, 0f), blurStrength = 2f).previewStructure())
+        // Black bars need no fill; under the blurred canvas they stay see-through.
+        assertEquals(null, video.barFill(android.graphics.Color.BLACK))
+        assertEquals(0xFFFF0000.toInt(), video.barFill(0xFFFF0000.toInt()))
+        assertEquals(null, video.copy(blur = true).barFill(0xFFFF0000.toInt()))
+    }
+
+    @Test
     fun volumeGainReadsALiveVolumeOverTheFades() {
         val volumes = LiveVolumes()
         // A fade from 1 s on at a quarter, unity before it (48 kHz).

@@ -5,6 +5,8 @@ package com.ndelic.kadar.video
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Matrix
+import android.graphics.RectF
 import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.C
@@ -25,6 +27,7 @@ import androidx.media3.effect.Brightness
 import androidx.media3.effect.Crop
 import androidx.media3.effect.FrameDropEffect
 import androidx.media3.effect.GaussianBlur
+import androidx.media3.effect.MatrixTransformation
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.Presentation
 import androidx.media3.effect.RgbMatrix
@@ -50,6 +53,7 @@ import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.model.animationSpans
 import com.ndelic.kadar.model.drawLayer
 import com.ndelic.kadar.model.filterMatrix
+import com.ndelic.kadar.model.fitRect
 import com.ndelic.kadar.model.glRgbMatrix
 import com.ndelic.kadar.model.motionAt
 import com.ndelic.kadar.model.renderLayers
@@ -100,10 +104,14 @@ data class VideoClip(
     /** The first clip's display size, set when the project is made; every clip is fitted into it. */
     val width: Int = 0,
     val height: Int = 0,
-    /** Output aspect ratio (width / height), or null to keep the video's own; the rest is black, or [blur]. */
+    /** Output aspect ratio (width / height), or null to keep the video's own; the rest is the project's background color, or [blur]. */
     val canvas: Float? = null,
-    /** Fills the canvas around the video with a blurred, zoomed copy of it instead of black. */
+    /** Fills the canvas around the video with a blurred, zoomed copy of it instead of the background color. */
     val blur: Boolean = false,
+    /** How strong the [blur] is, times [BLUR_SIGMA]. */
+    val blurStrength: Float = 1f,
+    /** Where every clip sits in the canvas after its fit. */
+    val placement: ClipPlacement = ClipPlacement(),
     /** The first clip's average frames per second, 0 when unknown. */
     val frameRate: Float = 0f,
     val voices: List<VoiceClip> = emptyList(),
@@ -112,8 +120,8 @@ data class VideoClip(
     fun withoutAdjust() = copy(segments = segments.map { it.copy(adjust = Adjust()) })
 
     /**
-     * What the preview's composition is built from: without what it takes live ([LiveLooks], [LiveVolumes]) or draws
-     * itself (the blurred canvas), so changing those doesn't reload it. The clips' volumes only say whether any has sound,
+     * What the preview's composition is built from: without what it takes live ([LiveLooks], [LiveVolumes]: looks,
+     * volumes, the placement and the bars' color) or draws itself (the blurred canvas), so changing those doesn't reload it. The clips' volumes only say whether any has sound,
      * which decides whether they get an audio track.
      */
     fun previewStructure(): VideoClip {
@@ -123,6 +131,8 @@ data class VideoClip(
             music = music.map { it.copy(part = it.part.copy(volume = 1f)) },
             voices = voices.map { it.copy(part = it.part.copy(volume = 1f)) },
             blur = false,
+            blurStrength = 1f,
+            placement = ClipPlacement(),
         )
     }
 
@@ -158,7 +168,48 @@ data class VideoClip(
 
     /** Whether the output has sound: from a clip, the music or a voiceover. */
     val hasSound get() = hasSound(segments) || music.isNotEmpty() || voices.isNotEmpty()
+
+    /**
+     * The color painted around the clips ([BarFill]) on a [background] canvas, or null for none: under a blurred canvas
+     * the bars stay see-through, and black bars come out black anyway.
+     */
+    fun barFill(background: Int) = background.takeIf { !blurred && it != android.graphics.Color.BLACK }
+
+    /** Where a [w]×[h] frame of a clip shows on the canvas, for pictures drawn without Media3 (thumbnail, eyedropper, draw pad). */
+    fun frameRect(w: Int, h: Int): RectF {
+        val (cw, ch) = outputSize
+        val r = fitRect(w, h, cw, ch)
+        val p = placement.place(floatArrayOf(r.left, r.top, r.right, r.bottom), cw, ch)
+        return RectF(p[0], p[1], p[2], p[3])
+    }
 }
+
+/**
+ * Where the clips sit in the canvas after they are fitted into it: zoomed by [zoom] (1 is the fit) about the canvas center,
+ * then moved by [x] and [y] (shares of the canvas, y down).
+ */
+data class ClipPlacement(val zoom: Float = 1f, val x: Float = 0f, val y: Float = 0f) {
+    val isFit get() = this == ClipPlacement()
+
+    /** Moved by [dx], [dy] and zoomed by [z] (a pinch), kept from zooming out past the fit or the center leaving the canvas. */
+    fun moved(dx: Float, dy: Float, z: Float) =
+        ClipPlacement((zoom * z).coerceIn(1f, MAX_CLIP_ZOOM), (x + dx).coerceIn(-0.5f, 0.5f), (y + dy).coerceIn(-0.5f, 0.5f))
+
+    /** Box [box] (left, top, right, bottom on a [w]×[h] canvas) placed like [matrix] places the frame. */
+    fun place(box: FloatArray, w: Int, h: Int): FloatArray {
+        val cx = w / 2f
+        val cy = h / 2f
+        return FloatArray(4) { i -> if (i % 2 == 0) cx + x * w + (box[i] - cx) * zoom else cy + y * h + (box[i] - cy) * zoom }
+    }
+
+    /** As a Media3 transformation: normalized device coordinates, 2 wide, y up. */
+    fun matrix() = Matrix().apply {
+        setScale(zoom, zoom)
+        postTranslate(2 * x, -2 * y)
+    }
+}
+
+const val MAX_CLIP_ZOOM = 5f
 
 /**
  * Size of a [ratio] canvas for a [w]×[h] video: the long side stays (capped at 1920 so phones can encode it), dimensions even.
@@ -192,7 +243,8 @@ private const val BLUR_LONG_SIDE = 320
  * the output's frame times (the preview turns it off). [frameClock] times the output by the frame clock at [VideoClip.frameRate]
  * even without video layers or transitions, for an export at a chosen frame rate. With [looks] (the preview's) the clips
  * take their looks from it on every frame instead of each baking its own in, and with [volumes] the clips, songs and
- * voiceovers their volumes. Call it on the main thread, like [timedOverlay].
+ * voiceovers their volumes, the clips' placement and the bars' color; without it the bars are [VideoClip.barFill] of
+ * [background]. Call it on the main thread, like [timedOverlay].
  */
 fun VideoClip.composition(
     layers: List<Layer> = emptyList(),
@@ -203,6 +255,7 @@ fun VideoClip.composition(
     previewCopies: Map<Uri, Uri> = emptyMap(),
     looks: LiveLooks? = null,
     volumes: LiveVolumes? = null,
+    background: Int = android.graphics.Color.BLACK,
 ): Composition {
     // Media3's compositor takes every output frame time from sequence 0 and draws it on top, then the others in order.
     // So sequence 0 is an invisible frame clock at the clip's rate, then the overlays (topmost layer first), each padded
@@ -233,15 +286,16 @@ fun VideoClip.composition(
     }
     val overlay = groups.last().takeIf { it.isNotEmpty() }?.let { timedOverlay(w, h, it, outputDurationMs) }
     val played = this.played
+    val frame = looks?.frameEffects() ?: frameEffects(placement, barFill(background))
     overlapping?.let { o ->
         val tails = headTailsMs(o)
         val fps = outputFrameRate(frameRate)
         inputs += incomingSettings(o, tails, fps)
-        sequences += incomingSequence(o, tails, played, fps)
+        sequences += incomingSequence(o, tails, played, fps, frame)
         inputs += outgoingSettings(o, fps)
     }
     // The clips set the output's frame times only when they are sequence 0; with a frame clock its rate already holds.
-    sequences += mainSequence(played, spans, dropFrames && sequences.isEmpty(), previewCopies, looks, volumes)
+    sequences += mainSequence(played, spans, dropFrames && sequences.isEmpty(), previewCopies, looks, volumes, frame)
     if (blurred) sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItems(played.map { blurredBackground(it) }).build()
     // Audio only, after every video sequence, so the compositor's input numbers above stay as they are.
     sequences += music.flatMapIndexed { i, m -> audioSequences(m.uri, m.startMs, m.durationMs, m.part, outputDurationMs, volumes?.music(i) ?: { m.part.volume }) }
@@ -286,7 +340,7 @@ private fun VideoClip.blankStill(effects: List<Effect> = emptyList()): EditedMed
  * handing the encoder speed times as many (300 fps at 10x). Media3 1.11's preview runs on past the end with the frame
  * drop effect, so the preview leaves it out; the frames it shows are the same.
  */
-private fun VideoClip.mainSequence(played: List<Segment>, spans: List<TransitionSpan>, dropFrames: Boolean, copies: Map<Uri, Uri>, looks: LiveLooks?, volumes: LiveVolumes?): EditedMediaItemSequence {
+private fun VideoClip.mainSequence(played: List<Segment>, spans: List<TransitionSpan>, dropFrames: Boolean, copies: Map<Uri, Uri>, looks: LiveLooks?, volumes: LiveVolumes?, frame: List<Effect>): EditedMediaItemSequence {
     val sound = hasSound(played)
     val dips = spans.filter { !it.kind.overlaps }
     val items = played.mapIndexed { i, s ->
@@ -301,7 +355,7 @@ private fun VideoClip.mainSequence(played: List<Segment>, spans: List<Transition
         val inMs = dips.firstOrNull { it.clip == i }?.let { (it.endMs - it.startMs) / 2 } ?: 0
         val audio = audioEffects(s, sound, fadeInUs = inMs * 1000, fadeOutUs = outMs * 1000, volume = volumes?.clip(i) ?: { s.volume })
         val look = looks?.let { listOf(it.effect(i), it.texture(i)) } ?: lookEffects(s.adjust)
-        segmentItem(s.copy(uri = copy ?: s.uri), Effects(audio, videoEffects(s, effects, fit = copy != null, look)), removeAudio = !sound)
+        segmentItem(s.copy(uri = copy ?: s.uri), Effects(audio, videoEffects(s, effects, fit = copy != null, look, frame)), removeAudio = !sound)
     }
     return EditedMediaItemSequence.Builder(tracks(sound)).addItems(items).build()
 }
@@ -311,7 +365,7 @@ private fun VideoClip.mainSequence(played: List<Segment>, spans: List<Transition
  * gaps between and to the end, over the main track: faded, moved or wiped in by [incomingSettings] and [WipeMask].
  * Each plays on for its [tails] past the cut, the same picture as the main track there, muted.
  */
-private fun VideoClip.incomingSequence(spans: List<TransitionSpan>, tails: List<Long>, played: List<Segment>, fps: Int): EditedMediaItemSequence {
+private fun VideoClip.incomingSequence(spans: List<TransitionSpan>, tails: List<Long>, played: List<Segment>, fps: Int, frame: List<Effect>): EditedMediaItemSequence {
     val heads = spans.mapIndexed { k, span -> segments[span.clip].let { it.copy(endMs = played[span.clip].startMs + (tails[k] * it.speed).toLong()) } }
     val sound = hasSound(heads)
     val builder = EditedMediaItemSequence.Builder(tracks(sound))
@@ -322,7 +376,7 @@ private fun VideoClip.incomingSequence(spans: List<TransitionSpan>, tails: List<
         at = maxOf(at, span.startMs) + s.outputDurationMs
         val wipe = listOfNotNull(WipeMask(span, fps).takeIf { span.kind.wipes })
         val spanUs = (span.endMs - span.startMs) * 1000
-        builder.addItem(segmentItem(s, Effects(audioEffects(s, sound, mutedFromUs = spanUs, fadeInUs = spanUs), videoEffects(s) + wipe), removeAudio = !sound))
+        builder.addItem(segmentItem(s, Effects(audioEffects(s, sound, mutedFromUs = spanUs, fadeInUs = spanUs), videoEffects(s, frame = frame) + wipe), removeAudio = !sound))
     }
     if (outputDurationMs > at) builder.addGap((outputDurationMs - at) * 1000)
     return builder.build()
@@ -364,7 +418,7 @@ private fun VideoClip.blurredBackground(s: Segment): EditedMediaItem {
     val effects = listOfNotNull(
         adjustEffect(s.adjust),
         Presentation.createForWidthAndHeight(bw, bh, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP),
-        GaussianBlur(BLUR_SIGMA),
+        GaussianBlur(BLUR_SIGMA * blurStrength),
         // Darker, so captions over the background stay readable.
         Brightness(-0.15f),
         Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_STRETCH_TO_FIT),
@@ -372,8 +426,8 @@ private fun VideoClip.blurredBackground(s: Segment): EditedMediaItem {
     return segmentItem(s, Effects(emptyList(), effects), removeAudio = true)
 }
 
-/** In pixels of [blurSize]'s frame: about 5% of the canvas's long side. */
-private const val BLUR_SIGMA = 16f
+/** In pixels of [blurSize]'s frame: about 5% of the canvas's long side, at a [VideoClip.blurStrength] of 1. */
+const val BLUR_SIGMA = 16f
 
 /** A transparent 2×2 PNG. */
 private const val BLANK_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAC0lEQVR4nGNgQAcAABIAAXfx+gAAAAAASUVORK5CYII="
@@ -653,8 +707,8 @@ private const val HIGH_BITS_PER_PIXEL = 0.28f
 private const val MAX_BITRATE = 50_000_000f
 private const val AAC_BITRATE = 131_072
 
-/** Clip [s]'s [look], then [transition] effects, then its fit into the canvas. */
-private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyList(), fit: Boolean = false, look: List<Effect> = lookEffects(s.adjust)): List<Effect> = buildList {
+/** Clip [s]'s [look], then [transition] effects, then its fit into the canvas, then its [frame] (placement and bars). */
+private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyList(), fit: Boolean = false, look: List<Effect> = lookEffects(s.adjust), frame: List<Effect>): List<Effect> = buildList {
     addAll(look)
     addAll(transition)
     // Clips of another size or orientation than the first are fitted into its frame.
@@ -662,7 +716,14 @@ private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyL
         val (w, h) = outputSize
         add(Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_SCALE_TO_FIT))
     }
+    addAll(frame)
 }
+
+/** The clips' [placement] (a transformation after the fit, which Media3 draws in the same pass), then the bars' [fill]. */
+private fun frameEffects(placement: ClipPlacement, fill: Int?) = listOfNotNull(
+    placement.takeUnless { it.isFit }?.let { p -> MatrixTransformation { p.matrix() } },
+    fill?.let { c -> BarFill { c } },
+)
 
 /** The same matrix as an image layer's paint, so a look or adjustment matches between photo and video. */
 private fun adjustEffect(adjust: Adjust) = if (adjust.isNone) null else glRgbMatrix(adjust.filterMatrix()).let { m -> RgbMatrix { _, _ -> m } }
@@ -691,6 +752,18 @@ class LiveLooks {
 
     /** Clip [clip]'s vignette and grain, after [effect]. */
     fun texture(clip: Int) = VignetteGrain { adjusts.getOrNull(clip) ?: Adjust() }
+
+    @Volatile private var placement = ClipPlacement()
+    @Volatile private var fill = android.graphics.Color.TRANSPARENT
+
+    /** The clips' [placement] and the bars' [fill] ([VideoClip.barFill], null for none). */
+    fun showFrame(placement: ClipPlacement, fill: Int?) {
+        this.placement = placement
+        this.fill = fill ?: android.graphics.Color.TRANSPARENT
+    }
+
+    /** Like the export's placement and bars, but always there, so a new placement or color comes in live. */
+    fun frameEffects() = listOf(MatrixTransformation { placement.matrix() }, BarFill { fill })
 }
 
 private val NO_LOOK = glRgbMatrix(Adjust().filterMatrix())

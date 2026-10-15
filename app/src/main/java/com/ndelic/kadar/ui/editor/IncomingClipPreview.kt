@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.SystemClock
 import android.view.TextureView
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.requiredSize
@@ -27,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
@@ -60,12 +62,13 @@ import kotlinx.coroutines.delay
 /**
  * The incoming clip of an overlapping transition (dissolve, wipe, slide, push) on the stage, over the main preview,
  * which keeps playing the clip before: the clip's head in its own player (a photo as its picture from [stills]),
- * fitted into the canvas like the export fits it, and faded, moved or clipped by the view at [clock] (the main
+ * fitted into the canvas and placed like the export places it, over the bars' [fill] (VideoClip.barFill, null for
+ * none), and faded, moved or clipped by the view at [clock] (the main
  * player's position, every frame while it plays). It follows [main] like [VideoLayerPreview]; the export draws the same
  * heads with Media3 (VideoClip.incomingSequence), placed by the same TransitionKind functions.
  */
 @Composable
-fun IncomingClipPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canvasWidth: Int, canvasHeight: Int, scale: Float, main: Player?, clock: LongState) {
+fun IncomingClipPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canvasWidth: Int, canvasHeight: Int, scale: Float, main: Player?, clock: LongState, fill: Int?) {
     val context = LocalContext.current
     val spans = remember(clip) { clip.transitionSpans.filter { it.kind.overlaps } }
     // Each head stays on top, at its final look, a little past its cut, until the main preview shows the next clip.
@@ -157,9 +160,16 @@ fun IncomingClipPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canvasW
             translationY = y * size.height
             shape = shown.kind.wipeRect(p)?.let(::FractionShape) ?: RectangleShape
             this.clip = true
-        },
+        }.then(if (fill != null) Modifier.background(Color(fill)) else Modifier),
     ) {
-        val placed = Modifier.fillMaxSize().wrapContentSize(Alignment.Center, unbounded = true).requiredSize(frame).graphicsLayer { renderEffect = filter }
+        val p = clip.placement
+        val placed = Modifier.fillMaxSize().wrapContentSize(Alignment.Center, unbounded = true).requiredSize(frame).graphicsLayer {
+            renderEffect = filter
+            scaleX = p.zoom
+            scaleY = p.zoom
+            translationX = p.x * canvasWidth * scale
+            translationY = p.y * canvasHeight * scale
+        }
         key(player) {
             AndroidView(
                 factory = { TextureView(it).also(player::setVideoTextureView) },

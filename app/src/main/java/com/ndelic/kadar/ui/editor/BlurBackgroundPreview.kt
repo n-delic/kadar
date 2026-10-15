@@ -38,6 +38,7 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.ndelic.kadar.model.filterMatrix
+import com.ndelic.kadar.video.BLUR_SIGMA
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.overlayNeedsSeek
 import com.ndelic.kadar.video.sourceMs
@@ -101,9 +102,9 @@ fun BlurBackgroundPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canva
     // Drawn and blurred at 1/BLUR_DOWNSCALE of its size, then scaled up: a blur costs its pixels times its radius, and a
     // blurred picture loses nothing by being small.
     val size = with(LocalDensity.current) { DpSize((s.width * cover / BLUR_DOWNSCALE).toDp(), (s.height * cover / BLUR_DOWNSCALE).toDp()) }
-    // The export blurs at 320 px on the long side with sigma 16; the same share of the stage here. Android turns a
+    // The export blurs at 320 px on the long side with sigma BLUR_SIGMA times the strength; the same share of the stage here. Android turns a
     // blur radius into sigma = 0.57735 * radius + 0.5, so the radius is scaled up to match.
-    val radius = BLUR_SHARE * maxOf(canvasWidth, canvasHeight) * scale / 0.57735f / BLUR_DOWNSCALE
+    val radius = BLUR_SHARE * clip.blurStrength * maxOf(canvasWidth, canvasHeight) * scale / 0.57735f / BLUR_DOWNSCALE
     val effect = remember(s.adjust, radius) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return@remember null
         val m = s.adjust.filterMatrix().copyOf()
@@ -134,6 +135,6 @@ fun BlurBackgroundPreview(clip: VideoClip, stills: Map<Uri, List<Bitmap>>, canva
     }, contentScale = ContentScale.FillBounds) }
 }
 
-private const val BLUR_SHARE = 16f / 320
+private const val BLUR_SHARE = BLUR_SIGMA / 320
 private const val POLL_MS = 32L
 private const val BLUR_DOWNSCALE = 8f

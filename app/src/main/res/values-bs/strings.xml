@@ -218,6 +218,10 @@
     <string name="undo_stroke">Poništi potez</string>
     <string name="pen_marker">Marker</string>
     <string name="pen_highlighter">Signir</string>
+    <string name="pen_neon">Neon</string>
+    <string name="pen_dotted">Tačkice</string>
+    <string name="pen_spray">Sprej</string>
+    <string name="pen_soft">Meka</string>
     <string name="brush_erase">Briši</string>
     <string name="brush_restore">Vrati</string>
     <string name="redo_stroke">Ponovi potez</string>

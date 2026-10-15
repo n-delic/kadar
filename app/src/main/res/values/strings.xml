@@ -220,6 +220,10 @@
     <string name="undo_stroke">Undo stroke</string>
     <string name="pen_marker">Marker</string>
     <string name="pen_highlighter">Highlighter</string>
+    <string name="pen_neon">Neon</string>
+    <string name="pen_dotted">Dotted</string>
+    <string name="pen_spray">Spray</string>
+    <string name="pen_soft">Soft</string>
     <string name="brush_erase">Erase</string>
     <string name="brush_restore">Restore</string>
     <string name="redo_stroke">Redo stroke</string>

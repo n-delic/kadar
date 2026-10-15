@@ -46,6 +46,7 @@ import com.ndelic.kadar.R
 import com.ndelic.kadar.model.DrawLayer
 import com.ndelic.kadar.model.Layer
 import com.ndelic.kadar.model.PenStroke
+import com.ndelic.kadar.model.PenStyle
 import com.ndelic.kadar.model.Project
 import com.ndelic.kadar.model.Transform
 import com.ndelic.kadar.model.canvasStrokes
@@ -62,7 +63,15 @@ import com.ndelic.kadar.ui.common.fullWidthPanel
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-private enum class Pen(@StringRes val label: Int) { Marker(R.string.pen_marker), Highlighter(R.string.pen_highlighter), Eraser(R.string.pen_eraser) }
+private enum class Pen(@StringRes val label: Int, val style: PenStyle = PenStyle.Solid) {
+    Marker(R.string.pen_marker),
+    Highlighter(R.string.pen_highlighter),
+    Neon(R.string.pen_neon, PenStyle.Neon),
+    Dotted(R.string.pen_dotted, PenStyle.Dotted),
+    Spray(R.string.pen_spray, PenStyle.Spray),
+    Soft(R.string.pen_soft, PenStyle.Soft),
+    Eraser(R.string.pen_eraser),
+}
 
 /**
  * Freehand drawing over the canvas: one finger draws or erases, two fingers zoom and pan. [layers] and [under] (the
@@ -119,10 +128,10 @@ fun DrawScreen(project: Project, layers: List<Layer>, under: Bitmap?, target: Dr
                     awaitEachGesture {
                         val down = awaitFirstDown()
                         val before = strokes
-                        // Width follows the screen, so zooming in draws finer lines; the highlighter is wider and see-through.
+                        // Width follows the screen, so zooming in draws finer lines; the highlighter is wider and see-through, a spray covers a patch.
                         val eraser = pen == Pen.Eraser
                         val highlighter = pen == Pen.Highlighter
-                        val width = with(density) { sizeDp.dp.toPx() } / (fit * zoom) * if (highlighter || eraser) 3 else 1
+                        val width = with(density) { sizeDp.dp.toPx() } / (fit * zoom) * if (highlighter || eraser || pen == Pen.Spray) 3 else 1
                         val alpha = (opacity * if (highlighter) 128 else 255).roundToInt()
                         val argb = (color and 0x00FFFFFF) or (alpha shl 24)
                         val points = ArrayList<Float>()
@@ -136,7 +145,7 @@ fun DrawScreen(project: Project, layers: List<Layer>, under: Bitmap?, target: Dr
                             }
                             points += c.x
                             points += c.y
-                            if (!eraser) current = PenStroke(argb, width, points.toFloatArray())
+                            if (!eraser) current = PenStroke(argb, width, points.toFloatArray(), pen.style)
                         }
                         add(down.position)
                         var drawing = true

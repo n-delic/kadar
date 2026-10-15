@@ -1,8 +1,10 @@
 package com.ndelic.kadar.model
 
 import android.graphics.Bitmap
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.ColorMatrixColorFilter
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
@@ -247,6 +249,7 @@ data class DrawLayer(
 ) : Layer {
     private val bounds = strokeBounds(strokes)
     private val paths by lazy { strokes.map { it.path() } }
+    private val sprays by lazy { strokes.map { if (it.style == PenStyle.Spray) sprayDots(it.points, it.width) else null } }
     // Per layer, not shared: animated video frames are drawn on the GL thread while the stage draws on the main thread.
     private val penPaint by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -260,7 +263,38 @@ data class DrawLayer(
     override fun drawContent(canvas: Canvas) = strokes.forEachIndexed { i, s ->
         penPaint.color = s.color
         penPaint.strokeWidth = s.width
-        canvas.drawPath(paths[i], penPaint)
+        when (s.style) {
+            PenStyle.Solid -> canvas.drawPath(paths[i], penPaint)
+            // Zero-length dashes with round caps are dots, one width apart.
+            PenStyle.Dotted -> drawWith(penPaint.apply { pathEffect = DashPathEffect(floatArrayOf(0f, s.width * 2), 0f) }) { canvas.drawPath(paths[i], it) }
+            PenStyle.Soft -> drawWith(penPaint.apply { maskFilter = BlurMaskFilter(s.width * 0.3f, BlurMaskFilter.Blur.NORMAL) }) { canvas.drawPath(paths[i], it) }
+            PenStyle.Neon -> {
+                // A wide blurred glow in the color, then a thin core close to white.
+                penPaint.strokeWidth = s.width * 1.6f
+                drawWith(penPaint.apply { maskFilter = BlurMaskFilter(s.width * 0.8f, BlurMaskFilter.Blur.NORMAL) }) { canvas.drawPath(paths[i], it) }
+                penPaint.strokeWidth = s.width * 0.45f
+                penPaint.color = towardWhite(s.color, 0.7f)
+                canvas.drawPath(paths[i], penPaint)
+            }
+            PenStyle.Spray -> drawWith(penPaint.apply { style = Paint.Style.FILL }) { p ->
+                val d = sprays[i]!!
+                for (k in 0 until d.size / 3) canvas.drawCircle(d[3 * k], d[3 * k + 1], d[3 * k + 2], p)
+            }
+        }
+    }
+
+    /** [color] moved [amount] of the way to white, its alpha kept. */
+    private fun towardWhite(color: Int, amount: Float): Int {
+        fun ch(shift: Int) = ((color shr shift and 0xFF) + ((255 - (color shr shift and 0xFF)) * amount)).roundToInt() shl shift
+        return (color and 0xFF000000.toInt()) or ch(16) or ch(8) or ch(0)
+    }
+
+        /** Draws with [paint] as set up for one stroke, then puts it back to a plain solid stroke. */
+    private inline fun drawWith(paint: Paint, draw: (Paint) -> Unit) {
+        draw(paint)
+        paint.pathEffect = null
+        paint.maskFilter = null
+        paint.style = Paint.Style.STROKE
     }
     override fun withTransform(t: Transform) = copy(t = t)
     override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = endMs)

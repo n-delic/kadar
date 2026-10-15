@@ -273,7 +273,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                     (0 until a.length()).map { i ->
                         val stroke = a.getJSONObject(i)
                         val p = stroke.getJSONArray("points")
-                        PenStroke(stroke.getInt("color"), stroke.getDouble("width").toFloat(), FloatArray(p.length() / 2 * 2) { p.getDouble(it).toFloat() })
+                        PenStroke(stroke.getInt("color"), stroke.getDouble("width").toFloat(), FloatArray(p.length() / 2 * 2) { p.getDouble(it).toFloat() }, enumOr(stroke.optString("style"), PenStyle.Solid))
                     }
                 },
                 hidden = j.optBoolean("hidden"),
@@ -464,6 +464,7 @@ private fun Layer.toJson() = JSONObject().apply {
                 JSONObject().apply {
                     put("color", stroke.color)
                     put("width", stroke.width.toDouble())
+                    if (stroke.style != PenStyle.Solid) put("style", stroke.style.name)
                     // Flat x, y list rounded to a tenth of a pixel: finer than anyone can see, and keeps the file small.
                     put("points", JSONArray(stroke.points.map { (it * 10).roundToInt() / 10.0 }))
                 }

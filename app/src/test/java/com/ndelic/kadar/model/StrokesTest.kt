@@ -4,6 +4,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class StrokesTest {
@@ -112,5 +113,24 @@ class StrokesTest {
         assertArrayEquals(floatArrayOf(-10f, 0f), more.strokes[1].points, 0.001f)
         // Re-centered on local -20, which is 20 px right on the canvas.
         assertEquals(520f, more.t.x, 0.001f)
+    }
+
+    @Test
+    fun sprayDotsStayInTheirCircleAndComeOutTheSameEveryTime() {
+        val line = floatArrayOf(0f, 0f, 100f, 0f)
+        val dots = sprayDots(line, 20f)
+        assertTrue(dots.size >= 3 * 6 * 25)
+        for (k in 0 until dots.size / 3) {
+            assertTrue(dots[3 * k] in -10f..110f)
+            assertTrue(dots[3 * k + 1] in -10f..10f)
+        }
+        assertArrayEquals(dots, sprayDots(line, 20f), 0f)
+    }
+
+    @Test
+    fun aGlowingStrokeReachesPastItsWidth() {
+        assertEquals(5f, PenStroke(0, 10f, floatArrayOf(0f, 0f)).reach, 0f)
+        assertEquals(10f, PenStroke(0, 10f, floatArrayOf(0f, 0f), PenStyle.Neon).reach, 0f)
+        assertEquals(PenStyle.Spray, erased(listOf(PenStroke(0, 2f, FloatArray(22) { i -> if (i % 2 == 0) i / 2 * 10f else 0f }, PenStyle.Spray)), 50f, -5f, 50f, 5f, 1f).first().style)
     }
 }

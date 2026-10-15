@@ -4,12 +4,61 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.sin
+import kotlin.math.sqrt
+import kotlin.random.Random
+
+/** How a stroke is drawn (`drawStroke` in Layers.kt); stored by name. */
+enum class PenStyle { Solid, Neon, Dotted, Spray, Soft }
 
 /**
  * One freehand line: [points] are x, y pairs and [width] is in the same pixels. [color] is ARGB, so the
  * highlighter's transparency is part of it. Never changed after it's made, so layers can share it.
  */
-class PenStroke(val color: Int, val width: Float, val points: FloatArray)
+class PenStroke(val color: Int, val width: Float, val points: FloatArray, val style: PenStyle = PenStyle.Solid) {
+    /** How far the stroke reaches from its line: a neon or soft stroke glows past its width. */
+    val reach get() = width / 2 * when (style) {
+        PenStyle.Neon -> 2f
+        PenStyle.Soft -> 1.5f
+        else -> 1f
+    }
+
+    fun copy(width: Float = this.width, points: FloatArray = this.points) = PenStroke(color, width, points, style)
+}
+
+/**
+ * The dots of a spray stroke along [points], as x, y, radius triples: scattered evenly over a circle [width] across
+ * around the line, from a seed taken from the points, so the same stroke always gets the same dots.
+ */
+fun sprayDots(points: FloatArray, width: Float): FloatArray {
+    val random = Random(points.contentHashCode())
+    val step = width * 0.2f
+    val out = ArrayList<Float>()
+    fun spray(x: Float, y: Float) = repeat(SPRAY_DOTS) {
+        // sqrt spreads the dots evenly over the circle instead of crowding its middle.
+        val r = width / 2 * sqrt(random.nextFloat())
+        val a = random.nextFloat() * 2 * Math.PI.toFloat()
+        out += x + r * cos(a)
+        out += y + r * sin(a)
+        out += width * 0.03f + random.nextFloat() * width * 0.03f
+    }
+    val n = points.size / 2
+    if (n > 0) spray(points[0], points[1])
+    var left = 0f
+    for (i in 1 until n) {
+        val ax = points[2 * i - 2]
+        val ay = points[2 * i - 1]
+        val len = hypot(points[2 * i] - ax, points[2 * i + 1] - ay)
+        var d = step - left
+        while (d <= len) {
+            spray(ax + (points[2 * i] - ax) * d / len, ay + (points[2 * i + 1] - ay) * d / len)
+            d += step
+        }
+        left = len - (d - step)
+    }
+    return out.toFloatArray()
+}
+
+private const val SPRAY_DOTS = 6
 
 /**
  * Quadratic segments through the midpoints between the finger's samples, so strokes come out smooth instead of jagged.
@@ -46,7 +95,7 @@ fun strokeBounds(strokes: List<PenStroke>): FloatArray? {
     var r = Float.NEGATIVE_INFINITY
     var b = Float.NEGATIVE_INFINITY
     for (s in strokes) {
-        val half = s.width / 2
+        val half = s.reach
         for (i in 0 until s.points.size / 2) {
             l = minOf(l, s.points[2 * i] - half)
             t = minOf(t, s.points[2 * i + 1] - half)
@@ -75,7 +124,7 @@ fun erased(strokes: List<PenStroke>, ax: Float, ay: Float, bx: Float, by: Float,
         }
         val from = i
         while (i < n && keep[i]) i++
-        if (i - from > 1) parts += PenStroke(s.color, s.width, s.points.copyOfRange(2 * from, 2 * i))
+        if (i - from > 1) parts += s.copy(points = s.points.copyOfRange(2 * from, 2 * i))
     }
     parts
 }
@@ -93,7 +142,7 @@ fun DrawLayer.canvasStrokes(): List<PenStroke> = strokes.map { s ->
     val p = s.points
     val fx = if (t.flipX) -t.scaleX else t.scaleX
     val fy = if (t.flipY) -t.scale else t.scale
-    PenStroke(s.color, s.width * t.scale, FloatArray(p.size).also { out ->
+    s.copy(width = s.width * t.scale, points = FloatArray(p.size).also { out ->
         for (i in 0 until p.size / 2) {
             val (x, y) = turned(p[2 * i] * fx, p[2 * i + 1] * fy, t.rotation)
             out[2 * i] = x + t.x
@@ -115,7 +164,7 @@ fun DrawLayer.withStrokes(strokes: List<PenStroke>): DrawLayer {
     val fy = if (t.flipY) -1 else 1
     val local = strokes.map { stroke ->
         val p = stroke.points
-        PenStroke(stroke.color, stroke.width / t.scale, FloatArray(p.size) { i ->
+        stroke.copy(width = stroke.width / t.scale, points = FloatArray(p.size) { i ->
             val dx = p[i - i % 2] - t.x
             val dy = p[i - i % 2 + 1] - t.y
             if (i % 2 == 0) (dx * c - dy * s) * fx / t.scaleX else (dx * s + dy * c) * fy / t.scale
@@ -127,6 +176,6 @@ fun DrawLayer.withStrokes(strokes: List<PenStroke>): DrawLayer {
     val cy = (b[1] + b[3]) / 2
     return copy(
         t = t.shiftedContent(cx, cy),
-        strokes = all.map { PenStroke(it.color, it.width, FloatArray(it.points.size) { i -> it.points[i] - if (i % 2 == 0) cx else cy }) },
+        strokes = all.map { it.copy(points = FloatArray(it.points.size) { i -> it.points[i] - if (i % 2 == 0) cx else cy }) },
     )
 }

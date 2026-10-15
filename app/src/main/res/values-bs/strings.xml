@@ -16,6 +16,11 @@
     <string name="tool_replace">Zamijeni</string>
     <string name="tool_color_clip">Klip boje</string>
     <string name="tool_censor">Zamuti dio</string>
+    <string name="tool_chroma_key">Ključ boje</string>
+    <string name="key_remove_color">Ukloni boju</string>
+    <string name="key_hint">Kao zeleni ekran: vidi se ono ispod</string>
+    <string name="key_strength">Jačina</string>
+    <string name="key_softness">Mekana ivica</string>
     <string name="previous_frame">Prethodni kadar</string>
     <string name="next_frame">Sljedeći kadar</string>
     <string name="tool_blend">Stapanje</string>

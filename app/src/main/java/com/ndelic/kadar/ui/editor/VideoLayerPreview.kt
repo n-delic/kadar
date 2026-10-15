@@ -1,9 +1,12 @@
+@file:OptIn(UnstableApi::class)
+
 package com.ndelic.kadar.ui.editor
 
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.os.SystemClock
 import android.view.TextureView
+import androidx.annotation.OptIn
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,10 +34,12 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.model.filterMatrix
 import com.ndelic.kadar.model.texturePaints
+import com.ndelic.kadar.video.ChromaKey
 import com.ndelic.kadar.video.overlayNeedsSeek
 import com.ndelic.kadar.video.overlaySourceMs
 import com.ndelic.kadar.video.overlaySpan
@@ -48,8 +53,16 @@ import kotlinx.coroutines.delay
 @Composable
 fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Player?) {
     val context = LocalContext.current
-    val player = remember(layer.uri) {
+    val current by rememberUpdatedState(layer)
+    val keyed = layer.key != null
+    // Once keyed, its player runs the export's key on its frames for good (no key passes them unchanged): effects take
+    // only when set before the player prepares, and a new player for every switch left its view blank while paused.
+    val everKeyed = remember(layer.uri) { booleanArrayOf(false) }
+    if (keyed) everKeyed[0] = true
+    val keying = everKeyed[0]
+    val player = remember(layer.uri, keying) {
         ExoPlayer.Builder(context).build().apply {
+            if (keying) setVideoEffects(listOf(ChromaKey(premultiply = true) { current }))
             setMediaItem(MediaItem.fromUri(layer.uri))
             prepare()
         }
@@ -60,7 +73,10 @@ fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Play
     var showing by remember { mutableStateOf(false) }
     // Counts the frames played, so the grain moves like the export's.
     var grainFrame by remember { mutableIntStateOf(0) }
-    val current by rememberUpdatedState(layer)
+    // Paused, the key reads its new settings only on a new frame.
+    LaunchedEffect(player, layer.key, layer.keyStrength, layer.keySoftness) {
+        if (keying && !player.isPlaying && player.playbackState == Player.STATE_READY) player.seekTo(gate.nudge(player, player.currentPosition))
+    }
     LaunchedEffect(player, main, totalMs) {
         if (main == null) return@LaunchedEffect
         var lastSeek = 0L
@@ -106,7 +122,10 @@ fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Play
         key(player) {
             AndroidView(
                 factory = { TextureView(it).also(player::setVideoTextureView) },
-                update = { it.setLayerPaint(look) },
+                update = {
+                    it.setLayerPaint(look)
+                    it.isOpaque = !keyed
+                },
                 modifier = Modifier.wrapContentSize(Alignment.TopStart, unbounded = true).size(frame).graphicsLayer {
                     translationX = -layer.crop.left * layer.videoWidth * scale
                     translationY = -layer.crop.top * layer.videoHeight * scale

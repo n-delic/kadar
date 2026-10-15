@@ -280,6 +280,9 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                 clipStartMs = j.optLong("clipStartMs"),
                 crop = cropFromJson(j),
                 adjust = adjustFromJson(j),
+                key = if (j.has("key")) j.getInt("key") else null,
+                keyStrength = j.optDouble("keyStrength", DEFAULT_KEY_STRENGTH.toDouble()).toFloat(),
+                keySoftness = j.optDouble("keySoftness", DEFAULT_KEY_SOFTNESS.toDouble()).toFloat(),
             )
             // Versions before drawings skip this type too.
             "draw" -> DrawLayer(
@@ -509,6 +512,11 @@ private fun Layer.toJson() = JSONObject().apply {
             put("clipStartMs", layer.clipStartMs)
             putAdjust(layer.adjust)
             putCrop(layer.crop)
+            layer.key?.let {
+                put("key", it)
+                put("keyStrength", layer.keyStrength.toDouble())
+                put("keySoftness", layer.keySoftness.toDouble())
+            }
         }
         is DrawLayer -> {
             put("type", "draw")

@@ -2,14 +2,18 @@ package com.ndelic.kadar.video
 
 import com.ndelic.kadar.video.TransitionKind.Black
 import com.ndelic.kadar.video.TransitionKind.Dissolve
+import com.ndelic.kadar.video.TransitionKind.Glitch
 import com.ndelic.kadar.video.TransitionKind.None
 import com.ndelic.kadar.video.TransitionKind.PushLeft
 import com.ndelic.kadar.video.TransitionKind.SlideUp
+import com.ndelic.kadar.video.TransitionKind.Spin
 import com.ndelic.kadar.video.TransitionKind.WipeLeft
 import com.ndelic.kadar.video.TransitionKind.WipeUp
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TransitionsTest {
@@ -105,5 +109,32 @@ class TransitionsTest {
         assertArrayEquals(floatArrayOf(0.5f, 0f, 1f, 1f), WipeLeft.wipeRect(0.5f), 0f)
         assertArrayEquals(floatArrayOf(0f, 0f, 1f, 1f), WipeUp.wipeRect(1f), 0f)
         assertNull(Dissolve.wipeRect(0.5f))
+    }
+
+    @Test
+    fun spinsAndFlipsTurnThroughTheCut() {
+        // Half a turn by the cut, the other half after it, at the frame's size at both ends.
+        assertEquals(0f, spinDegrees(0f), 0f)
+        assertEquals(180f, spinDegrees(0.5f), 0f)
+        assertEquals(360f, spinDegrees(1f), 0f)
+        assertEquals(1f, spinScale(0f), 0f)
+        assertEquals(1 + SPIN_ZOOM, spinScale(0.5f), 0f)
+        assertEquals(1f, flipWidth(0f), 1e-6f)
+        assertEquals(0f, flipWidth(0.5f), 1e-6f)
+        assertEquals(flipWidth(0.25f), flipWidth(0.75f), 1e-6f)
+    }
+
+    @Test
+    fun glitchPatternDependsOnlyOnTheFrameTime() {
+        assertEquals(glitchSeed(GLITCH_STEP_MS * 3), glitchSeed(GLITCH_STEP_MS * 4 - 1), 0f)
+        assertNotEquals(glitchSeed(GLITCH_STEP_MS * 3), glitchSeed(GLITCH_STEP_MS * 4), 0f)
+        // Kept small for the GPU's float precision, even an hour in.
+        assertTrue(glitchSeed(3_600_000) < 1000f)
+    }
+
+    @Test
+    fun newKindsAreCenteredOnTheCut() {
+        assertEquals(listOf(TransitionSpan(1, Spin, 2700, 3300)), transitionSpans(listOf(3000L, 2000L), listOf(Transition(), Transition(Spin, 600))))
+        assertEquals(listOf(0L, 0L), headsMs(listOf(3000L, 2000L), listOf(Transition(), Transition(Glitch, 600))))
     }
 }

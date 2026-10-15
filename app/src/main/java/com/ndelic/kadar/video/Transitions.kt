@@ -4,12 +4,14 @@ import androidx.annotation.StringRes
 import com.ndelic.kadar.R
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.sin
 
 /**
  * How one clip turns into the next. Kinds that [overlaps] show both clips at once: the incoming clip's head plays over
  * the end of the clip before (on top, faded or moved in), which makes the video that much shorter. The others pass
- * through a look centered on the cut (black, white, a zoom, a blur), one clip at a time. [dx] and [dy] are the way a
+ * through a look centered on the cut (black, white, a zoom, a blur, a spin, a flip, a glitch, split colors), one clip at
+ * a time. [dx] and [dy] are the way a
  * wipe, slide or push moves, in canvas directions (y down).
  */
 enum class TransitionKind(@StringRes val label: Int, val overlaps: Boolean, val dx: Int = 0, val dy: Int = 0) {
@@ -19,6 +21,10 @@ enum class TransitionKind(@StringRes val label: Int, val overlaps: Boolean, val 
     White(R.string.transition_white, false),
     Zoom(R.string.transition_zoom, false),
     Blur(R.string.transition_blur, false),
+    Spin(R.string.transition_spin, false),
+    Flip(R.string.transition_flip, false),
+    Glitch(R.string.transition_glitch, false),
+    ColorSplit(R.string.transition_color_split, false),
     WipeLeft(R.string.transition_wipe_left, true, dx = -1),
     WipeUp(R.string.transition_wipe_up, true, dy = -1),
     SlideLeft(R.string.transition_slide_left, true, dx = -1),
@@ -115,10 +121,28 @@ fun TransitionKind.wipeRect(p: Float): FloatArray? {
     return floatArrayOf(if (dx < 0) 1 - e else 0f, if (dy < 0) 1 - e else 0f, if (dx > 0) e else 1f, if (dy > 0) e else 1f)
 }
 
+/** How far a spin has turned the frame at [p], in degrees: a whole turn, half of it by the cut, fastest there. */
+fun spinDegrees(p: Float) = 360f * ease(p)
+
+/** How much bigger a spin shows the frame at [p]: up to [SPIN_ZOOM] at the cut, so the turned frame's corners stay mostly filled. */
+fun spinScale(p: Float) = 1 + SPIN_ZOOM * dipAt(p).let { it * it }
+
+/** How wide a flip shows the frame at [p], as a share of it: a card turning at an even pace, edge-on at the cut. */
+fun flipWidth(p: Float) = cos(dipAt(p) * PI / 2).toFloat()
+
+/**
+ * Which pattern of shifted rows a glitch shows at output time [ms]: a new one every [GLITCH_STEP_MS], from the frame's
+ * time and nothing else, so the preview and the export glitch alike. Kept small for the GPU's float precision.
+ */
+fun glitchSeed(ms: Long) = (ms / GLITCH_STEP_MS % 1000).toFloat()
+
 /** Slow at both ends. */
 private fun ease(p: Float) = p * p * (3 - 2 * p)
 
 const val DEFAULT_TRANSITION_MS = 500L
+/** At the cut a spin shows the frame this much bigger (1.5x). */
+const val SPIN_ZOOM = 0.5f
+const val GLITCH_STEP_MS = 60L
 /** The shortest a transition runs; capped below this by short clips, there is none. */
 const val MIN_TRANSITION_MS = 100L
 /** At least one frame of a clip down to 20 fps. */

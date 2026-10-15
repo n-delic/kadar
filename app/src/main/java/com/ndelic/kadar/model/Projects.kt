@@ -206,6 +206,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                         animOutMs = outMs,
                         outline = if (j.has("outline")) j.getInt("outline") else null,
                         outlineStyle = enumOr(j.optString("outlineStyle"), OutlineStyle.Solid),
+                        blend = enumOr(j.optString("blend"), LayerBlend.Normal),
                         outlineWidth = j.optDouble("outlineWidth", DEFAULT_OUTLINE_WIDTH.toDouble()).toFloat(),
                     )
                 }
@@ -410,6 +411,7 @@ private fun Layer.toJson() = JSONObject().apply {
     when (val layer = this@toJson) {
         is ImageLayer -> {
             put("type", "image")
+            if (layer.blend != LayerBlend.Normal) put("blend", layer.blend.name)
             put("file", layer.file)
             putAdjust(layer.adjust)
             put("opacity", layer.opacity.toDouble())

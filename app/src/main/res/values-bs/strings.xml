@@ -17,6 +17,14 @@
     <string name="tool_color_clip">Klip boje</string>
     <string name="previous_frame">Prethodni kadar</string>
     <string name="next_frame">Sljedeći kadar</string>
+    <string name="tool_blend">Stapanje</string>
+    <string name="blend_normal">Normalno</string>
+    <string name="blend_multiply">Množenje</string>
+    <string name="blend_screen">Ekran</string>
+    <string name="blend_overlay">Preklop</string>
+    <string name="blend_darken">Tamnije</string>
+    <string name="blend_lighten">Svjetlije</string>
+    <string name="blend_add">Zbir</string>
     <string name="duplicate">Dupliraj</string>
     <string name="edit">Uredi</string>
     <string name="save">Spremi</string>

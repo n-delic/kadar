@@ -1,6 +1,7 @@
 package com.ndelic.kadar.model
 
 import android.graphics.Bitmap
+import android.graphics.BlendMode
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.ColorMatrixColorFilter
@@ -164,6 +165,8 @@ data class ImageLayer(
     val outlineStyle: OutlineStyle = OutlineStyle.Solid,
     /** How thick the outline is (or how far a glow or shadow spreads), as a part of the picture's longer side. */
     val outlineWidth: Float = DEFAULT_OUTLINE_WIDTH,
+    /** How the picture mixes with what's under it (photo projects; a video's layers are drawn apart from the video). */
+    val blend: LayerBlend = LayerBlend.Normal,
 ) : Layer {
     // With an outline the opacity goes on both at once (one offscreen layer), so the outline doesn't show through the picture.
     private val pictureAlpha = if (outline == null) opacity else 1f
@@ -184,6 +187,8 @@ data class ImageLayer(
     override val height get() = bitmap.height.toFloat()
     override val reach get() = hypot(width, height) / 2 + outlineSize * if (outlineStyle == OutlineStyle.Shadow) 2.5f else 1f
     override fun drawContent(canvas: Canvas) {
+        // A blend mixes the whole layer (outline, opacity, vignette and grain) with what's under it, so it goes around everything.
+        val blended = if (blend == LayerBlend.Normal) null else canvas.saveLayer(-reach, -reach, reach, reach, Paint().apply { blendMode = blend.mode })
         val m = mask
         // Down and right on the canvas whichever way the picture is flipped, as far across as down when it's stretched.
         val dx = if (outlineStyle != OutlineStyle.Shadow) 0f else outlineSize / t.stretch * if (t.flipX) -1 else 1
@@ -205,7 +210,7 @@ data class ImageLayer(
             canvas.drawBitmap(bitmap, -width / 2, -height / 2, paint)
             texture.forEach { canvas.drawRect(-width / 2, -height / 2, width / 2, height / 2, it) }
         }
-        canvas.restoreToCount(count)
+        canvas.restoreToCount(blended ?: count)
     }
     override fun withTransform(t: Transform) = copy(t = t)
     override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = endMs)
@@ -396,6 +401,17 @@ enum class TextAlign(@StringRes val label: Int) { Left(R.string.align_left), Cen
 
 /** The shape of a text layer's box: the rounded caption box, or a bubble with a tail. */
 enum class Bubble(@StringRes val label: Int) { Box(R.string.bubble_box), Speech(R.string.bubble_speech), Thought(R.string.bubble_thought), Shout(R.string.bubble_shout), Pill(R.string.bubble_pill), Double(R.string.bubble_double) }
+
+/** How an image layer mixes with the layers and picture under it. */
+enum class LayerBlend(@StringRes val label: Int, val mode: BlendMode) {
+    Normal(R.string.blend_normal, BlendMode.SRC_OVER),
+    Multiply(R.string.blend_multiply, BlendMode.MULTIPLY),
+    Screen(R.string.blend_screen, BlendMode.SCREEN),
+    Overlay(R.string.blend_overlay, BlendMode.OVERLAY),
+    Darken(R.string.blend_darken, BlendMode.DARKEN),
+    Lighten(R.string.blend_lighten, BlendMode.LIGHTEN),
+    Add(R.string.blend_add, BlendMode.PLUS),
+}
 
 /** A new text's size on a [width]×[height] canvas, and 100% on the size slider. */
 fun defaultTextSize(width: Int, height: Int) = minOf(width, height) * 0.1f

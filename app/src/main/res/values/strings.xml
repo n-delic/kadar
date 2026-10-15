@@ -18,6 +18,14 @@
     <string name="tool_color_clip">Color clip</string>
     <string name="previous_frame">Previous frame</string>
     <string name="next_frame">Next frame</string>
+    <string name="tool_blend">Blend</string>
+    <string name="blend_normal">Normal</string>
+    <string name="blend_multiply">Multiply</string>
+    <string name="blend_screen">Screen</string>
+    <string name="blend_overlay">Overlay</string>
+    <string name="blend_darken">Darken</string>
+    <string name="blend_lighten">Lighten</string>
+    <string name="blend_add">Add</string>
     <string name="duplicate">Duplicate</string>
     <string name="edit">Edit</string>
     <string name="save">Save</string>

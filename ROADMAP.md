@@ -142,18 +142,21 @@ Feature parity with the big phone editors, built from how their features behave,
 - [x] Replace a clip with another video or photo, keeping its place and settings
 - [x] Clip tools: freeze frame, capture the frame as a photo
 - [x] Clip tools: a blank color clip
-- [ ] Clip tools: reverse, rotate and flip, crop the main clip
+- [x] Clip tools: rotate and flip, crop the main clip
+- [ ] Clip tools: reverse
 - [x] Canvas: 1:2; zoom and move the clip inside the canvas; background color, blur strength
 - [ ] Canvas: a background image behind the clips
 - [ ] Speed ramps (presets that slow down or speed up within a clip)
 - [ ] Timed video effects on their own track: slow zoom, jump zoom, shake, glitch, blur, flash, fade to black, film grain
-- [ ] Audio: a bundled CC0 sound-effect pack (meme sounds), several music tracks, extract the sound of a video, voice effects (higher, deeper, robot), text-to-speech with the phone's offline voices
+- [x] Audio: extract the sound of a video, voice effects (higher, deeper, chipmunk, robot), text-to-speech with the phone's offline voices
+- [ ] Audio: a bundled CC0 sound-effect pack (meme sounds), several music tracks
 - [x] Clip in/out animations: fade, zoom in or out, slide, spin, for the entrance and the exit separately
 - [ ] Keyframes for layers and clips (position, scale, rotation, opacity over time)
-- [ ] Blur or pixelate part of the video (faces, usernames): a rectangle, circle or heart region on its own track, with strength and opacity; also mosaic, frosted glass and magnifier looks
-- [ ] Green screen: remove a picked color from a video layer, with strength and edge-shadow sliders
+- [x] Blur or pixelate part of the video (faces, usernames): a rectangle, ellipse or heart region on its own track, with strength
+- [ ] Blur areas: opacity, frosted glass and magnifier looks; censoring video layers too
+- [x] Green screen: remove a picked color from a video layer, with strength and soft-edge sliders
 - [ ] Video layers: blend modes (multiply, screen, overlay, darken, lighten) and shaped masks (linear, radial, rectangle, heart, star) with a soft edge
-- [ ] More transitions: spin, flip, glitch, color split
+- [x] More transitions: spin, flip, glitch, color split
 - [x] Step one frame back or forward while trimming
 - [ ] Precut: cut out the middle of a clip
 - [x] Mute a clip in one tap
@@ -164,7 +167,7 @@ Feature parity with the big phone editors, built from how their features behave,
 
 ### Photo
 
-- [ ] Effects: blur, pixelate, glitch, posterize, pop art, vignette, sharpen, noise, duotone, with strength
+- [x] Effects: blur, pixelate, glitch, posterize, pop art, vignette, sharpen, noise, duotone, with strength
 - [x] Blend modes for image layers in photos (normal, multiply, screen, overlay, darken, lighten, add)
 - [ ] Blend modes for text, shapes and drawings
 - [ ] Canvas tools: free crop and rotate of the whole picture, resize, perspective, border and frame, fit with a blurred or colored background
@@ -174,7 +177,8 @@ Feature parity with the big phone editors, built from how their features behave,
 - [ ] Text perspective
 - [x] Bubble styles: pill and double outline
 - [x] Cut-out outlines: solid, glow and offset shadow around the cut-out
-- [ ] Cut-out outlines: dotted; shape cut-outs (circle, heart, star, triangle, diamond); a lasso to pick the area
+- [x] Shape cut-outs in the crop tool (circle, rounded, heart, star, triangle, diamond)
+- [ ] Cut-out outlines: dotted; a lasso to pick the area
 - [x] Draw: more pens (neon, dotted, spray, soft)
 - [ ] A CC0 sticker pack
 

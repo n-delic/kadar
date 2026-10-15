@@ -30,6 +30,7 @@ import com.ndelic.kadar.media.trackMimes
 import com.ndelic.kadar.media.trimTransparent
 import com.ndelic.kadar.media.turnBitmap
 import com.ndelic.kadar.media.videoFrame
+import com.ndelic.kadar.media.videoStill
 import com.ndelic.kadar.model.Anim
 import com.ndelic.kadar.model.AppSettings
 import com.ndelic.kadar.model.CropRect
@@ -793,6 +794,31 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         // A cut, not a transition, joins the two halves.
         updateClip { copy(segments = segments.take(i) + s.copy(endMs = at) + s.copy(startMs = at, transition = Transition()) + segments.drop(i + 1)) }
         selectClip(i + 1)
+    }
+
+    /**
+     * Freezes the frame under the playhead ([atMs], output time): the clip is cut there and a still of that frame,
+     * [PHOTO_CLIP_MS] long, goes between the halves (before or after the whole clip when the playhead is at its edge).
+     */
+    fun freezeFrame(atMs: Long) = work(R.string.busy_freezing) {
+        val dir = _uiState.value.projectDir ?: return@work
+        val v = _uiState.value.project?.video ?: return@work
+        val (i, into) = v.segmentAt(atMs)
+        val s = v.segments[i]
+        if (s.isImage) return@work
+        val at = sourceMs(s.startMs, s.speed, into).coerceIn(s.startMs, s.endMs)
+        val bitmap = withContext(Dispatchers.IO) { runCatching { videoStill(app, s.uri, at, minOf(MAX_PHOTO, maxOf(s.width, s.height))) }.getOrNull() } ?: throw UserError(R.string.error_read_video)
+        val file = withContext(Dispatchers.IO) { store.writeImage(dir, bitmap) }
+        val still = Segment(Uri.fromFile(File(dir, file)), MAX_PHOTO_CLIP_MS, bitmap.width, bitmap.height, endMs = PHOTO_CLIP_MS, isImage = true, adjust = s.adjust)
+        val parts = when {
+            splitPoint(s.startMs, s.endMs, s.speed, into) != null -> listOf(s.copy(endMs = at), still, s.copy(startMs = at, transition = Transition()))
+            // At the clip's start the still takes its transition in; at its end it comes right after it.
+            into < s.outputDurationMs / 2 -> listOf(still.copy(transition = s.transition), s.copy(transition = Transition()))
+            else -> listOf(s, still)
+        }
+        updateClip { copy(segments = segments.take(i) + parts + segments.drop(i + 1)) }
+        selectClip(i + parts.indexOf(still))
+        loadFilmstrip(dir, still)
     }
 
     /** Sets the transition into clip [index] from the one before it, or with [all] into every clip after the first. */

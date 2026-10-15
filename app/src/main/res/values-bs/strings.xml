@@ -9,6 +9,8 @@
     <string name="delete">Obriši</string>
     <string name="mute">Utišaj</string>
     <string name="unmute">Vrati zvuk</string>
+    <string name="tool_freeze">Zamrzni</string>
+    <string name="busy_freezing">Zamrzavam kadar…</string>
     <string name="duplicate">Dupliraj</string>
     <string name="edit">Uredi</string>
     <string name="save">Spremi</string>

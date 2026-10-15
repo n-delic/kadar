@@ -547,6 +547,12 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         ToolDivider()
                         IconTool(R.drawable.ic_content_cut, stringResource(R.string.tool_trim), trimming != null, onClick = ::trim)
                         IconTool(R.drawable.ic_split_scene, stringResource(R.string.tool_split)) { vm.splitClip(positionMs) }
+                        if (video?.segmentAt(positionMs)?.let { video.segments[it.first].isImage } == false) {
+                            IconTool(R.drawable.ic_ac_unit, stringResource(R.string.tool_freeze)) {
+                                playing = false
+                                vm.freezeFrame(positionMs)
+                            }
+                        }
                         IconTool(R.drawable.ic_speed, stringResource(R.string.tool_speed), panel == Panel.Speed) { toggle(Panel.Speed) }
                         IconTool(R.drawable.ic_music_note, stringResource(R.string.tool_audio), panel == Panel.Audio) { toggle(Panel.Audio) }
                         video?.segments?.getOrNull(clipIndex)?.takeIf { !it.isImage }?.let { s ->

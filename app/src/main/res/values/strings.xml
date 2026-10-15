@@ -10,6 +10,8 @@
     <string name="delete">Delete</string>
     <string name="mute">Mute</string>
     <string name="unmute">Unmute</string>
+    <string name="tool_freeze">Freeze</string>
+    <string name="busy_freezing">Freezing the frame…</string>
     <string name="duplicate">Duplicate</string>
     <string name="edit">Edit</string>
     <string name="save">Save</string>

@@ -185,6 +185,12 @@ fun trackMimes(context: Context, uri: Uri): List<String> {
     }
 }
 
+/** The frame at [timeMs] itself (not the nearest keyframe), at most [maxSide] on its long side; null if it can't be read. */
+fun videoStill(context: Context, uri: Uri, timeMs: Long, maxSide: Int): Bitmap? = MediaMetadataRetriever().use { r ->
+    r.setDataSource(context, uri)
+    r.getScaledFrameAtTime(timeMs * 1000, MediaMetadataRetriever.OPTION_CLOSEST, maxSide, maxSide)
+}
+
 /** A frame near [timeMs], small enough for a thumbnail. */
 fun videoFrame(context: Context, uri: Uri, timeMs: Long): Bitmap? = MediaMetadataRetriever().use { r ->
     r.setDataSource(context, uri)

@@ -296,6 +296,10 @@
     <string name="transition_white">Kroz bijelo</string>
     <string name="transition_zoom">Zum</string>
     <string name="transition_blur">Zamućenje</string>
+    <string name="transition_spin">Vrtnja</string>
+    <string name="transition_flip">Prevrtanje</string>
+    <string name="transition_glitch">Smetnje</string>
+    <string name="transition_color_split">Razdvajanje boja</string>
     <string name="transition_wipe_left">Zavjesa lijevo</string>
     <string name="transition_wipe_up">Zavjesa gore</string>
     <string name="transition_slide_left">Klizi lijevo</string>

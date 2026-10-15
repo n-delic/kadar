@@ -204,6 +204,9 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                         opacity = j.optDouble("opacity", 1.0).toFloat(),
                         animInMs = inMs,
                         animOutMs = outMs,
+                        outline = if (j.has("outline")) j.getInt("outline") else null,
+                        outlineStyle = enumOr(j.optString("outlineStyle"), OutlineStyle.Solid),
+                        outlineWidth = j.optDouble("outlineWidth", DEFAULT_OUTLINE_WIDTH.toDouble()).toFloat(),
                     )
                 }
             }
@@ -410,6 +413,11 @@ private fun Layer.toJson() = JSONObject().apply {
             put("file", layer.file)
             putAdjust(layer.adjust)
             put("opacity", layer.opacity.toDouble())
+            layer.outline?.let {
+                put("outline", it)
+                put("outlineStyle", layer.outlineStyle.name)
+                put("outlineWidth", layer.outlineWidth.toDouble())
+            }
             layer.source?.let {
                 put("source", it)
                 put("sourceX", layer.sourceX)

@@ -216,6 +216,7 @@
     <string name="fill">Fill</string>
     <string name="outline">Outline</string>
     <string name="outline_width">Width</string>
+    <string name="outline_solid">Solid</string>
     <string name="stretch">Stretch</string>
     <string name="shape_rect">Rectangle</string>
     <string name="shape_round_rect">Rounded</string>

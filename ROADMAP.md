@@ -166,7 +166,8 @@ Feature parity with the big phone editors, built from how their features behave,
 - [x] Curved text (a bend slider) and gradient text fill
 - [ ] Text perspective
 - [x] Bubble styles: pill and double outline
-- [ ] Cut-out outlines: solid, dotted, glow and offset shadow around the cut-out; shape cut-outs (circle, heart, star, triangle, diamond); a lasso to pick the area
+- [x] Cut-out outlines: solid, glow and offset shadow around the cut-out
+- [ ] Cut-out outlines: dotted; shape cut-outs (circle, heart, star, triangle, diamond); a lasso to pick the area
 - [x] Draw: more pens (neon, dotted, spray, soft)
 - [ ] A CC0 sticker pack
 

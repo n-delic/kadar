@@ -15,6 +15,7 @@
     <string name="busy_saving_frame">Snimam kadar</string>
     <string name="tool_replace">Zamijeni</string>
     <string name="tool_color_clip">Klip boje</string>
+    <string name="tool_censor">Zamuti dio</string>
     <string name="previous_frame">Prethodni kadar</string>
     <string name="next_frame">Sljedeći kadar</string>
     <string name="tool_blend">Stapanje</string>
@@ -247,6 +248,7 @@
     <string name="shape_arrow">Strelica</string>
     <string name="shape_star">Zvijezda</string>
     <string name="shape_line">Linija</string>
+    <string name="shape_heart">Srce</string>
 
     <!-- Full-screen tools -->
     <string name="undo_stroke">Poništi potez</string>

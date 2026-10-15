@@ -34,6 +34,7 @@ import com.ndelic.kadar.media.shapedBitmap
 import com.ndelic.kadar.media.videoStill
 import com.ndelic.kadar.model.Anim
 import com.ndelic.kadar.model.AppSettings
+import com.ndelic.kadar.model.CensorLayer
 import com.ndelic.kadar.model.CropRect
 import com.ndelic.kadar.model.DrawLayer
 import com.ndelic.kadar.model.ExportQuality
@@ -482,6 +483,13 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         addLayer { newShape(it, kind, Transform(p.width / 2f, p.height / 2f), min(p.width, p.height) * 0.4f) }
     }
 
+    /** A blur area over the middle of the video, for its whole length. */
+    fun addCensor() {
+        val p = _uiState.value.project ?: return
+        val size = min(p.width, p.height) * 0.3f
+        addLayer { CensorLayer(it, Transform(p.width / 2f, p.height / 2f), size, size) }
+    }
+
     private fun addLayer(make: (Long) -> Layer) {
         val layer = make(nextId++)
         updateProject { it.copy(layers = it.layers + layer) }
@@ -502,6 +510,8 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     fun editVideo(change: VideoLayer.() -> VideoLayer) = updateSelected { if (it is VideoLayer) it.change() else it }
 
     fun editShape(change: ShapeLayer.() -> ShapeLayer) = updateSelected { if (it is ShapeLayer) it.change() else it }
+
+    fun editCensor(change: CensorLayer.() -> CensorLayer) = updateSelected { if (it is CensorLayer) it.change() else it }
 
     /** Tail drags on the stage; like gestures, only the first update of a drag ([first]) becomes an undo step. */
     fun setTail(x: Float, y: Float, first: Boolean) = updateSelected(record = first) { if (it is TextLayer) it.copy(tail = x to y) else it }
@@ -551,6 +561,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         is VideoLayer -> copy(id = id)
         is DrawLayer -> copy(id = id)
         is ShapeLayer -> copy(id = id, animIn = animIn, animOut = animOut)
+        is CensorLayer -> copy(id = id)
     }
 
     /** Cuts the selected layer at [atMs] (output time) into two with the same look, one ending and one starting there. */

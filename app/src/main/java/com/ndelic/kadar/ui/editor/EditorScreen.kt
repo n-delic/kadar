@@ -125,6 +125,7 @@ import com.ndelic.kadar.R
 import com.ndelic.kadar.Sticker
 import com.ndelic.kadar.model.Adjust
 import com.ndelic.kadar.model.Anim
+import com.ndelic.kadar.model.CensorLayer
 import com.ndelic.kadar.model.CropRect
 import com.ndelic.kadar.model.DrawLayer
 import com.ndelic.kadar.model.Font
@@ -170,7 +171,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Presets, Font, Color, Stroke, Shadow, Glow, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Opacity, ImageOutline, Shape, ShapeFill, ShapeOutline, Transition, ColorClip, Blend, Effects }
+enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Presets, Font, Color, Stroke, Shadow, Glow, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Opacity, ImageOutline, Shape, ShapeFill, ShapeOutline, Transition, ColorClip, Blend, Effects, Censor }
 
 @Composable
 fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
@@ -279,6 +280,12 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             // Media3 mixes the sound about a second ahead of what plays. Paused, a seek drops it, so play starts at the new
             // volume; playing, it would cut the sound for most of a second, so the change comes in that much later.
             player.refreshPaused()
+        }
+        // And the blur areas, live while one is moved or changed.
+        val censors = project.layers.filterIsInstance<CensorLayer>()
+        LaunchedEffect(player, censors) {
+            looks.showCensors(censors)
+            if (!player.isPlaying) player.experimentalRedrawLastFrame()
         }
         val structure = remember(previewed) { previewed.previewStructure() }
         LaunchedEffect(player, structure, copies) {
@@ -433,6 +440,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         Panel.ImageOutline -> (selected as? ImageLayer)?.let { ImageOutlinePanel(it, vm) }
                         Panel.Blend -> (selected as? ImageLayer)?.let { BlendPanel(it, vm) }
                         Panel.Effects -> (selected as? ImageLayer)?.let { EffectsPanel(it, vm) }
+                        Panel.Censor -> (selected as? CensorLayer)?.let { CensorPanel(it, vm) }
                         Panel.Transition -> video?.let { v -> transitionAt?.takeIf { it in 1 until v.segments.size }?.let { TransitionPanel(v, it, vm) } }
                         Panel.Adjust -> when (val l = selected) {
                             is ImageLayer -> AdjustPanel(l.adjust, onCompare = compare, onDrag = drag) { a -> vm.editImage { copy(adjust = a) } }
@@ -462,6 +470,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             is VideoLayer -> 3
             is DrawLayer -> 4
             is ShapeLayer -> 5
+            is CensorLayer -> 8
         }
         AnimatedContent(targetState = toolset, transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(100)) }, label = "tools") { tools ->
             Row(
@@ -506,6 +515,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_language, stringResource(R.string.tool_web), onClick = onBrowse)
                         if (video != null) {
                             IconTool(R.drawable.ic_movie, stringResource(R.string.video)) { overlayVideo.launch(PickVisualMediaRequest(PickVisualMedia.VideoOnly)) }
+                            IconTool(R.drawable.ic_blur_on, stringResource(R.string.tool_censor), onClick = vm::addCensor)
                             IconTool(R.drawable.ic_content_cut, stringResource(R.string.tool_trim), trimming != null, onClick = ::trim)
                             IconTool(R.drawable.ic_split_scene, stringResource(R.string.tool_split)) { vm.splitClip(positionMs) }
                             IconTool(R.drawable.ic_speed, stringResource(R.string.tool_speed), panel == Panel.Speed) { toggleClip(Panel.Speed) }
@@ -561,6 +571,14 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, stringResource(R.string.tool_front), onClick = vm::bringToFront)
                         IconTool(R.drawable.ic_flip_to_back, stringResource(R.string.tool_back), onClick = vm::sendToBack)
+                        IconTool(R.drawable.ic_delete, stringResource(R.string.delete), onClick = vm::deleteSelected)
+                    }
+                    8 -> {
+                        IconTool(R.drawable.ic_check, stringResource(R.string.done)) { vm.select(null) }
+                        ToolDivider()
+                        IconTool(R.drawable.ic_blur_on, stringResource(R.string.tool_censor), panel == Panel.Censor) { toggle(Panel.Censor) }
+                        timeTools()
+                        IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_delete, stringResource(R.string.delete), onClick = vm::deleteSelected)
                     }
                     6 -> {

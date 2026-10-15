@@ -822,12 +822,42 @@ data class ShapeLayer(
     }
 }
 
+enum class CensorKind(@StringRes val label: Int) { Blur(R.string.effect_blur), Pixelate(R.string.effect_pixelate) }
+
+enum class CensorShape(@StringRes val label: Int) { Rect(R.string.shape_rect), Ellipse(R.string.shape_ellipse), Heart(R.string.shape_heart) }
+
+/**
+ * A part of a video blurred or pixelated ([kind]): a [shape] filling its [w]×[h] box (own pixels), as coarse as [strength]
+ * (0 to 1) says. Its pixels come from the clips under it (the `Censor` GL effect on every clip, in the preview and the
+ * export alike), so it draws nothing here; the stage shows its selection box like any layer.
+ */
+data class CensorLayer(
+    override val id: Long,
+    override val t: Transform,
+    val w: Float,
+    val h: Float,
+    val kind: CensorKind = CensorKind.Blur,
+    val shape: CensorShape = CensorShape.Ellipse,
+    val strength: Float = 0.5f,
+    override val startMs: Long = 0,
+    override val endMs: Long = Long.MAX_VALUE,
+    override val hidden: Boolean = false,
+    override val locked: Boolean = false,
+) : Layer {
+    override val width get() = w
+    override val height get() = h
+    override fun drawContent(canvas: Canvas) = Unit
+    override fun withTransform(t: Transform) = copy(t = t)
+    override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = endMs)
+    override fun withFlags(hidden: Boolean, locked: Boolean) = copy(hidden = hidden, locked = locked)
+}
+
 /** Whether the stage shows handles on the left and right ([vertical] false) or top and bottom sides; a line has no height. */
 fun Layer.hasSideHandles(vertical: Boolean) = when (this) {
     is TextLayer -> !vertical
     is VideoLayer -> false
     is ShapeLayer -> !vertical || kind != ShapeKind.Line
-    is ImageLayer, is DrawLayer -> true
+    is ImageLayer, is DrawLayer, is CensorLayer -> true
 }
 
 /** A side handle dragged by [d] own pixels: text wraps, a shape resizes, a picture or drawing stretches. */

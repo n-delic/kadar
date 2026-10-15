@@ -84,6 +84,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.ndelic.kadar.R
+import com.ndelic.kadar.model.CensorLayer
 import com.ndelic.kadar.model.DrawLayer
 import com.ndelic.kadar.model.ImageLayer
 import com.ndelic.kadar.model.Layer
@@ -348,6 +349,7 @@ private fun Track(
         is VideoLayer -> Ink.violet
         is DrawLayer -> Ink.coral
         is ShapeLayer -> Ink.sky
+        is CensorLayer -> Ink.dim
     }
     Box(
         Modifier
@@ -473,6 +475,7 @@ private fun Track(
                         layer is VideoLayer -> R.drawable.ic_movie
                         layer is DrawLayer -> R.drawable.ic_draw
                         layer is ShapeLayer -> layer.kind.icon
+                        layer is CensorLayer -> R.drawable.ic_blur_on
                         else -> R.drawable.ic_image
                     }
                     KIcon(icon, Modifier.size(14.dp), Ink.onAccent)

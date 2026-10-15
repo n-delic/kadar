@@ -318,6 +318,20 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                 animInMs = inMs,
                 animOutMs = outMs,
             )
+            // Versions before blur areas skip this type too.
+            "censor" -> CensorLayer(
+                id = id,
+                t = t,
+                w = j.getDouble("w").toFloat(),
+                h = j.getDouble("h").toFloat(),
+                kind = enumOr(j.optString("kind"), CensorKind.Blur),
+                shape = enumOr(j.optString("shape"), CensorShape.Ellipse),
+                strength = j.optDouble("strength", 0.5).toFloat(),
+                hidden = j.optBoolean("hidden"),
+                locked = j.optBoolean("locked"),
+                startMs = start,
+                endMs = end,
+            )
             else -> null
         }
     }
@@ -517,6 +531,14 @@ private fun Layer.toJson() = JSONObject().apply {
             layer.outline?.let { put("outline", it) }
             put("stroke", layer.stroke.toDouble())
             put("opacity", layer.opacity.toDouble())
+        }
+        is CensorLayer -> {
+            put("type", "censor")
+            put("w", layer.w.toDouble())
+            put("h", layer.h.toDouble())
+            put("kind", layer.kind.name)
+            put("shape", layer.shape.name)
+            put("strength", layer.strength.toDouble())
         }
     }
 }

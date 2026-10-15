@@ -135,7 +135,7 @@ Feature parity with the big phone editors, built from how their features behave,
 
 ### Existing tools that do less than the big editors
 
-- [ ] Adjust: vignette and grain (need shaders)
+- [x] Adjust: vignette and grain
 
 ### Video
 
@@ -152,7 +152,7 @@ Feature parity with the big phone editors, built from how their features behave,
 - [ ] More transitions: spin, flip, glitch, color split
 - [ ] Precut: cut out the middle of a clip, and step one frame back or forward while trimming
 - [ ] Mute a clip in one tap
-- [ ] The preview stalls at the start when the first clip is faster than 5x (seen on the emulator; the same clip later in the video previews fine, and the export is right). Check on a phone, then find the cause in CompositionPlayer
+- [ ] The preview stalls at the start when the first clip is faster than 5x (on the emulator; on a G7 ThinQ the picture runs about 0.5 s behind the clock for a 6x first clip, then catches up; the export is right). Find the cause in CompositionPlayer
 - [ ] Overlay clips with long frame gaps (screen recordings that only emit frames when the screen changes) make Media3's compositor draw a stretched copy of the overlay over the main clip during the gap. Constant-frame-rate clips (phone camera) are fine. Fix idea: re-time such overlays to a constant rate before compositing
 
 ### Photo
@@ -162,10 +162,11 @@ Feature parity with the big phone editors, built from how their features behave,
 - [ ] Canvas tools: free crop and rotate of the whole picture, resize, perspective, border and frame, fit with a blurred or colored background
 - [ ] Clone and stretch/warp brushes, curves, tilt-shift, motion trail
 - [ ] Collage: a grid of photos (2 to 9 cells) with inner spacing, outer padding, rounded corners and a background; long-press to swap two photos; a free layout; stitch photos into one long strip
-- [ ] Curved text (a bend slider), gradient text fill, text perspective
-- [ ] Bubble styles: pill and double outline
+- [x] Curved text (a bend slider) and gradient text fill
+- [ ] Text perspective
+- [x] Bubble styles: pill and double outline
 - [ ] Cut-out outlines: solid, dotted, glow and offset shadow around the cut-out; shape cut-outs (circle, heart, star, triangle, diamond); a lasso to pick the area
-- [ ] Draw: more pens (neon, dotted, spray, soft)
+- [x] Draw: more pens (neon, dotted, spray, soft)
 - [ ] A CC0 sticker pack
 
 ## Later / maybe

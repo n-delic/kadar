@@ -101,6 +101,9 @@ data class Segment(
     val flipY: Boolean = false,
     /** Quarter turns clockwise, 0 to 3, last. */
     val turns: Int = 0,
+    /** How it comes in and goes out, unless a transition at that cut plays instead. */
+    val animIn: ClipAnimation = ClipAnimation(),
+    val animOut: ClipAnimation = ClipAnimation(),
 ) {
     val outputDurationMs get() = outputMs(startMs, endMs, speed)
 
@@ -163,6 +166,9 @@ data class VideoClip(
     /** Where each transition plays, in output time. */
     val transitionSpans get() = transitionSpans(segments.map { it.outputDurationMs }, segments.map { it.transition })
 
+    /** Where each clip's entrance and exit plays, in output time. */
+    val clipAnimSpans get() = clipAnimSpans(segments.map { it.outputDurationMs }, segments.map { it.transition }, segments.map { it.animIn }, segments.map { it.animOut })
+
     /** The clips end to end, shortened by every overlapping transition. */
     val outputDurationMs get() = played.sumOf { it.outputDurationMs }
 
@@ -189,9 +195,11 @@ data class VideoClip(
 
     /**
      * The color painted around the clips ([BarFill]) on a [background] canvas, or null for none: under a blurred canvas
-     * the bars stay see-through, and black bars come out black anyway.
+     * the bars stay see-through, and black bars come out black anyway, unless a clip fades and so needs black under it.
      */
-    fun barFill(background: Int) = background.takeIf { !blurred && it != android.graphics.Color.BLACK }
+    fun barFill(background: Int) = background.takeIf { !blurred && (it != android.graphics.Color.BLACK || fades) }
+
+    private val fades get() = segments.any { it.animIn.kind == ClipAnimKind.Fade || it.animOut.kind == ClipAnimKind.Fade }
 
     /** Where a [w]×[h] frame of a clip shows on the canvas, for pictures drawn without Media3 (thumbnail, eyedropper, draw pad). */
     fun frameRect(w: Int, h: Int): RectF {
@@ -361,6 +369,7 @@ private fun VideoClip.blankStill(effects: List<Effect> = emptyList()): EditedMed
 private fun VideoClip.mainSequence(played: List<Segment>, spans: List<TransitionSpan>, dropFrames: Boolean, copies: Map<Uri, Uri>, looks: LiveLooks?, volumes: LiveVolumes?, frame: List<Effect>): EditedMediaItemSequence {
     val sound = hasSound(played)
     val dips = spans.filter { !it.kind.overlaps }
+    val anims = clipAnimSpans
     val items = played.mapIndexed { i, s ->
         val drop = if (dropFrames && s.speed > 1f && !s.isImage) listOf(FrameDropEffect.createDefaultFrameDropEffect(outputFrameRate(frameRate).toFloat())) else emptyList()
         val effects = drop + s.shownSize.let { (w, h) -> dipEffects(dips.filter { it.clip == i || it.clip == i + 1 }, w, h) }
@@ -373,7 +382,8 @@ private fun VideoClip.mainSequence(played: List<Segment>, spans: List<Transition
         val inMs = dips.firstOrNull { it.clip == i }?.let { (it.endMs - it.startMs) / 2 } ?: 0
         val audio = audioEffects(s, sound, fadeInUs = inMs * 1000, fadeOutUs = outMs * 1000, volume = volumes?.clip(i) ?: { s.volume })
         val look = looks?.let { listOf(it.effect(i), it.texture(i)) } ?: lookEffects(s.adjust)
-        segmentItem(s.copy(uri = copy ?: s.uri), Effects(audio, videoEffects(s, effects, fit = copy != null, look, frame)), removeAudio = !sound)
+        val anim = outputSize.let { (w, h) -> clipAnimEffects(anims.filter { it.clip == i }, w, h) }
+        segmentItem(s.copy(uri = copy ?: s.uri), Effects(audio, videoEffects(s, effects, fit = copy != null, look, anim, frame)), removeAudio = !sound)
     }
     return EditedMediaItemSequence.Builder(tracks(sound)).addItems(items).build()
 }
@@ -725,8 +735,11 @@ private const val HIGH_BITS_PER_PIXEL = 0.28f
 private const val MAX_BITRATE = 50_000_000f
 private const val AAC_BITRATE = 131_072
 
-/** Clip [s]'s crop, flip and turn, its [look], then [transition] effects, then its fit into the canvas, then its [frame] (placement and bars). */
-private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyList(), fit: Boolean = false, look: List<Effect> = lookEffects(s.adjust), frame: List<Effect>): List<Effect> = buildList {
+/**
+ * Clip [s]'s crop, flip and turn, its [look], then [transition] effects, then its fit into the canvas, its entrance and
+ * exit ([anim], on the canvas), then its [frame] (placement and bars).
+ */
+private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyList(), fit: Boolean = false, look: List<Effect> = lookEffects(s.adjust), anim: List<Effect> = emptyList(), frame: List<Effect>): List<Effect> = buildList {
     addAll(shapeEffects(s))
     addAll(look)
     addAll(transition)
@@ -735,6 +748,7 @@ private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyL
         val (w, h) = outputSize
         add(Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_SCALE_TO_FIT))
     }
+    addAll(anim)
     addAll(frame)
 }
 
@@ -789,8 +803,11 @@ class LiveLooks {
         this.fill = fill ?: android.graphics.Color.TRANSPARENT
     }
 
-    /** Like the export's placement and bars, but always there, so a new placement or color comes in live. */
-    fun frameEffects() = listOf(MatrixTransformation { placement.matrix() }, BarFill { fill })
+    /**
+     * Like the export's placement and bars, but always there, so a new placement or color comes in live; see-through
+     * pixels (a fading clip over the blurred canvas) come out premultiplied, as the preview's view blends them.
+     */
+    fun frameEffects() = listOf(MatrixTransformation { placement.matrix() }, BarFill(premultiplied = true) { fill })
 }
 
 private val NO_LOOK = glRgbMatrix(Adjust().filterMatrix())

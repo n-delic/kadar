@@ -148,7 +148,8 @@ Feature parity with the big phone editors, built from how their features behave,
 - [ ] Speed ramps (presets that slow down or speed up within a clip)
 - [ ] Timed video effects on their own track: slow zoom, jump zoom, shake, glitch, blur, flash, fade to black, film grain
 - [ ] Audio: a bundled CC0 sound-effect pack (meme sounds), several music tracks, extract the sound of a video, voice effects (higher, deeper, robot), text-to-speech with the phone's offline voices
-- [ ] Clip in/out animations (zoom, slide, spin) and keyframes for layers and clips (position, scale, rotation, opacity over time)
+- [x] Clip in/out animations: fade, zoom in or out, slide, spin, for the entrance and the exit separately
+- [ ] Keyframes for layers and clips (position, scale, rotation, opacity over time)
 - [ ] Blur or pixelate part of the video (faces, usernames): a rectangle, circle or heart region on its own track, with strength and opacity; also mosaic, frosted glass and magnifier looks
 - [ ] Green screen: remove a picked color from a video layer, with strength and edge-shadow sliders
 - [ ] Video layers: blend modes (multiply, screen, overlay, darken, lighten) and shaped masks (linear, radial, rectangle, heart, star) with a soft edge

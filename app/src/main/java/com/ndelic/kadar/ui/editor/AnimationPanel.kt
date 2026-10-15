@@ -30,6 +30,10 @@ import com.ndelic.kadar.model.TextLayer
 import com.ndelic.kadar.ui.common.Ink
 import com.ndelic.kadar.ui.common.KSlider
 import com.ndelic.kadar.ui.common.TextTabs
+import com.ndelic.kadar.video.ClipAnimKind
+import com.ndelic.kadar.video.ClipAnimation
+import com.ndelic.kadar.video.VideoClip
+import com.ndelic.kadar.video.maxClipAnimMs
 
 private enum class Part(@StringRes val label: Int) { In(R.string.anim_in), Out(R.string.anim_out), Loop(R.string.anim_loop) }
 
@@ -54,18 +58,7 @@ fun AnimationPanel(layer: Layer, vm: EditorViewModel) {
         if (anim != Anim.None) KSlider(null, (ms ?: anim.ms).toFloat(), MIN_MS.toFloat()..MAX_MS.toFloat(), { seconds.format(it / 1000) }) { onCommit(it.toLong()) }
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Part.entries.forEach { p ->
-                Text(
-                    stringResource(p.label).uppercase(),
-                    color = if (p == part) Ink.accent else Ink.dim,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.sp,
-                    modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { part = p }.padding(horizontal = 8.dp, vertical = 6.dp),
-                )
-            }
-        }
+        PartTabs(Part.entries, part) { part = it }
         when (part) {
             Part.In -> {
                 TextTabs(if (layer is TextLayer) Anim.entries else whole, layer.animIn, label = { stringResource(it.label) }) { set(animIn = it) }
@@ -76,6 +69,49 @@ fun AnimationPanel(layer: Layer, vm: EditorViewModel) {
                 Length(layer.animOut, layer.animOutMs) { set(outMs = it) }
             }
             Part.Loop -> TextTabs(Loop.entries, layer.animLoop, label = { stringResource(it.label) }) { set(loop = it) }
+        }
+    }
+}
+
+/**
+ * Entrance and exit of clip [index] of the main track, one at a time, each with a length up to half the clip as it plays.
+ * A transition at that cut plays instead, which the panel says.
+ */
+@Composable
+fun ClipAnimationPanel(clip: VideoClip, index: Int, vm: EditorViewModel) {
+    val s = clip.segments[index]
+    var part by rememberSaveable { mutableStateOf(Part.In) }
+    val exit = part == Part.Out
+    val a = if (exit) s.animOut else s.animIn
+    fun set(new: ClipAnimation) = vm.updateSegment(index) { if (exit) copy(animOut = new) else copy(animIn = new) }
+    val longest = minOf(MAX_MS, maxClipAnimMs(clip.played[index].outputDurationMs))
+    val cut = if (exit) index + 1 else index
+    val seconds = stringResource(R.string.transition_seconds)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        PartTabs(listOf(Part.In, Part.Out), part) { part = it }
+        TextTabs(ClipAnimKind.entries, a.kind, label = { stringResource(it.label) }) { set(a.copy(kind = it)) }
+        if (a.kind != ClipAnimKind.None) {
+            if (clip.transitionSpans.any { it.clip == cut }) {
+                Text(stringResource(R.string.clip_anim_transition), color = Ink.dim, fontSize = 12.sp, modifier = Modifier.padding(start = 12.dp))
+            } else if (longest > MIN_MS) {
+                KSlider(null, a.durationMs.coerceIn(MIN_MS, longest).toFloat(), MIN_MS.toFloat()..longest.toFloat(), { seconds.format(it / 1000) }) { set(a.copy(durationMs = it.toLong())) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PartTabs(parts: List<Part>, part: Part, onPick: (Part) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        parts.forEach { p ->
+            Text(
+                stringResource(p.label).uppercase(),
+                color = if (p == part) Ink.accent else Ink.dim,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.sp,
+                modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { onPick(p) }.padding(horizontal = 8.dp, vertical = 6.dp),
+            )
         }
     }
 }

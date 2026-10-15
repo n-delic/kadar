@@ -70,6 +70,7 @@ import com.ndelic.kadar.ui.editor.Timeline
 import com.ndelic.kadar.ui.editor.label
 import com.ndelic.kadar.video.AudioPart
 import com.ndelic.kadar.video.AudioRef
+import com.ndelic.kadar.video.ClipAnimation
 import com.ndelic.kadar.video.GIF_FPS
 import com.ndelic.kadar.video.GIF_MAX_MS
 import com.ndelic.kadar.video.Music
@@ -818,10 +819,10 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val new = newSegment(dir, uri)
         val length = old.outputDurationMs
         val segment = if (new.isImage) {
-            new.copy(endMs = length.coerceAtMost(MAX_PHOTO_CLIP_MS), volume = old.volume, adjust = old.adjust, transition = old.transition)
+            new.copy(endMs = length.coerceAtMost(MAX_PHOTO_CLIP_MS), volume = old.volume, adjust = old.adjust, transition = old.transition, animIn = old.animIn, animOut = old.animOut)
         } else {
             val speed = if (old.isImage) 1f else old.speed
-            new.copy(endMs = minOf(new.durationMs, (length * speed).toLong()), speed = speed, volume = old.volume, keepPitch = old.keepPitch, adjust = old.adjust, transition = old.transition)
+            new.copy(endMs = minOf(new.durationMs, (length * speed).toLong()), speed = speed, volume = old.volume, keepPitch = old.keepPitch, adjust = old.adjust, transition = old.transition, animIn = old.animIn, animOut = old.animOut)
         }
         updateSegment(index) { segment }
         loadFilmstrip(dir, segment)
@@ -852,8 +853,8 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             _effects.trySend(EditorEffect.Message(UiText.Res(R.string.split_too_close)))
             return
         }
-        // A cut, not a transition, joins the two halves.
-        updateClip { copy(segments = segments.take(i) + s.copy(endMs = at) + s.copy(startMs = at, transition = Transition()) + segments.drop(i + 1)) }
+        // A cut, not a transition, joins the two halves, with no exit and entrance there.
+        updateClip { copy(segments = segments.take(i) + s.copy(endMs = at, animOut = ClipAnimation()) + s.copy(startMs = at, transition = Transition(), animIn = ClipAnimation()) + segments.drop(i + 1)) }
         selectClip(i + 1)
     }
 
@@ -872,10 +873,10 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val file = withContext(Dispatchers.IO) { store.writeImage(dir, bitmap) }
         val still = Segment(Uri.fromFile(File(dir, file)), MAX_PHOTO_CLIP_MS, bitmap.width, bitmap.height, endMs = PHOTO_CLIP_MS, isImage = true, adjust = s.adjust, crop = s.crop, flipX = s.flipX, flipY = s.flipY, turns = s.turns)
         val parts = when {
-            splitPoint(s.startMs, s.endMs, s.speed, into) != null -> listOf(s.copy(endMs = at), still, s.copy(startMs = at, transition = Transition()))
-            // At the clip's start the still takes its transition in; at its end it comes right after it.
-            into < s.outputDurationMs / 2 -> listOf(still.copy(transition = s.transition), s.copy(transition = Transition()))
-            else -> listOf(s, still)
+            splitPoint(s.startMs, s.endMs, s.speed, into) != null -> listOf(s.copy(endMs = at, animOut = ClipAnimation()), still, s.copy(startMs = at, transition = Transition(), animIn = ClipAnimation()))
+            // At the clip's start the still takes its transition and entrance; at its end it comes right after it, with its exit.
+            into < s.outputDurationMs / 2 -> listOf(still.copy(transition = s.transition, animIn = s.animIn), s.copy(transition = Transition(), animIn = ClipAnimation()))
+            else -> listOf(s.copy(animOut = ClipAnimation()), still.copy(animOut = s.animOut))
         }
         updateClip { copy(segments = segments.take(i) + parts + segments.drop(i + 1)) }
         selectClip(i + parts.indexOf(still))

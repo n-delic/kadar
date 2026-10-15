@@ -17,9 +17,11 @@ import androidx.media3.effect.GlShaderProgram
 
 /**
  * Paints [color] (read on every frame) under a clip fitted into the canvas: Media3 leaves the letterbox bars
- * transparent. A transparent color leaves the frame as it is, so the blurred background shows through.
+ * transparent. A transparent color leaves the frame as it is, so the blurred background shows through. The frame's own
+ * alpha is first scaled by [alpha] at its time (a clip's fade, [clipAnimEffects]). Left see-through, the colors come out
+ * [premultiplied] by alpha if asked: the preview's TextureView blends them that way, Media3's compositor straight.
  */
-class BarFill(val color: () -> Int) : GlEffect {
+class BarFill(val alpha: (Long) -> Float = { 1f }, val premultiplied: Boolean = false, val color: () -> Int) : GlEffect {
     override fun toGlShaderProgram(context: Context, useHdr: Boolean): GlShaderProgram = Program(useHdr)
 
     private inner class Program(useHdr: Boolean) : BaseGlShaderProgram(useHdr, 1) {
@@ -38,6 +40,8 @@ class BarFill(val color: () -> Int) : GlEffect {
             try {
                 program.use()
                 program.setSamplerTexIdUniform("uTexSampler", inputTexId, 0)
+                program.setFloatUniform("uAlpha", alpha(presentationTimeUs))
+                program.setFloatUniform("uPremultiply", if (premultiplied) 1f else 0f)
                 program.setFloatsUniform("uFill", floatArrayOf(Color.red(c) / 255f, Color.green(c) / 255f, Color.blue(c) / 255f, Color.alpha(c) / 255f))
                 program.bindAttributesAndUniforms()
                 GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
@@ -71,9 +75,12 @@ private const val FRAGMENT = """
 precision mediump float;
 uniform sampler2D uTexSampler;
 uniform vec4 uFill;
+uniform float uAlpha;
+uniform float uPremultiply;
 varying vec2 vTexCoord;
 void main() {
   vec4 c = texture2D(uTexSampler, vTexCoord);
-  gl_FragColor = uFill.a > 0.0 ? vec4(mix(uFill.rgb, c.rgb, c.a), 1.0) : c;
+  c.a *= uAlpha;
+  gl_FragColor = uFill.a > 0.0 ? vec4(mix(uFill.rgb, c.rgb, c.a), 1.0) : vec4(c.rgb * mix(1.0, c.a, uPremultiply), c.a);
 }
 """

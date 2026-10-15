@@ -3,6 +3,7 @@
 package com.ndelic.kadar.video
 
 import android.content.Context
+import android.graphics.Color
 import android.graphics.Matrix
 import android.opengl.GLES20
 import androidx.annotation.OptIn
@@ -65,17 +66,8 @@ fun dipEffects(spans: List<TransitionSpan>, width: Int, height: Int): List<Effec
         })
     }
     if (Spin in kinds) {
-        // Matrices act on normalized coordinates, so a turn is done in the frame's own proportions to keep it rigid.
         val aspect = width.toFloat() / height
-        add(MatrixTransformation { us ->
-            Matrix().apply {
-                progress(us, Spin)?.let { p ->
-                    setScale(aspect, 1f)
-                    postRotate(spinDegrees(p))
-                    spinScale(p).let { s -> postScale(s / aspect, s) }
-                }
-            }
-        })
+        add(MatrixTransformation { us -> progress(us, Spin)?.let { p -> turned(aspect, spinDegrees(p), spinScale(p)) } ?: Matrix() })
     }
     if (Flip in kinds) {
         add(MatrixTransformation { us ->
@@ -91,6 +83,33 @@ fun dipEffects(spans: List<TransitionSpan>, width: Int, height: Int): List<Effec
     }
 }
 
+/**
+ * The entrances and exits among [spans] of a clip fitted into a [width]×[height] canvas, at output time like [dipEffects]:
+ * zoomed, turned and moved on the canvas before the clips' placement (so a placed clip turns about its own center, and a
+ * slide starts off the canvas at any zoom), and faded by its alpha, so the bars' fill or the blurred canvas shows through.
+ */
+fun clipAnimEffects(spans: List<ClipAnimSpan>, width: Int, height: Int): List<Effect> = buildList {
+    fun look(us: Long) = spans.firstOrNull { us / 1000 in it }?.let { it.kind.look(it.presence(us / 1000), it.exit) } ?: ClipLook()
+    val aspect = width.toFloat() / height
+    if (spans.any { it.kind != ClipAnimKind.Fade }) {
+        add(MatrixTransformation { us ->
+            // Never quite gone: a frame scaled to nothing has no area to draw.
+            look(us).let { l -> turned(aspect, -l.degrees, maxOf(MIN_CLIP_SCALE, l.scale)).apply { postTranslate(2 * l.dx, -2 * l.dy) } }
+        })
+    }
+    if (spans.any { it.kind == ClipAnimKind.Fade }) add(BarFill({ us -> look(us).alpha }) { Color.TRANSPARENT })
+}
+
+/**
+ * A turn of [degrees] counter-clockwise and a zoom of [scale] about the center of a frame [aspect] wide to tall. Matrices
+ * act on normalized coordinates, so the turn is done in the frame's own proportions to keep it rigid.
+ */
+private fun turned(aspect: Float, degrees: Float, scale: Float) = Matrix().apply {
+    setScale(aspect, 1f)
+    postRotate(degrees)
+    postScale(scale / aspect, scale)
+}
+
 /** At the cut a zoom shows the frame this much bigger (2x). */
 private const val ZOOM_PEAK = 1f
 /** A blur's sigma at the cut, as a share of the clip's short side. */
@@ -98,6 +117,7 @@ private const val BLUR_PEAK = 0.03f
 /** Next to nothing: a sigma of 0 is not a Gaussian. */
 private const val MIN_SIGMA = 0.01f
 private const val MIN_FLIP_WIDTH = 0.01f
+private const val MIN_CLIP_SCALE = 0.01f
 /** How far a color split moves red and blue apart at the cut, each way, as a share of the width. */
 private const val SPLIT_PEAK = 0.04f
 /** A glitch's color split and how far its rows slide at most at the cut, as shares of the width. */

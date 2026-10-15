@@ -122,7 +122,7 @@ private fun Anim.slide(d: Float, p: Float): Motion {
 
 private const val SLIDE = 0.08f
 
-private fun easeOut(p: Float) = 1 - (1 - p) * (1 - p) * (1 - p)
+internal fun easeOut(p: Float) = 1 - (1 - p) * (1 - p) * (1 - p)
 
 /** Overshoots to about 1.1 before settling at 1. */
 private fun backOut(p: Float): Float {

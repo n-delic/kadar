@@ -5,7 +5,10 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.net.Uri
 import com.ndelic.kadar.video.AudioPart
+import com.ndelic.kadar.video.ClipAnimKind
+import com.ndelic.kadar.video.ClipAnimation
 import com.ndelic.kadar.video.ClipPlacement
+import com.ndelic.kadar.video.DEFAULT_CLIP_ANIM_MS
 import com.ndelic.kadar.video.MUSIC_FADE_MS
 import com.ndelic.kadar.video.Music
 import com.ndelic.kadar.video.DEFAULT_TRANSITION_MS
@@ -376,6 +379,8 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
         flipX = j.optBoolean("flipX"),
         flipY = j.optBoolean("flipY"),
         turns = j.optInt("turns"),
+        animIn = clipAnimFromJson(j, "animIn"),
+        animOut = clipAnimFromJson(j, "animOut"),
     )
 
     private companion object {
@@ -535,7 +540,18 @@ private fun Segment.toJson() = JSONObject().apply {
         put("transition", transition.kind.name)
         put("transitionMs", transition.durationMs)
     }
+    putClipAnim("animIn", animIn)
+    putClipAnim("animOut", animOut)
 }
+
+private fun JSONObject.putClipAnim(key: String, a: ClipAnimation) {
+    if (a.kind == ClipAnimKind.None) return
+    put(key, a.kind.name)
+    put(key + "Ms", a.durationMs)
+}
+
+private fun clipAnimFromJson(j: JSONObject, key: String) =
+    ClipAnimation(ClipAnimKind.entries.firstOrNull { it.name == j.optString(key) } ?: ClipAnimKind.None, j.optLong(key + "Ms", DEFAULT_CLIP_ANIM_MS))
 
 private fun VideoClip.toJson() = JSONObject().apply {
     put("clips", JSONArray(segments.map { it.toJson() }))

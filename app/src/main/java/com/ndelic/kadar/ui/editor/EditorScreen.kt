@@ -428,7 +428,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         }
                         Panel.Style -> (selected as? TextLayer)?.let { TextStylePanel(it, vm) }
                         Panel.Overlay -> (selected as? VideoLayer)?.let { VideoLayerPanel(it, vm) }
-                        Panel.Animate -> selected?.let { AnimationPanel(it, vm) }
+                        Panel.Animate -> if (selected != null) AnimationPanel(selected, vm) else video?.let { ClipAnimationPanel(it, clipIndex, vm) }
                         Panel.Opacity -> (selected as? ImageLayer)?.let { l -> KSlider(R.drawable.ic_opacity, l.opacity, 0.05f..1f, ::percent) { v -> vm.editImage { copy(opacity = v) } } }
                         Panel.ImageOutline -> (selected as? ImageLayer)?.let { ImageOutlinePanel(it, vm) }
                         Panel.Blend -> (selected as? ImageLayer)?.let { BlendPanel(it, vm) }
@@ -589,6 +589,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         }
                         IconTool(R.drawable.ic_tune, stringResource(R.string.tool_adjust), panel == Panel.Adjust) { toggle(Panel.Adjust) }
                         IconTool(R.drawable.ic_filter_vintage, stringResource(R.string.tool_filters), panel == Panel.Filters) { toggle(Panel.Filters) }
+                        IconTool(R.drawable.ic_animation, stringResource(R.string.tool_animate), panel == Panel.Animate) { toggle(Panel.Animate) }
                         IconTool(R.drawable.ic_crop, stringResource(R.string.tool_crop)) {
                             playing = false
                             val i = clipIndex

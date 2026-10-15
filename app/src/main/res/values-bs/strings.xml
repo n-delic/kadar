@@ -208,6 +208,8 @@
     <string name="anim_slide_left">Klizi lijevo</string>
     <string name="anim_slide_right">Klizi desno</string>
     <string name="anim_zoom_out">Udalji</string>
+    <string name="anim_zoom_in">Približi</string>
+    <string name="clip_anim_transition">Umjesto toga se pušta prijelaz na ovom rezu</string>
     <string name="anim_typewriter">Kucanje</string>
     <string name="anim_letters_pop">Slova iskaču</string>
     <string name="anim_loop">Ponavljanje</string>

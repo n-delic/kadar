@@ -210,6 +210,8 @@
     <string name="anim_slide_left">Slide left</string>
     <string name="anim_slide_right">Slide right</string>
     <string name="anim_zoom_out">Zoom out</string>
+    <string name="anim_zoom_in">Zoom in</string>
+    <string name="clip_anim_transition">The transition at this cut plays instead</string>
     <string name="anim_typewriter">Typewriter</string>
     <string name="anim_letters_pop">Letters pop</string>
     <string name="anim_loop">Loop</string>

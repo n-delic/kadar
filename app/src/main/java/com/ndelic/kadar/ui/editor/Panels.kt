@@ -250,6 +250,7 @@ fun TextStylePanel(layer: TextLayer, vm: EditorViewModel) {
         }
         LabeledSlider(stringResource(R.string.spacing), layer.spacing * 2) { v -> vm.editText { copy(spacing = v / 2) } }
         LabeledSlider(stringResource(R.string.line_height), layer.lineSpacing, 0.6f..2f, { "${(it * 10).roundToInt() / 10f}" }) { v -> vm.editText { copy(lineSpacing = v) } }
+        LabeledSlider(stringResource(R.string.text_curve), layer.curve, -1f..1f, ::percent) { v -> vm.editText { copy(curve = v) } }
         LabeledSlider(stringResource(R.string.opacity), layer.opacity, 0.05f..1f, ::percent) { v -> vm.editText { copy(opacity = v) } }
     }
 }

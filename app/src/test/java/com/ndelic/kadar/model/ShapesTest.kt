@@ -110,4 +110,14 @@ class ShapesTest {
         assertEquals(40f, x, 0.001f)
         assertEquals(-70f, y, 0.001f)
     }
+
+    @Test
+    fun aFullCurveBendsALineIntoHalfACircle() {
+        // At 1 the line is half the circle's circumference: radius = width / π, its ends drop a whole radius.
+        assertEquals(100f / Math.PI.toFloat(), curveRadius(100f, 1f), 0.001f)
+        assertEquals(100f / Math.PI.toFloat(), curveRise(100f, -1f), 0.001f)
+        assertEquals(0f, curveRise(100f, 0f), 0f)
+        // A gentle curve barely rises.
+        assertEquals(true, curveRise(100f, 0.1f) < 5f)
+    }
 }

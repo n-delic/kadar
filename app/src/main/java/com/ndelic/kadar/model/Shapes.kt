@@ -104,6 +104,12 @@ fun spikyPoints(rx: Float, ry: Float, spikes: Int = 14): FloatArray = FloatArray
     if (i % 2 == 0) (cos(a) * (rx + out)).toFloat() else (sin(a) * (ry + out)).toFloat()
 }
 
+/** Radius of the circle a line [width] long bends onto at [curve] (-1 to 1, not 0): at ±1 the line is half a circle. */
+fun curveRadius(width: Float, curve: Float) = width / (abs(curve) * PI.toFloat())
+
+/** How far the ends of a line [width] long, bent by [curve], drop below (or rise above) its middle. */
+fun curveRise(width: Float, curve: Float) = if (curve == 0f) 0f else curveRadius(width, curve) * (1 - cos(abs(curve) * PI.toFloat() / 2))
+
 /** Half the width and height of a [bubble]'s body around the ellipse ([rx], [ry]), without its tail. */
 fun bubbleHalfSize(bubble: Bubble, rx: Float, ry: Float): FloatArray = when (bubble) {
     Bubble.Box, Bubble.Speech, Bubble.Double -> floatArrayOf(rx, ry)

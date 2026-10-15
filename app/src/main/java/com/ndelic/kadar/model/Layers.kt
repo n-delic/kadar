@@ -414,6 +414,8 @@ data class TextLayer(
     val lineSpacing: Float = 1f,
     /** Where the text wraps, in the layer's own pixels; null keeps the lines as typed (bubbles wrap to a round block). */
     val wrap: Float? = null,
+    /** -1 to 1: how far the lines bend, an arch above 0 and a smile below; 0 keeps them straight. */
+    val curve: Float = 0f,
     override val startMs: Long = 0,
     override val endMs: Long = Long.MAX_VALUE,
     override val hidden: Boolean = false,
@@ -484,7 +486,10 @@ data class TextLayer(
     val tailTip get() = if (isBubble) tail ?: (-bubbleHalf[0] * 0.4f to bubbleHalf[1] + size * 1.2f) else null
 
     override val width get() = if (isBubble) 2 * bubbleHalf[0] + boxStroke else layout.width + stroke + 2 * boxPadX
-    override val height get() = if (isBubble) 2 * bubbleHalf[1] + boxStroke else layout.height + stroke + 2 * boxPadY
+    override val height get() = if (isBubble) 2 * bubbleHalf[1] + boxStroke else layout.height + rise + stroke + 2 * boxPadY
+    /** How much taller the curve makes the text: its ends drop (an arch) or rise (a smile) this far. */
+    // Plus room for the tilted letters at the ends, which lean past the arc.
+    private val rise = curveRise(layout.width.toFloat(), curve) + size * 0.3f * abs(curve)
     override val reach get() = maxOf(hypot(width, height) / 2, tailTip?.let { hypot(it.first, it.second) + boxStroke } ?: 0f) + maxOf(glowRadius, shadowReach)
 
     override fun drawContent(canvas: Canvas) = drawContent(canvas, null)
@@ -519,8 +524,13 @@ data class TextLayer(
                 canvas.drawRoundRect(-width / 2 + i, -height / 2 + i, width / 2 - i, height / 2 - i, size * 0.25f, size * 0.25f, boxPaint)
             }
         }
-        canvas.translate(-layout.width / 2f, -layout.height / 2f)
-        fun draw() = if (reveal == null) layout.draw(canvas) else drawLetters(canvas, reveal)
+        // A curved block is taller by its rise; centered, the ends of an arch hang below and a smile's rise above.
+        canvas.translate(-layout.width / 2f, -layout.height / 2f + if (curve > 0) -rise / 2 else rise / 2)
+        fun draw() = when {
+            curve != 0f -> drawCurved(canvas, reveal)
+            reveal == null -> layout.draw(canvas)
+            else -> drawLetters(canvas, reveal)
+        }
         paint.strokeJoin = Paint.Join.ROUND
         paint.strokeWidth = stroke
         if (glow != null) {
@@ -580,6 +590,48 @@ data class TextLayer(
             canvas.scale(k, k, x + paint.measureText(shown, s, e) / 2, y - size * 0.35f)
             canvas.drawText(shown, s, e, x, y, paint)
             canvas.restore()
+        }
+    }
+
+    /**
+     * Each line along an arc of one circle, all around the same center, so the block bends as one: the widest line takes
+     * [curveRadius], the others sit their line height closer to or further from the center. During a per-letter entrance
+     * the letters come in one by one in place (without the pop).
+     */
+    private fun drawCurved(canvas: Canvas, reveal: Reveal?) {
+        val arch = curve > 0
+        val r = curveRadius(layout.width.toFloat(), curve)
+        val mid = (layout.getLineBaseline(0) + layout.getLineBaseline(layout.lineCount - 1)) / 2f
+        val cx = layout.width / 2f
+        val cy = if (arch) mid + r else mid - r
+        val n = letters.size - 1
+        val half = size * 0.35f
+        for (line in 0 until layout.lineCount) {
+            val s = layout.getLineStart(line)
+            val e = layout.getLineVisibleEnd(line)
+            if (e <= s) continue
+            val y = layout.getLineBaseline(line).toFloat()
+            // The path runs through the letters' middle, so they keep their spacing there instead of crowding at the
+            // inner edge; the vertical offset puts their baseline back on the line's own arc.
+            val radius = ((if (arch) cy - y else y - cy) + if (arch) half else -half).coerceAtLeast(size)
+            val w = paint.measureText(shown, s, e)
+            val offset = layout.getLineLeft(line) + layout.getLineWidth(line) / 2 - cx
+            val span = Math.toDegrees((w / radius).toDouble()).toFloat()
+            val middle = Math.toDegrees((offset / radius).toDouble()).toFloat()
+            // Left to right along the top of the circle (an arch) or the bottom (a smile), so the letters stand upright.
+            val path = Path().apply {
+                if (arch) addArc(cx - radius, cy - radius, cx + radius, cy + radius, -90 + middle - span / 2, span)
+                else addArc(cx - radius, cy - radius, cx + radius, cy + radius, 90 - middle + span / 2, -span)
+            }
+            if (reveal == null) {
+                canvas.drawTextOnPath(shown.substring(s, e), path, 0f, half, paint)
+                continue
+            }
+            for (i in 0 until n) {
+                val a = letters[i]
+                if (a < s || a >= e || letterScale(reveal.anim, reveal.p, i, n) <= 0f) continue
+                canvas.drawTextOnPath(shown.substring(a, letters[i + 1]), path, paint.measureText(shown, s, a), half, paint)
+            }
         }
     }
 

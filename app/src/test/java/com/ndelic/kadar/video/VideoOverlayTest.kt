@@ -101,6 +101,9 @@ class VideoOverlayTest {
         assertTrue(overlayNeedsSeek(1_100, 1_000, playing = true, sinceSeekMs = 5_000))
         // Right after a correction it gets a second to play before the next one.
         assertFalse(overlayNeedsSeek(1_000, 2_000, playing = true, sinceSeekMs = 999))
+        // A player whose seeks stall it longer gets more slack.
+        assertFalse(overlayNeedsSeek(1_000, 1_300, playing = true, sinceSeekMs = 5_000, maxDriftMs = 300))
+        assertTrue(overlayNeedsSeek(1_000, 1_301, playing = true, sinceSeekMs = 5_000, maxDriftMs = 300))
     }
 
     @Test

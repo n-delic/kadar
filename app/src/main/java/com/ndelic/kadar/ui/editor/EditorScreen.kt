@@ -231,6 +231,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     }
     // The preview's volumes, read on every sample: a volume slider's drag goes straight in, no reload.
     val volumes = remember { LiveVolumes() }
+    // The clips' looks change on the preview's frames, so a look or slider shows without a new composition.
+    val looks = remember(player) { LiveLooks() }
 
     LaunchedEffect(state.selectedId) {
         // Selecting from the Layers list keeps the list open; anything else starts from the layer's tools.
@@ -261,8 +263,6 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         // preview fails mid-playback ("frame for an ended input") on devices; the export still composites everything.
         val previewed = staged.video ?: video
         val copies = state.previewCopies
-        // The clips' looks change on the preview's frames, so a look or slider shows without a new composition.
-        val looks = remember(player) { LiveLooks() }
         val adjusts = previewed.segments.map { it.adjust }
         LaunchedEffect(player, adjusts) {
             looks.show(adjusts)
@@ -372,6 +372,9 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                 dropper = null
             },
             placingClip = panel == Panel.VideoCanvas,
+            looks,
+            volumes,
+            state.previewCopies,
             Modifier.weight(1f).fillMaxWidth(),
         )
 
@@ -857,6 +860,7 @@ private val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF2DE1C2
  * Drag, pinch and twist move the selected layer; the corner handles delete it or scale and rotate it with one finger;
  * double-tap a text layer to edit it. With [picking] (the stage picture) a touch on the canvas picks a color from it for
  * [onPicked] instead; with [placingClip] (the video Canvas panel open) a drag or pinch on it moves or zooms the clips.
+ * The heads of overlapping transitions take the main preview's [looks], [volumes] and [previewCopies].
  */
 @Composable
 private fun Stage(
@@ -870,6 +874,9 @@ private fun Stage(
     picking: Bitmap?,
     onPicked: (Int) -> Unit,
     placingClip: Boolean,
+    looks: LiveLooks,
+    volumes: LiveVolumes,
+    previewCopies: Map<Uri, Uri>,
     modifier: Modifier,
 ) {
     // In a video only the layers on screen at the playhead show (and can be grabbed); the selected one always does, to edit it.
@@ -1000,7 +1007,7 @@ private fun Stage(
                         },
                     )
                 }
-                project.video?.takeIf { overlapping.isNotEmpty() }?.let { IncomingClipPreview(it, stills, project.width, project.height, scale, player, clock, it.barFill(project.background)) }
+                if (overlapping.isNotEmpty()) IncomingClipPreview(project, player, clock, looks, volumes, previewCopies)
                 // Over the main video and under the top canvas (handles and the layers above every video layer), bottom
                 // layer first, each over the layers drawn under it, like the export.
                 if (videoEnd != null) {
@@ -1298,10 +1305,11 @@ private fun android.graphics.Canvas.drawSelection(layer: Layer, viewScale: Float
  * The buffer has the canvas's aspect ratio, so the scaling never distorts. A SurfaceView shows each frame at its time
  * without the UI thread, so playback is even; a TextureView lets its 30 fps land on whichever screen refresh the UI
  * draws next (17 or 50 ms apart) and drops frames when the UI is busy. Only with [translucent] (the blurred canvas,
- * which must show through the letterbox bars) is it a TextureView: a SurfaceView sits behind the window.
+ * which must show through the letterbox bars, and the transitions' heads over the main preview) is it a TextureView: a
+ * SurfaceView sits behind the window.
  */
 @Composable
-private fun VideoSurface(player: CompositionPlayer, canvasWidth: Int, canvasHeight: Int, translucent: Boolean, modifier: Modifier) {
+fun VideoSurface(player: CompositionPlayer, canvasWidth: Int, canvasHeight: Int, translucent: Boolean, modifier: Modifier) {
     val f = PREVIEW_LONG_SIDE / maxOf(canvasWidth, canvasHeight).toFloat()
     val bw = (canvasWidth * f).roundToInt()
     val bh = (canvasHeight * f).roundToInt()

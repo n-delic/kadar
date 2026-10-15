@@ -628,10 +628,23 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     /** The stage's picture at [positionMs] (output time; ignored for photos), at most [PICK_SIZE] wide or tall, for the eyedropper. */
     suspend fun stagePicture(positionMs: Long): Bitmap? {
         val p = _uiState.value.project ?: return null
-        // shortcut: video layers and the blurred canvas are left out (players draw them); render their frames if users pick from them.
-        val layers = if (p.video == null) p.layers else p.layers.filter { it.visibleAt(positionMs) }
+        val video = _uiState.value.selected as? VideoLayer
+        // shortcut: other video layers and the blurred canvas are left out (players draw them); render their frames if users pick from them.
+        // The selected video layer is its raw frame, unkeyed and without its look, so its key color can be picked from it.
+        val layers = if (p.video == null) p.layers else p.layers.filter { it.visibleAt(positionMs) || it.id == video?.id }.map { l ->
+            if (l.id == video?.id) layerFrame(video, positionMs)?.let { rawFrameLayer(video, it) } ?: l else l
+        }
         val frame = frameAt(positionMs)
         return renderLayers(p.width, p.height, p.background, layers, min(1f, PICK_SIZE / max(p.width, p.height)), frame, underAt = frame?.let { p.video?.frameRect(it.width, it.height) })
+    }
+
+    /** Video layer [l]'s [frame], cropped like it, as a picture drawn where it shows. */
+    private fun rawFrameLayer(l: VideoLayer, frame: Bitmap): ImageLayer {
+        val c = l.crop
+        val w = (c.width * frame.width).roundToInt().coerceIn(1, frame.width)
+        val h = (c.height * frame.height).roundToInt().coerceIn(1, frame.height)
+        val cut = Bitmap.createBitmap(frame, (c.left * frame.width).roundToInt().coerceIn(0, frame.width - w), (c.top * frame.height).roundToInt().coerceIn(0, frame.height - h), w, h)
+        return ImageLayer(l.id, l.t.copy(scale = l.t.scale * l.width / w), cut, "")
     }
 
     /** The video frame under the playhead ([positionMs], output time), as a guide for the draw screen; null for photos. */

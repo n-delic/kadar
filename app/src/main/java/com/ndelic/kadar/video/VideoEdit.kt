@@ -504,9 +504,10 @@ private fun VideoLayer.sequence(span: Pair<Long, Long>, totalMs: Long): EditedMe
     val clip = EditedMediaItem.Builder(clipped(uri, clipStartMs, clipStartMs + end - start))
         .setDurationUs(durationMs * 1000)
         .setRemoveAudio(volume == 0f)
-        // Its look, cropped, then presented at the layer's own size, so the compositor's scale is the layer's scale; then
-        // its vignette and grain, which fit what it shows, like the preview's (VideoLayerPreview).
-        .setEffects(Effects(listOf(gain({ volume })), listOfNotNull(adjustEffect(adjust), Crop(left, right, bottom, top), Presentation.createForWidthAndHeight(width.roundToInt(), height.roundToInt(), Presentation.LAYOUT_STRETCH_TO_FIT), textureEffect(adjust))))
+        // Its key on the frame's own colors (the compositor shows what's under through its alpha), its look, cropped, then
+        // presented at the layer's own size, so the compositor's scale is the layer's scale; then its vignette and grain,
+        // which fit what it shows, like the preview's (VideoLayerPreview).
+        .setEffects(Effects(listOf(gain({ volume })), listOfNotNull(key?.let { ChromaKey(premultiply = false) { this } }, adjustEffect(adjust), Crop(left, right, bottom, top), Presentation.createForWidthAndHeight(width.roundToInt(), height.roundToInt(), Presentation.LAYOUT_STRETCH_TO_FIT), textureEffect(adjust))))
         .build()
     val tracks = if (volume == 0f) setOf(C.TRACK_TYPE_VIDEO) else setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO)
     return EditedMediaItemSequence.Builder(tracks)

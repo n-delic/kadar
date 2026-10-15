@@ -35,6 +35,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.model.filterMatrix
 import com.ndelic.kadar.model.texturePaints
+import com.ndelic.kadar.video.ChromaKey
 import com.ndelic.kadar.video.overlayNeedsSeek
 import com.ndelic.kadar.video.overlaySourceMs
 import com.ndelic.kadar.video.overlaySpan
@@ -48,8 +49,12 @@ import kotlinx.coroutines.delay
 @Composable
 fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Player?) {
     val context = LocalContext.current
-    val player = remember(layer.uri) {
+    val current by rememberUpdatedState(layer)
+    val keyed = layer.key != null
+    // Keyed, it runs the export's key on its frames (a new player, since effects are set before it prepares).
+    val player = remember(layer.uri, keyed) {
         ExoPlayer.Builder(context).build().apply {
+            if (keyed) setVideoEffects(listOf(ChromaKey(premultiply = true) { current }))
             setMediaItem(MediaItem.fromUri(layer.uri))
             prepare()
         }
@@ -60,7 +65,10 @@ fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Play
     var showing by remember { mutableStateOf(false) }
     // Counts the frames played, so the grain moves like the export's.
     var grainFrame by remember { mutableIntStateOf(0) }
-    val current by rememberUpdatedState(layer)
+    // Paused, the key reads its new settings only on a new frame.
+    LaunchedEffect(player, layer.key, layer.keyStrength, layer.keySoftness) {
+        if (keyed && !player.isPlaying && player.playbackState == Player.STATE_READY) player.seekTo(gate.nudge(player, player.currentPosition))
+    }
     LaunchedEffect(player, main, totalMs) {
         if (main == null) return@LaunchedEffect
         var lastSeek = 0L
@@ -106,7 +114,10 @@ fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Play
         key(player) {
             AndroidView(
                 factory = { TextureView(it).also(player::setVideoTextureView) },
-                update = { it.setLayerPaint(look) },
+                update = {
+                    it.setLayerPaint(look)
+                    it.isOpaque = !keyed
+                },
                 modifier = Modifier.wrapContentSize(Alignment.TopStart, unbounded = true).size(frame).graphicsLayer {
                     translationX = -layer.crop.left * layer.videoWidth * scale
                     translationY = -layer.crop.top * layer.videoHeight * scale

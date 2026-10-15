@@ -171,7 +171,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Presets, Font, Color, Stroke, Shadow, Glow, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Opacity, ImageOutline, Shape, ShapeFill, ShapeOutline, Transition, ColorClip, Blend, Effects, Censor }
+enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Presets, Font, Color, Stroke, Shadow, Glow, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Opacity, ImageOutline, Shape, ShapeFill, ShapeOutline, Transition, ColorClip, Blend, Effects, Censor, ChromaKey }
 
 @Composable
 fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit) {
@@ -435,6 +435,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         }
                         Panel.Style -> (selected as? TextLayer)?.let { TextStylePanel(it, vm) }
                         Panel.Overlay -> (selected as? VideoLayer)?.let { VideoLayerPanel(it, vm) }
+                        Panel.ChromaKey -> (selected as? VideoLayer)?.let { ChromaKeyPanel(it, vm) }
                         Panel.Animate -> if (selected != null) AnimationPanel(selected, vm) else video?.let { ClipAnimationPanel(it, clipIndex, vm) }
                         Panel.Opacity -> (selected as? ImageLayer)?.let { l -> KSlider(R.drawable.ic_opacity, l.opacity, 0.05f..1f, ::percent) { v -> vm.editImage { copy(opacity = v) } } }
                         Panel.ImageOutline -> (selected as? ImageLayer)?.let { ImageOutlinePanel(it, vm) }
@@ -636,6 +637,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_edit, stringResource(R.string.edit), panel == Panel.Overlay) { toggle(Panel.Overlay) }
                         IconTool(R.drawable.ic_tune, stringResource(R.string.tool_adjust), panel == Panel.Adjust) { toggle(Panel.Adjust) }
                         IconTool(R.drawable.ic_filter_vintage, stringResource(R.string.tool_filters), panel == Panel.Filters) { toggle(Panel.Filters) }
+                        IconTool(R.drawable.ic_background_replace, stringResource(R.string.tool_chroma_key), panel == Panel.ChromaKey) { toggle(Panel.ChromaKey) }
                         IconTool(R.drawable.ic_crop, stringResource(R.string.tool_crop)) {
                             playing = false
                             (state.selected as? VideoLayer)?.let { l -> scope.launch { vm.layerFrame(l, positionMs)?.let { croppingVideo = l to it } } }

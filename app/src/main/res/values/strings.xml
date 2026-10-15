@@ -17,6 +17,11 @@
     <string name="tool_replace">Replace</string>
     <string name="tool_color_clip">Color clip</string>
     <string name="tool_censor">Blur area</string>
+    <string name="tool_chroma_key">Chroma key</string>
+    <string name="key_remove_color">Remove a color</string>
+    <string name="key_hint">Like a green screen: what\'s under shows through</string>
+    <string name="key_strength">Strength</string>
+    <string name="key_softness">Soft edge</string>
     <string name="previous_frame">Previous frame</string>
     <string name="next_frame">Next frame</string>
     <string name="tool_blend">Blend</string>

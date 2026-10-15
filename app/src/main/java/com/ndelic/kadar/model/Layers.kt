@@ -248,6 +248,11 @@ fun Transform.recropped(from: CropRect, to: CropRect, width: Int, height: Int) =
  * Its pixels come only from the Media3 compositor (`VideoClip.composition`), in the preview and the export alike, so it draws
  * nothing here (thumbnails and the bitmap overlay skip it); the stage shows its selection box like any layer.
  */
+/** A green screen's green, the key a video layer starts with. */
+const val KEY_GREEN = 0xFF00B140.toInt()
+const val DEFAULT_KEY_STRENGTH = 0.5f
+const val DEFAULT_KEY_SOFTNESS = 0.3f
+
 data class VideoLayer(
     override val id: Long,
     override val t: Transform,
@@ -268,6 +273,12 @@ data class VideoLayer(
     val crop: CropRect = CropRect(),
     /** Look and color sliders, like a clip's. */
     val adjust: Adjust = Adjust(),
+    /** The color removed from its frames (a green screen), or null for none. */
+    val key: Int? = null,
+    /** 0 to 1: how far from [key] a color still goes. */
+    val keyStrength: Float = DEFAULT_KEY_STRENGTH,
+    /** 0 to 1: how soft the cut edge is. */
+    val keySoftness: Float = DEFAULT_KEY_SOFTNESS,
 ) : Layer {
     override val width get() = videoWidth * crop.width
     override val height get() = videoHeight * crop.height

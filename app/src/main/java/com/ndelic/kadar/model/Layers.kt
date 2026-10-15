@@ -164,9 +164,17 @@ data class ImageLayer(
         if (!adjust.isNone) colorFilter = ColorMatrixColorFilter(adjust.filterMatrix())
         alpha = (opacity * 255).roundToInt()
     }
+    private val texture = adjust.texturePaints(width, height)
     override val width get() = bitmap.width.toFloat()
     override val height get() = bitmap.height.toFloat()
-    override fun drawContent(canvas: Canvas) = canvas.drawBitmap(bitmap, -width / 2, -height / 2, paint)
+    override fun drawContent(canvas: Canvas) {
+        if (texture.isEmpty()) return canvas.drawBitmap(bitmap, -width / 2, -height / 2, paint)
+        // A layer of its own, so the vignette and grain (SRC_ATOP) land only on the picture's pixels.
+        val saved = canvas.saveLayer(-width / 2, -height / 2, width / 2, height / 2, null)
+        canvas.drawBitmap(bitmap, -width / 2, -height / 2, paint)
+        texture.forEach { canvas.drawRect(-width / 2, -height / 2, width / 2, height / 2, it) }
+        canvas.restoreToCount(saved)
+    }
     override fun withTransform(t: Transform) = copy(t = t)
     override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = endMs)
     override fun withFlags(hidden: Boolean, locked: Boolean) = copy(hidden = hidden, locked = locked)
@@ -311,7 +319,7 @@ private fun PenStroke.path() = Path().apply {
 }
 
 /**
- * Brightness, contrast, saturation, warmth, tint and hue, each -1..1, and fade 0..1, with 0 meaning unchanged, plus a
+ * Brightness, contrast, saturation, warmth, tint and hue, each -1..1, and fade, vignette and grain 0..1, with 0 meaning unchanged, plus a
  * [Look] blended in by [amount] (0..1). Used by image layers, video clips and video layers.
  */
 data class Adjust(
@@ -327,8 +335,15 @@ data class Adjust(
     /** A turn of the color wheel, -1..1 for -180°..180°. */
     val hue: Float = 0f,
     val fade: Float = 0f,
+    /** Darkens toward the edges, 0..1. */
+    val vignette: Float = 0f,
+    /** Film grain, 0..1. */
+    val grain: Float = 0f,
 ) {
+    /** No color change: [vignette] and [grain] aren't colors, see [hasTexture]. */
     val isNone get() = listOf(brightness, contrast, saturation, warmth, tint, hue, fade).all { it == 0f } && (look == Look.None || amount == 0f)
+
+    val hasTexture get() = vignette != 0f || grain != 0f
 
     /** 4x5 color matrix for [android.graphics.ColorMatrix]: saturate, then contrast around mid-gray, then brighten. */
     fun colorMatrix(): FloatArray {

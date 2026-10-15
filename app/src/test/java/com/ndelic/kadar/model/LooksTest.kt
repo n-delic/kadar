@@ -93,4 +93,30 @@ class LooksTest {
         assertTrue(apply(m, 0f, 0f, 0f)[0] > 30f)
         assertTrue(apply(m, 255f, 255f, 255f)[0] < 240f)
     }
+
+    @Test
+    fun vignetteAndGrainAreNotColors() {
+        val a = Adjust(vignette = 0.5f, grain = 0.5f)
+        assertTrue(a.isNone)
+        assertTrue(a.hasTexture)
+        assertFalse(Adjust().hasTexture)
+    }
+
+    @Test
+    fun vignetteDarkensOnlyTowardTheEdges() {
+        assertEquals(0f, vignetteDarkness(0f, 1f), 0f)
+        assertEquals(0f, vignetteDarkness(VIGNETTE_INNER, 1f), 0f)
+        assertEquals(0f, vignetteDarkness(1.41f, 0f), 0f)
+        val edge = vignetteDarkness(1f, 1f)
+        val corner = vignetteDarkness(1.41f, 1f)
+        assertTrue(edge > 0.2f && corner > edge && corner <= VIGNETTE_MAX)
+        assertEquals(edge / 2, vignetteDarkness(1f, 0.5f), 0.0001f)
+    }
+
+    @Test
+    fun grainSpecksAreTheSameShareOfAnyPicture() {
+        assertEquals(2f, grainCell(1080f, 1920f), 0.0001f)
+        assertEquals(grainCell(1080f, 1920f) * 2, grainCell(2160f, 3840f), 0.0001f)
+        assertEquals(1f, grainCell(64f, 64f), 0f)
+    }
 }

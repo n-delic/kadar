@@ -4,6 +4,7 @@ import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.os.SystemClock
 import android.view.TextureView
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -13,6 +14,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -20,7 +22,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.DpSize
@@ -30,6 +34,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.model.filterMatrix
+import com.ndelic.kadar.model.texturePaints
 import com.ndelic.kadar.video.overlayNeedsSeek
 import com.ndelic.kadar.video.overlaySourceMs
 import com.ndelic.kadar.video.overlaySpan
@@ -53,6 +58,8 @@ fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Play
     val gate = rememberFrameGate(player)
     LaunchedEffect(player, layer.volume) { player.volume = layer.volume }
     var showing by remember { mutableStateOf(false) }
+    // Counts the frames played, so the grain moves like the export's.
+    var grainFrame by remember { mutableIntStateOf(0) }
     val current by rememberUpdatedState(layer)
     LaunchedEffect(player, main, totalMs) {
         if (main == null) return@LaunchedEffect
@@ -73,7 +80,7 @@ fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Play
                 gate.seeked = true
                 lastSeek = now
             }
-            if (main.isPlaying) withFrameMillis {} else delay(POLL_MS)
+            if (main.isPlaying) withFrameMillis { grainFrame++ } else delay(POLL_MS)
         }
     }
     val w = layer.width * scale
@@ -105,6 +112,22 @@ fun VideoLayerPreview(layer: VideoLayer, totalMs: Long, scale: Float, main: Play
                     translationY = -layer.crop.top * layer.videoHeight * scale
                 },
             )
+        }
+        // Over the view, since a layer paint takes only a color filter; the export draws them on the cropped frame too.
+        if (layer.adjust.hasTexture) {
+            Canvas(Modifier.fillMaxSize()) {
+                val w = layer.width
+                val h = layer.height
+                val paints = layer.adjust.texturePaints(w, h, grainFrame)
+                val box = this.size
+                drawIntoCanvas {
+                    it.nativeCanvas.apply {
+                        scale(box.width / w, box.height / h)
+                        translate(w / 2, h / 2)
+                        paints.forEach { p -> drawRect(-w / 2, -h / 2, w / 2, h / 2, p) }
+                    }
+                }
+            }
         }
     }
 }

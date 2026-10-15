@@ -59,5 +59,15 @@ class VideoEditTest {
         assertArrayEquals(identity, looks.effect(2).getMatrix(0, false), 0f)
     }
 
+    @Test
+    fun liveLooksSwapTheVignetteAndGrainAnEffectReads() {
+        val looks = LiveLooks()
+        val first = looks.texture(0)
+        assertEquals(Adjust(), first.adjust())
+        looks.show(listOf(Adjust(vignette = 0.4f, grain = 0.2f)))
+        assertEquals(Adjust(vignette = 0.4f, grain = 0.2f), first.adjust())
+        assertEquals(Adjust(), looks.texture(1).adjust())
+    }
+
     private fun assertEquals(expected: Int, actual: Int, delta: Int) = assertEquals(expected.toDouble(), actual.toDouble(), delta.toDouble())
 }

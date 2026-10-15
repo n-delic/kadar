@@ -183,7 +183,7 @@ fun VideoCanvasPanel(project: Project, clip: VideoClip, defaultExport: ExportSiz
     }
 }
 
-/** The color sliders on [Adjust], picked one at a time from tabs so the panel stays short. */
+/** The sliders on [Adjust], picked one at a time from tabs so the panel stays short. */
 private enum class AdjustSlider(@StringRes val label: Int, val value: (Adjust) -> Float, val set: Adjust.(Float) -> Adjust, val range: ClosedFloatingPointRange<Float> = -1f..1f) {
     Brightness(R.string.brightness, { it.brightness }, { copy(brightness = it) }),
     Contrast(R.string.contrast, { it.contrast }, { copy(contrast = it) }),
@@ -192,10 +192,12 @@ private enum class AdjustSlider(@StringRes val label: Int, val value: (Adjust) -
     Tint(R.string.tint, { it.tint }, { copy(tint = it) }),
     Hue(R.string.hue, { it.hue }, { copy(hue = it) }),
     Fade(R.string.fade, { it.fade }, { copy(fade = it) }, 0f..1f),
+    Vignette(R.string.vignette, { it.vignette }, { copy(vignette = it) }, 0f..1f),
+    Grain(R.string.grain, { it.grain }, { copy(grain = it) }, 0f..1f),
 }
 
 /**
- * Brightness, contrast, saturation, warmth, tint, hue and fade, one slider at a time; [onChange] gets the whole new
+ * Brightness, contrast, saturation, warmth, tint, hue, fade, vignette and grain, one slider at a time; [onChange] gets the whole new
  * value, [onDrag] the value while a slider moves, [onApplyAll] (clips) copies it to every clip, [onCompare] is held to
  * see the picture without any of it.
  */

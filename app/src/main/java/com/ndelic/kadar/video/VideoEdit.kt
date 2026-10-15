@@ -31,6 +31,7 @@ import androidx.media3.effect.MatrixTransformation
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.Presentation
 import androidx.media3.effect.RgbMatrix
+import androidx.media3.effect.ScaleAndRotateTransformation
 import androidx.media3.effect.StaticOverlaySettings
 import androidx.media3.effect.TextureOverlay
 import androidx.media3.transformer.Composition
@@ -45,6 +46,7 @@ import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
 import com.ndelic.kadar.media.await
 import com.ndelic.kadar.model.Adjust
+import com.ndelic.kadar.model.CropRect
 import com.ndelic.kadar.model.ExportQuality
 import com.ndelic.kadar.model.Layer
 import com.ndelic.kadar.model.Loop
@@ -92,8 +94,24 @@ data class Segment(
     val isImage: Boolean = false,
     /** The transition into this clip from the one before it; the first clip's is unused. */
     val transition: Transition = Transition(),
+    /** The part of the source frame it shows. */
+    val crop: CropRect = CropRect(),
+    /** Mirrored in the source's own axes, after the [crop] and before the [turns]. */
+    val flipX: Boolean = false,
+    val flipY: Boolean = false,
+    /** Quarter turns clockwise, 0 to 3, last. */
+    val turns: Int = 0,
 ) {
     val outputDurationMs get() = outputMs(startMs, endMs, speed)
+
+    /** The size of the picture it shows: its [crop] of the source, turned. */
+    val shownSize get() = turnedSize((width * crop.width).roundToInt(), (height * crop.height).roundToInt(), turns)
+
+    /** Turned a quarter turn further clockwise. */
+    fun turned() = copy(turns = (turns + 1) % 4)
+
+    /** Mirrored left to right ([horizontal]) or upside down as it shows: after an odd number of turns that's the source's other axis. */
+    fun mirrored(horizontal: Boolean) = if (horizontal == (turns % 2 == 0)) copy(flipX = !flipX) else copy(flipY = !flipY)
 }
 
 data class VideoClip(
@@ -345,7 +363,7 @@ private fun VideoClip.mainSequence(played: List<Segment>, spans: List<Transition
     val dips = spans.filter { !it.kind.overlaps }
     val items = played.mapIndexed { i, s ->
         val drop = if (dropFrames && s.speed > 1f && !s.isImage) listOf(FrameDropEffect.createDefaultFrameDropEffect(outputFrameRate(frameRate).toFloat())) else emptyList()
-        val effects = drop + dipEffects(dips.filter { it.clip == i || it.clip == i + 1 }, s.width, s.height)
+        val effects = drop + s.shownSize.let { (w, h) -> dipEffects(dips.filter { it.clip == i || it.clip == i + 1 }, w, h) }
         // A preview copy is smaller than its source, so it is always fitted into the frame.
         val copy = copies[s.uri]
         // Fades out under the head of an overlapping transition into the next clip, which fades in (incomingSequence);
@@ -415,7 +433,7 @@ private fun VideoClip.segmentItem(s: Segment, effects: Effects, removeAudio: Boo
 private fun VideoClip.blurredBackground(s: Segment): EditedMediaItem {
     val (w, h) = outputSize
     val (bw, bh) = blurSize(w, h)
-    val effects = listOfNotNull(
+    val effects = shapeEffects(s) + listOfNotNull(
         adjustEffect(s.adjust),
         Presentation.createForWidthAndHeight(bw, bh, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP),
         GaussianBlur(BLUR_SIGMA * blurStrength),
@@ -707,17 +725,26 @@ private const val HIGH_BITS_PER_PIXEL = 0.28f
 private const val MAX_BITRATE = 50_000_000f
 private const val AAC_BITRATE = 131_072
 
-/** Clip [s]'s [look], then [transition] effects, then its fit into the canvas, then its [frame] (placement and bars). */
+/** Clip [s]'s crop, flip and turn, its [look], then [transition] effects, then its fit into the canvas, then its [frame] (placement and bars). */
 private fun VideoClip.videoEffects(s: Segment, transition: List<Effect> = emptyList(), fit: Boolean = false, look: List<Effect> = lookEffects(s.adjust), frame: List<Effect>): List<Effect> = buildList {
+    addAll(shapeEffects(s))
     addAll(look)
     addAll(transition)
-    // Clips of another size or orientation than the first are fitted into its frame.
-    if (fit || canvas != null || s.width != width || s.height != height) {
+    // Clips of another size or orientation than the first (as they show, cropped and turned) are fitted into its frame.
+    if (fit || canvas != null || s.shownSize != (width to height)) {
         val (w, h) = outputSize
         add(Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_SCALE_TO_FIT))
     }
     addAll(frame)
 }
+
+/** Clip [s]'s [Segment.crop], then its flips and [Segment.turns]: Media3 scales before it rotates, counter-clockwise. */
+private fun shapeEffects(s: Segment) = listOfNotNull(
+    s.crop.takeIf { it != CropRect() }?.let { c -> cropNdc(c).let { (l, r, b, t) -> Crop(l, r, b, t) } },
+    if (s.flipX || s.flipY || s.turns != 0) {
+        ScaleAndRotateTransformation.Builder().setScale(if (s.flipX) -1f else 1f, if (s.flipY) -1f else 1f).setRotationDegrees(-90f * s.turns).build()
+    } else null,
+)
 
 /** The clips' [placement] (a transformation after the fit, which Media3 draws in the same pass), then the bars' [fill]. */
 private fun frameEffects(placement: ClipPlacement, fill: Int?) = listOfNotNull(

@@ -30,6 +30,7 @@ import com.ndelic.kadar.media.trackMimes
 import com.ndelic.kadar.media.trimTransparent
 import com.ndelic.kadar.media.turnBitmap
 import com.ndelic.kadar.media.videoFrame
+import com.ndelic.kadar.media.shapedBitmap
 import com.ndelic.kadar.media.videoStill
 import com.ndelic.kadar.model.Anim
 import com.ndelic.kadar.model.AppSettings
@@ -274,7 +275,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             val first = v.segments.firstOrNull { !it.isImage } ?: return@withContext p
             p.copy(video = v.copy(frameRate = runCatching { mediaInfo(app, first.uri).frameRate }.getOrDefault(0f)))
         }
-        val frame = project.video?.let { v -> withContext(Dispatchers.IO) { segmentFrame(v.segments.first(), v.segments.first().startMs) } }
+        val frame = project.video?.segments?.first()?.let { s -> withContext(Dispatchers.IO) { segmentFrame(s, s.startMs)?.let { s.shaped(it) } } }
         if (project.video != null && frame == null) _effects.send(EditorEffect.Message(UiText.Res(R.string.error_video_missing)))
         open(dir, project, frame, saved = true)
     }
@@ -357,6 +358,9 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     private fun segmentFrame(s: Segment, ms: Long): Bitmap? = runCatching {
         if (s.isImage) loadBitmap(app, s.uri, FRAME_SIZE) else videoFrame(app, s.uri, ms)
     }.getOrNull()
+
+    /** [frame], a picture of this clip's whole source, cropped, mirrored and turned as the clip shows it. */
+    private fun Segment.shaped(frame: Bitmap) = shapedBitmap(frame, crop, flipX, flipY, turns)
 
     // Undo
 
@@ -621,8 +625,25 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val v = _uiState.value.project?.video ?: return null
         val (i, into) = v.segmentAt(positionMs)
         val s = v.segments[i]
-        return withContext(Dispatchers.IO) { segmentFrame(s, sourceMs(s.startMs, s.speed, into)) }
+        return withContext(Dispatchers.IO) { segmentFrame(s, sourceMs(s.startMs, s.speed, into))?.let { s.shaped(it) } }
     }
+
+    /**
+     * Clip [index]'s whole frame under the playhead ([positionMs]), else at its start, mirrored and turned as it shows,
+     * to crop on; null (with a message) if unreadable.
+     */
+    suspend fun clipFrame(index: Int, positionMs: Long): Bitmap? {
+        val v = _uiState.value.project?.video ?: return null
+        val s = v.segments.getOrNull(index) ?: return null
+        val (i, into) = v.segmentAt(positionMs)
+        val ms = if (i == index) sourceMs(s.startMs, s.speed, into).coerceAtMost(s.endMs) else s.startMs
+        val frame = withContext(Dispatchers.IO) { segmentFrame(s, ms)?.let { s.copy(crop = CropRect()).shaped(it) } }
+        if (frame == null) _effects.trySend(EditorEffect.Message(UiText.Res(R.string.error_read_video)))
+        return frame
+    }
+
+    /** Shows only [crop] of clip [index]'s source frame. */
+    fun cropClip(index: Int, crop: CropRect) = updateSegment(index) { copy(crop = crop) }
 
     /** Result of the eraser screen: one undo step for the whole session. Same size as before, so the source offset still holds. */
     fun applyErase(id: Long, bitmap: Bitmap) = work(R.string.busy_saving) {
@@ -847,7 +868,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val at = sourceMs(s.startMs, s.speed, into).coerceIn(s.startMs, s.endMs)
         val bitmap = clipStill(s, at, MAX_PHOTO)
         val file = withContext(Dispatchers.IO) { store.writeImage(dir, bitmap) }
-        val still = Segment(Uri.fromFile(File(dir, file)), MAX_PHOTO_CLIP_MS, bitmap.width, bitmap.height, endMs = PHOTO_CLIP_MS, isImage = true, adjust = s.adjust)
+        val still = Segment(Uri.fromFile(File(dir, file)), MAX_PHOTO_CLIP_MS, bitmap.width, bitmap.height, endMs = PHOTO_CLIP_MS, isImage = true, adjust = s.adjust, crop = s.crop, flipX = s.flipX, flipY = s.flipY, turns = s.turns)
         val parts = when {
             splitPoint(s.startMs, s.endMs, s.speed, into) != null -> listOf(s.copy(endMs = at), still, s.copy(startMs = at, transition = Transition()))
             // At the clip's start the still takes its transition in; at its end it comes right after it.
@@ -866,7 +887,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val s = v.segments[i]
         if (s.isImage) return@work
         val bitmap = clipStill(s, sourceMs(s.startMs, s.speed, into).coerceIn(s.startMs, s.endMs), Int.MAX_VALUE)
-        val uri = withContext(Dispatchers.IO) { saveToGallery(app, "image/jpeg") { bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it) } }
+        val uri = withContext(Dispatchers.IO) { saveToGallery(app, "image/jpeg") { s.shaped(bitmap).compress(Bitmap.CompressFormat.JPEG, 95, it) } }
         _effects.send(EditorEffect.Saved(uri, "image/jpeg", share = false))
     }
 

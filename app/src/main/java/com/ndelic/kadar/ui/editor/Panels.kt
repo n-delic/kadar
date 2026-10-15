@@ -56,6 +56,7 @@ import com.ndelic.kadar.EditorViewModel
 import com.ndelic.kadar.R
 import com.ndelic.kadar.Sticker
 import com.ndelic.kadar.model.Adjust
+import com.ndelic.kadar.model.CensorLayer
 import com.ndelic.kadar.model.DrawLayer
 import com.ndelic.kadar.model.ExportSize
 import com.ndelic.kadar.model.Font
@@ -337,6 +338,7 @@ fun LayersPanel(layers: List<Layer>, selectedId: Long?, vm: EditorViewModel) {
                         is VideoLayer -> KIcon(R.drawable.ic_movie, Modifier.size(22.dp), Ink.violet)
                         is DrawLayer -> KIcon(R.drawable.ic_draw, Modifier.size(22.dp), Ink.coral)
                         is ShapeLayer -> KIcon(l.kind.icon, Modifier.size(22.dp), Ink.sky)
+                        is CensorLayer -> KIcon(R.drawable.ic_blur_on, Modifier.size(22.dp), Ink.dim)
                     }
                 }
                 Spacer(Modifier.width(12.dp))
@@ -364,6 +366,7 @@ val Layer.label: String
         is VideoLayer -> stringResource(R.string.video)
         is DrawLayer -> stringResource(R.string.drawing)
         is ShapeLayer -> stringResource(kind.label)
+        is CensorLayer -> stringResource(R.string.tool_censor)
     }
 
 @Composable

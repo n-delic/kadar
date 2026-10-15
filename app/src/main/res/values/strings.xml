@@ -16,6 +16,7 @@
     <string name="busy_saving_frame">Saving the frame</string>
     <string name="tool_replace">Replace</string>
     <string name="tool_color_clip">Color clip</string>
+    <string name="tool_censor">Blur area</string>
     <string name="previous_frame">Previous frame</string>
     <string name="next_frame">Next frame</string>
     <string name="tool_blend">Blend</string>
@@ -247,6 +248,7 @@
     <string name="shape_arrow">Arrow</string>
     <string name="shape_star">Star</string>
     <string name="shape_line">Line</string>
+    <string name="shape_heart">Heart</string>
 
     <!-- Full-screen tools -->
     <string name="undo_stroke">Undo stroke</string>

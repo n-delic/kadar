@@ -46,6 +46,7 @@ import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
 import com.ndelic.kadar.media.await
 import com.ndelic.kadar.model.Adjust
+import com.ndelic.kadar.model.CensorLayer
 import com.ndelic.kadar.model.CropRect
 import com.ndelic.kadar.model.ExportQuality
 import com.ndelic.kadar.model.Layer
@@ -261,8 +262,9 @@ private const val BLUR_LONG_SIDE = 320
  * the output's frame times (the preview turns it off). [frameClock] times the output by the frame clock at [VideoClip.frameRate]
  * even without video layers or transitions, for an export at a chosen frame rate. With [looks] (the preview's) the clips
  * take their looks from it on every frame instead of each baking its own in, and with [volumes] the clips, songs and
- * voiceovers their volumes, the clips' placement and the bars' color; without it the bars are [VideoClip.barFill] of
- * [background]. Call it on the main thread, like [timedOverlay].
+ * voiceovers their volumes, the clips' placement, the bars' color and the blur areas (on the clips and the heads, not
+ * on video layers); without it the bars are [VideoClip.barFill] of [background] and the blur areas the [CensorLayer]s
+ * among [layers]. Call it on the main thread, like [timedOverlay].
  */
 fun VideoClip.composition(
     layers: List<Layer> = emptyList(),
@@ -282,7 +284,9 @@ fun VideoClip.composition(
     // transparent (Media3 clears to transparent black), so the background shows through them.
     val (w, h) = outputSize
     fun VideoLayer.span() = overlaySpan(startMs, endMs, playableMs, outputDurationMs)
-    val shown = layers.filter { !it.hidden && (it !is VideoLayer || it.span() != null) }
+    // Blur areas draw nothing: they are an effect on the clips (Censor), after their placement.
+    val censors = layers.filterIsInstance<CensorLayer>().filter { !it.hidden }
+    val shown = layers.filter { !it.hidden && it !is CensorLayer && (it !is VideoLayer || it.span() != null) }
     val groups = drawnGroups(shown) { it is VideoLayer }
     val videos = shown.filterIsInstance<VideoLayer>()
     val spans = transitionSpans
@@ -304,7 +308,7 @@ fun VideoClip.composition(
     }
     val overlay = groups.last().takeIf { it.isNotEmpty() }?.let { timedOverlay(w, h, it, outputDurationMs) }
     val played = this.played
-    val frame = looks?.frameEffects() ?: frameEffects(placement, barFill(background))
+    val frame = looks?.frameEffects() ?: frameEffects(placement, barFill(background), censors)
     overlapping?.let { o ->
         val tails = headTailsMs(o)
         val fps = outputFrameRate(frameRate)
@@ -746,10 +750,11 @@ private fun shapeEffects(s: Segment) = listOfNotNull(
     } else null,
 )
 
-/** The clips' [placement] (a transformation after the fit, which Media3 draws in the same pass), then the bars' [fill]. */
-private fun frameEffects(placement: ClipPlacement, fill: Int?) = listOfNotNull(
+/** The clips' [placement] (a transformation after the fit, which Media3 draws in the same pass), then the bars' [fill], then the blur areas. */
+private fun frameEffects(placement: ClipPlacement, fill: Int?, censors: List<CensorLayer>) = listOfNotNull(
     placement.takeUnless { it.isFit }?.let { p -> MatrixTransformation { p.matrix() } },
     fill?.let { c -> BarFill { c } },
+    censors.takeIf { it.isNotEmpty() }?.let { c -> Censor { c } },
 )
 
 /** The same matrix as an image layer's paint, so a look or adjustment matches between photo and video. */
@@ -789,8 +794,15 @@ class LiveLooks {
         this.fill = fill ?: android.graphics.Color.TRANSPARENT
     }
 
-    /** Like the export's placement and bars, but always there, so a new placement or color comes in live. */
-    fun frameEffects() = listOf(MatrixTransformation { placement.matrix() }, BarFill { fill })
+    @Volatile private var censors = emptyList<CensorLayer>()
+
+    /** The project's blur areas. */
+    fun showCensors(censors: List<CensorLayer>) {
+        this.censors = censors
+    }
+
+    /** Like the export's placement, bars and blur areas, but always there, so a new placement, color or blur area comes in live. */
+    fun frameEffects() = listOf(MatrixTransformation { placement.matrix() }, BarFill { fill }, Censor { censors })
 }
 
 private val NO_LOOK = glRgbMatrix(Adjust().filterMatrix())

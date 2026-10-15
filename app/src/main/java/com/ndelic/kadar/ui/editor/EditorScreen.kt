@@ -154,6 +154,7 @@ import com.ndelic.kadar.ui.common.LocalEyedropper
 import com.ndelic.kadar.ui.common.blockTouches
 import com.ndelic.kadar.ui.common.fullWidthPanel
 import com.ndelic.kadar.video.LiveLooks
+import com.ndelic.kadar.video.LiveVolumes
 import com.ndelic.kadar.video.VideoClip
 import com.ndelic.kadar.video.audioPart
 import com.ndelic.kadar.video.composition
@@ -220,6 +221,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     val staged = remember(project, comparing, dragged) {
         if (comparing) project.withoutAdjust() else dragged?.let { project.withAdjust(state.selectedId, clipIndex, it) } ?: project
     }
+    // The preview's volumes, read on every sample: a volume slider's drag goes straight in, no reload.
+    val volumes = remember { LiveVolumes() }
 
     LaunchedEffect(state.selectedId) {
         // Selecting from the Layers list keeps the list open; anything else starts from the layer's tools.
@@ -258,11 +261,18 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             // A paused player keeps its frame; its replayable cache draws it again through the new look.
             if (!player.isPlaying) player.experimentalRedrawLastFrame()
         }
-        val structure = remember(previewed) { previewed.withoutAdjust() }
+        val levels = remember(previewed) { previewed.segments.map { it.volume } + previewed.music.map { it.part.volume } + previewed.voices.map { it.part.volume } }
+        LaunchedEffect(player, levels) {
+            volumes.show(previewed)
+            // Media3 mixes the sound about a second ahead of what plays. Paused, a seek drops it, so play starts at the new
+            // volume; playing, it would cut the sound for most of a second, so the change comes in that much later.
+            player.refreshPaused()
+        }
+        val structure = remember(previewed) { previewed.previewStructure() }
         LaunchedEffect(player, structure, copies) {
             // After an edit (a split, a trim) the playhead stays where it was.
             val start = resumeAt[0].also { resumeAt[0] = 0 }.takeIf { it > 0 } ?: positionMs.coerceAtMost(previewed.outputDurationMs)
-            player.setComposition(structure.copy(blur = false).composition(incoming = false, dropFrames = false, previewCopies = copies, looks = looks), start)
+            player.setComposition(structure.composition(incoming = false, dropFrames = false, previewCopies = copies, looks = looks, volumes = volumes), start)
             player.prepare()
         }
         DisposableEffect(player) {
@@ -383,7 +393,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         Panel.Canvas -> CanvasPanel(project, state.settings.exportSize, vm)
                         Panel.Speed -> video?.let { SpeedPanel(it, clipIndex, vm) }
                         Panel.Audio -> video?.let { v ->
-                            AudioPanel(v, clipIndex, audio, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }) {
+                            AudioPanel(v, clipIndex, audio, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }, onDrag = volumes::show) {
                                 VoiceoverSection(v, state.recordingFromMs, positionMs, playing, player, vm, onPlay = { playing = it })
                             }
                         }
@@ -1198,7 +1208,7 @@ private fun VideoSurface(player: CompositionPlayer, canvasWidth: Int, canvasHeig
                             player.setVideoSurface(holder.surface, androidx.media3.common.util.Size(bw, bh))
                             attached[0] = holder.surface
                             // A paused player only draws on a seek.
-                            if (player.playbackState != Player.STATE_IDLE && !player.isPlaying) player.seekTo(player.currentPosition)
+                            player.refreshPaused()
                         }
 
                         override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = Unit
@@ -1230,7 +1240,7 @@ private fun VideoSurface(player: CompositionPlayer, canvasWidth: Int, canvasHeig
                                 attached[0] = it
                             }
                             // A paused player only draws on a seek.
-                            if (player.playbackState != Player.STATE_IDLE && !player.isPlaying) player.seekTo(player.currentPosition)
+                            player.refreshPaused()
                         }
 
                         // TextureView resets the buffer to the view size on every resize; keep it fixed.
@@ -1256,6 +1266,14 @@ private fun VideoSurface(player: CompositionPlayer, canvasWidth: Int, canvasHeig
 }
 
 private const val PREVIEW_LONG_SIDE = 1280f
+
+/**
+ * A paused player seeks where it is: it draws its frame again and drops the sound it mixed ahead. A millisecond off,
+ * since after a seek to the very spot it is at, Media3 1.11 plays about a second of silence.
+ */
+private fun Player.refreshPaused() {
+    if (playbackState != Player.STATE_IDLE && !isPlaying) seekTo(currentPosition.let { if (it > 0) it - 1 else 1 })
+}
 
 /** The preview player, null for the moment one is swapped for the next. */
 @Composable

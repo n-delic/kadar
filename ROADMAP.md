@@ -131,7 +131,7 @@ Feature parity with the big phone editors, built from how their features behave,
 
 ### Urgent
 
-- [ ] Speed, volume, trim and transition changes still reload the video preview (0.5 to 1.3 s on the emulator): they change the composition's structure. Find which can change without a reload (volume, for one)
+- [ ] Speed, trim, split, reorder, transition, fade and canvas shape changes still reload the video preview (0.4 to 0.7 s on the emulator, up to 0.35 s of it blocking the UI thread inside Media3's `setComposition`; paused, the picture stays): they change the composition's items. Volumes and the blurred canvas no longer reload. A change while playing still freezes the picture for about half a second
 
 ### Existing tools that do less than the big editors
 

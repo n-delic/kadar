@@ -6,6 +6,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.ImageDecoder
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.Typeface
 import android.graphics.fonts.FontFamily
 import android.media.MediaExtractor
@@ -28,8 +30,10 @@ import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
 import com.ndelic.kadar.R
 import com.ndelic.kadar.model.CropRect
+import com.ndelic.kadar.model.CutShape
 import com.ndelic.kadar.model.UiText
 import com.ndelic.kadar.model.UserError
+import com.ndelic.kadar.model.cutShapePath
 import com.ndelic.kadar.model.opaqueBounds
 import com.ndelic.kadar.video.Music
 import java.io.File
@@ -149,6 +153,18 @@ fun shapedBitmap(bitmap: Bitmap, crop: CropRect, flipX: Boolean, flipY: Boolean,
     val odd = turns % 2 == 1
     return turnBitmap(cut, 90f * turns, if (odd) cut.height else cut.width, if (odd) cut.width else cut.height, flipX = flipX, flipY = flipY)
 }
+
+/** [bitmap] with everything outside [shape] (filling it, mirrored by [flipX], [flipY]) made transparent; same size, so source offsets hold. */
+fun cutToShape(bitmap: Bitmap, shape: CutShape, flipX: Boolean = false, flipY: Boolean = false): Bitmap =
+    Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888).also {
+        Canvas(it).apply {
+            translate(bitmap.width / 2f, bitmap.height / 2f)
+            scale(if (flipX) -1f else 1f, if (flipY) -1f else 1f)
+            drawPath(cutShapePath(shape, bitmap.width.toFloat(), bitmap.height.toFloat()), Paint(Paint.ANTI_ALIAS_FLAG))
+            setMatrix(null)
+            drawBitmap(bitmap, 0f, 0f, Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN) })
+        }
+    }
 
 /** Crops away transparent borders. Returns the crop and its `[left, top, right, bottom)` in [src], or null if nothing is visible. */
 fun trimTransparent(src: Bitmap): Pair<Bitmap, IntArray>? {

@@ -16,6 +16,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
 import com.ndelic.kadar.media.cutOutSubject
+import com.ndelic.kadar.media.cutToShape
 import com.ndelic.kadar.media.displayName
 import com.ndelic.kadar.media.downloadImage
 import com.ndelic.kadar.media.importFont
@@ -36,6 +37,7 @@ import com.ndelic.kadar.model.Anim
 import com.ndelic.kadar.model.AppSettings
 import com.ndelic.kadar.model.CensorLayer
 import com.ndelic.kadar.model.CropRect
+import com.ndelic.kadar.model.CutShape
 import com.ndelic.kadar.model.DrawLayer
 import com.ndelic.kadar.model.ExportQuality
 import com.ndelic.kadar.model.ExportSize
@@ -670,14 +672,17 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
      * Crops the layer to `[left, top, right, bottom)`, keeping the kept part where it was on screen. Unturned, that is in
      * its bitmap's pixels. Turned by [turns] quarter turns and [angle] degrees, it is in the crop screen's frame (the
      * picture as shown, flipped like the layer, its box after the quarter turns, same center), and the flip is baked
-     * into the new bitmap and source.
+     * into the new bitmap and source. With a [shape], the crop is cut to it as shown; the source stays whole, so the
+     * restore brush can bring the rest back.
      */
-    fun applyCrop(id: Long, left: Int, top: Int, right: Int, bottom: Int, turns: Int = 0, angle: Float = 0f) = work(R.string.busy_cropping) {
+    fun applyCrop(id: Long, left: Int, top: Int, right: Int, bottom: Int, turns: Int = 0, angle: Float = 0f, shape: CutShape? = null) = work(R.string.busy_cropping) {
         val layer = _uiState.value.project?.layers?.firstOrNull { it.id == id } as? ImageLayer ?: return@work
         val dir = _uiState.value.projectDir ?: return@work
         val degrees = turns * 90 + angle
         if (degrees % 360f == 0f) {
-            val cut = Bitmap.createBitmap(layer.bitmap, left, top, right - left, bottom - top)
+            val box = Bitmap.createBitmap(layer.bitmap, left, top, right - left, bottom - top)
+            // This rectangle is in the bitmap, which the layer draws mirrored, so the shape is mirrored to show upright.
+            val cut = shape?.let { withContext(Dispatchers.Default) { cutToShape(box, it, layer.t.flipX, layer.t.flipY) } } ?: box
             val file = withContext(Dispatchers.IO) { store.writeImage(dir, cut) }
             val t = layer.t.shiftedContent((left + right) / 2f - layer.width / 2, (top + bottom) / 2f - layer.height / 2)
             putCropped(layer.copy(t = t, bitmap = cut, file = file, source = layer.source ?: layer.file, sourceX = layer.sourceX + left, sourceY = layer.sourceY + top))
@@ -696,7 +701,9 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             layer.bitmap.width, layer.bitmap.height, if (original != null) layer.sourceX else 0, if (original != null) layer.sourceY else 0,
             src.width, src.height, degrees, tw, th, left - fw / 2, top - fh / 2, fx, fy,
         )
-        val cut = withContext(Dispatchers.Default) { turnBitmap(layer.bitmap, degrees, right - left, bottom - top, dx, dy, fx, fy) }
+        val cut = withContext(Dispatchers.Default) {
+            turnBitmap(layer.bitmap, degrees, right - left, bottom - top, dx, dy, fx, fy).let { b -> shape?.let { cutToShape(b, it) } ?: b }
+        }
         val file = withContext(Dispatchers.IO) { store.writeImage(dir, cut) }
         val source = withContext(Dispatchers.IO) { store.writeImage(dir, turnBitmap(src, degrees, tw, th, flipX = fx, flipY = fy)) }
         // The frame is the picture as shown in the layer's box, so the shift is in box pixels, and the new bitmap is unflipped.

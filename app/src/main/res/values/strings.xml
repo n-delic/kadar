@@ -251,6 +251,9 @@
     <string name="shape_star">Star</string>
     <string name="shape_line">Line</string>
     <string name="shape_heart">Heart</string>
+    <string name="shape_circle">Circle</string>
+    <string name="shape_triangle">Triangle</string>
+    <string name="shape_diamond">Diamond</string>
 
     <!-- Full-screen tools -->
     <string name="undo_stroke">Undo stroke</string>

@@ -249,6 +249,9 @@
     <string name="shape_star">Zvijezda</string>
     <string name="shape_line">Linija</string>
     <string name="shape_heart">Srce</string>
+    <string name="shape_circle">Krug</string>
+    <string name="shape_triangle">Trougao</string>
+    <string name="shape_diamond">Romb</string>
 
     <!-- Full-screen tools -->
     <string name="undo_stroke">Poništi potez</string>

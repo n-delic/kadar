@@ -734,14 +734,15 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     cropping?.let { layer ->
         CropScreen(
             bitmap = layer.bitmap,
-            onDone = { r, turns, angle ->
+            onDone = { r, turns, angle, shape ->
                 cropping = null
-                vm.applyCrop(layer.id, r[0], r[1], r[2], r[3], turns, angle)
+                vm.applyCrop(layer.id, r[0], r[1], r[2], r[3], turns, angle, shape)
             },
             onCancel = { cropping = null },
             flipX = layer.t.flipX,
             flipY = layer.t.flipY,
             turnable = true,
+            shapes = true,
         )
     }
     croppingVideo?.let { (layer, frame) ->
@@ -750,7 +751,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         CropScreen(
             bitmap = frame,
             initial = layer.crop.run { Rect(left * fw, top * fh, right * fw, bottom * fh) },
-            onDone = { r, _, _ ->
+            onDone = { r, _, _, _ ->
                 croppingVideo = null
                 vm.cropVideo(layer.id, CropRect(r[0] / fw, r[1] / fh, r[2] / fw, r[3] / fh))
             },
@@ -765,7 +766,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
         CropScreen(
             bitmap = frame,
             initial = turnedCrop(s.crop, s.turns, s.flipX, s.flipY).run { Rect(left * fw, top * fh, right * fw, bottom * fh) },
-            onDone = { r, _, _ ->
+            onDone = { r, _, _, _ ->
                 croppingClip = null
                 vm.cropClip(i, unturnedCrop(CropRect(r[0] / fw, r[1] / fh, r[2] / fw, r[3] / fh), s.turns, s.flipX, s.flipY))
             },

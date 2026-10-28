@@ -529,6 +529,8 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun editShape(change: ShapeLayer.() -> ShapeLayer) = updateSelected { if (it is ShapeLayer) it.change() else it }
 
+    fun editDraw(change: DrawLayer.() -> DrawLayer) = updateSelected { if (it is DrawLayer) it.change() else it }
+
     fun editCensor(change: CensorLayer.() -> CensorLayer) = updateSelected { if (it is CensorLayer) it.change() else it }
 
     /** Tail drags on the stage; like gestures, only the first update of a drag ([first]) becomes an undo step. */

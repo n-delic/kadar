@@ -97,6 +97,14 @@ data class Transform(
 /** The narrowest a side handle squeezes a layer, in canvas pixels. */
 private const val MIN_SIDE = 16f
 
+/** Draws [draw] into one offscreen layer that mixes the whole content with what's under it by [blend]; Normal draws directly. */
+private fun withBlend(canvas: Canvas, blend: LayerBlend, reach: Float, draw: () -> Unit) {
+    if (blend == LayerBlend.Normal) return draw()
+    val count = canvas.saveLayer(-reach, -reach, reach, reach, Paint().apply { blendMode = blend.mode })
+    draw()
+    canvas.restoreToCount(count)
+}
+
 /** [name] is what projects store, so fonts can change without breaking saved files. */
 class Font(val name: String, val typeface: Typeface)
 
@@ -194,29 +202,30 @@ data class ImageLayer(
     override val reach get() = hypot(width, height) / 2 + outlineSize * if (outlineStyle == OutlineStyle.Shadow) 2.5f else 1f
     override fun drawContent(canvas: Canvas) {
         // A blend mixes the whole layer (outline, opacity, vignette and grain) with what's under it, so it goes around everything.
-        val blended = if (blend == LayerBlend.Normal) null else canvas.saveLayer(-reach, -reach, reach, reach, Paint().apply { blendMode = blend.mode })
-        val m = mask
-        // Down and right on the canvas whichever way the picture is flipped, as far across as down when it's stretched.
-        val dx = if (outlineStyle != OutlineStyle.Shadow) 0f else outlineSize / t.stretch * if (t.flipX) -1 else 1
-        val dy = if (outlineStyle != OutlineStyle.Shadow) 0f else outlineSize * if (t.flipY) -1 else 1
-        val count = if (m == null || opacity >= 1f) canvas.save() else {
-            val r = RectF(m.bounds).apply { union(left + dx, top + dy, right + dx, bottom + dy) }
-            canvas.saveLayerAlpha(r, (opacity * 255).roundToInt())
+        withBlend(canvas, blend, reach) {
+            val m = mask
+            // Down and right on the canvas whichever way the picture is flipped, as far across as down when it's stretched.
+            val dx = if (outlineStyle != OutlineStyle.Shadow) 0f else outlineSize / t.stretch * if (t.flipX) -1 else 1
+            val dy = if (outlineStyle != OutlineStyle.Shadow) 0f else outlineSize * if (t.flipY) -1 else 1
+            val count = if (m == null || opacity >= 1f) canvas.save() else {
+                val r = RectF(m.bounds).apply { union(left + dx, top + dy, right + dx, bottom + dy) }
+                canvas.saveLayerAlpha(r, (opacity * 255).roundToInt())
+            }
+            if (m != null) {
+                canvas.translate(dx, dy)
+                canvas.drawBitmap(m.bitmap, null, m.bounds, outlinePaint)
+                canvas.translate(-dx, -dy)
+            }
+            if (texture.isEmpty()) {
+                canvas.drawBitmap(picture, null, bounds, paint)
+            } else {
+                // A layer of its own, so the vignette and grain (SRC_ATOP) land only on the picture's pixels, not its outline.
+                canvas.saveLayer(-width / 2, -height / 2, width / 2, height / 2, null)
+                canvas.drawBitmap(picture, null, bounds, paint)
+                texture.forEach { canvas.drawRect(-width / 2, -height / 2, width / 2, height / 2, it) }
+            }
+            canvas.restoreToCount(count)
         }
-        if (m != null) {
-            canvas.translate(dx, dy)
-            canvas.drawBitmap(m.bitmap, null, m.bounds, outlinePaint)
-            canvas.translate(-dx, -dy)
-        }
-        if (texture.isEmpty()) {
-            canvas.drawBitmap(picture, null, bounds, paint)
-        } else {
-            // A layer of its own, so the vignette and grain (SRC_ATOP) land only on the picture's pixels, not its outline.
-            canvas.saveLayer(-width / 2, -height / 2, width / 2, height / 2, null)
-            canvas.drawBitmap(picture, null, bounds, paint)
-            texture.forEach { canvas.drawRect(-width / 2, -height / 2, width / 2, height / 2, it) }
-        }
-        canvas.restoreToCount(blended ?: count)
     }
     override fun withTransform(t: Transform) = copy(t = t)
     override fun withTime(startMs: Long, endMs: Long) = copy(startMs = startMs, endMs = endMs)
@@ -310,6 +319,8 @@ data class DrawLayer(
     override val endMs: Long = Long.MAX_VALUE,
     override val hidden: Boolean = false,
     override val locked: Boolean = false,
+    /** How the whole drawing mixes with what's under it (photo projects; a video's layers are drawn apart from the video). */
+    val blend: LayerBlend = LayerBlend.Normal,
 ) : Layer {
     private val bounds = strokeBounds(strokes)
     private val paths by lazy { strokes.map { it.path() } }
@@ -324,25 +335,27 @@ data class DrawLayer(
     }
     override val width get() = bounds?.let { it[2] - it[0] } ?: 0f
     override val height get() = bounds?.let { it[3] - it[1] } ?: 0f
-    override fun drawContent(canvas: Canvas) = strokes.forEachIndexed { i, s ->
-        penPaint.color = s.color
-        penPaint.strokeWidth = s.width
-        when (s.style) {
-            PenStyle.Solid -> canvas.drawPath(paths[i], penPaint)
-            // Zero-length dashes with round caps are dots, one width apart.
-            PenStyle.Dotted -> drawWith(penPaint.apply { pathEffect = DashPathEffect(floatArrayOf(0f, s.width * 2), 0f) }) { canvas.drawPath(paths[i], it) }
-            PenStyle.Soft -> drawWith(penPaint.apply { maskFilter = BlurMaskFilter(s.width * 0.3f, BlurMaskFilter.Blur.NORMAL) }) { canvas.drawPath(paths[i], it) }
-            PenStyle.Neon -> {
-                // A wide blurred glow in the color, then a thin core close to white.
-                penPaint.strokeWidth = s.width * 1.6f
-                drawWith(penPaint.apply { maskFilter = BlurMaskFilter(s.width * 0.8f, BlurMaskFilter.Blur.NORMAL) }) { canvas.drawPath(paths[i], it) }
-                penPaint.strokeWidth = s.width * 0.45f
-                penPaint.color = towardWhite(s.color, 0.7f)
-                canvas.drawPath(paths[i], penPaint)
-            }
-            PenStyle.Spray -> drawWith(penPaint.apply { style = Paint.Style.FILL }) { p ->
-                val d = sprays[i]!!
-                for (k in 0 until d.size / 3) canvas.drawCircle(d[3 * k], d[3 * k + 1], d[3 * k + 2], p)
+    override fun drawContent(canvas: Canvas) = withBlend(canvas, blend, reach) {
+        strokes.forEachIndexed { i, s ->
+            penPaint.color = s.color
+            penPaint.strokeWidth = s.width
+            when (s.style) {
+                PenStyle.Solid -> canvas.drawPath(paths[i], penPaint)
+                // Zero-length dashes with round caps are dots, one width apart.
+                PenStyle.Dotted -> drawWith(penPaint.apply { pathEffect = DashPathEffect(floatArrayOf(0f, s.width * 2), 0f) }) { canvas.drawPath(paths[i], it) }
+                PenStyle.Soft -> drawWith(penPaint.apply { maskFilter = BlurMaskFilter(s.width * 0.3f, BlurMaskFilter.Blur.NORMAL) }) { canvas.drawPath(paths[i], it) }
+                PenStyle.Neon -> {
+                    // A wide blurred glow in the color, then a thin core close to white.
+                    penPaint.strokeWidth = s.width * 1.6f
+                    drawWith(penPaint.apply { maskFilter = BlurMaskFilter(s.width * 0.8f, BlurMaskFilter.Blur.NORMAL) }) { canvas.drawPath(paths[i], it) }
+                    penPaint.strokeWidth = s.width * 0.45f
+                    penPaint.color = towardWhite(s.color, 0.7f)
+                    canvas.drawPath(paths[i], penPaint)
+                }
+                PenStyle.Spray -> drawWith(penPaint.apply { style = Paint.Style.FILL }) { p ->
+                    val d = sprays[i]!!
+                    for (k in 0 until d.size / 3) canvas.drawCircle(d[3 * k], d[3 * k + 1], d[3 * k + 2], p)
+                }
             }
         }
     }
@@ -490,6 +503,8 @@ data class TextLayer(
     override val animLoop: Loop = Loop.None,
     override val animInMs: Long? = null,
     override val animOutMs: Long? = null,
+    /** How the whole layer (box included) mixes with what's under it (photo projects; a video's layers are drawn apart from the video). */
+    val blend: LayerBlend = LayerBlend.Normal,
 ) : Layer {
     private val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).also {
         // The platform fakes bold and italic for fonts that have no such style.
@@ -561,68 +576,71 @@ data class TextLayer(
 
     /** With [reveal] (a per-letter entrance in progress) the letters are drawn one by one, each as [letterScale] says. */
     fun drawContent(canvas: Canvas, reveal: Reveal?) {
-        // Like a fade: one offscreen layer, so the outline and box don't show through the letters. Room for a shadow.
-        val r = reach * 1.2f
-        val count = if (opacity < 1f) canvas.saveLayerAlpha(-r, -r, r, r, (opacity * 255).roundToInt()) else canvas.save()
-        if (box != null) {
-            boxPaint.style = Paint.Style.FILL
-            boxPaint.color = box
-            boxPaint.alpha = (boxPaint.alpha * boxOpacity).roundToInt()
-            if (isBubble) canvas.drawPath(bubblePath, boxPaint)
-            else canvas.drawRoundRect(-width / 2, -height / 2, width / 2, height / 2, size * 0.25f, size * 0.25f, boxPaint)
-        }
-        if (box != null && boxOutline != null) {
-            boxPaint.style = Paint.Style.STROKE
-            boxPaint.strokeJoin = Paint.Join.ROUND
-            boxPaint.strokeWidth = boxStroke
-            boxPaint.color = boxOutline
-            if (isBubble) {
-                canvas.drawPath(bubblePath, boxPaint)
-                if (bubble == Bubble.Double) {
-                    boxPaint.strokeWidth = boxStroke * 0.4f
-                    boxPaint.color = box
-                    canvas.drawPath(bubblePath, boxPaint)
-                }
-            } else {
-                // Inside the caption box, so adding an outline doesn't change its size.
-                val i = boxStroke / 2
-                canvas.drawRoundRect(-width / 2 + i, -height / 2 + i, width / 2 - i, height / 2 - i, size * 0.25f, size * 0.25f, boxPaint)
+        // A blend mixes the whole layer (box, glow, shadow and all) with what's under it, so it goes around everything.
+        withBlend(canvas, blend, reach * 1.2f) {
+            // Like a fade: one offscreen layer, so the outline and box don't show through the letters. Room for a shadow.
+            val r = reach * 1.2f
+            val count = if (opacity < 1f) canvas.saveLayerAlpha(-r, -r, r, r, (opacity * 255).roundToInt()) else canvas.save()
+            if (box != null) {
+                boxPaint.style = Paint.Style.FILL
+                boxPaint.color = box
+                boxPaint.alpha = (boxPaint.alpha * boxOpacity).roundToInt()
+                if (isBubble) canvas.drawPath(bubblePath, boxPaint)
+                else canvas.drawRoundRect(-width / 2, -height / 2, width / 2, height / 2, size * 0.25f, size * 0.25f, boxPaint)
             }
-        }
-        // A curved block is taller by its rise; centered, the ends of an arch hang below and a smile's rise above.
-        canvas.translate(-layout.width / 2f, -layout.height / 2f + if (curve > 0) -rise / 2 else rise / 2)
-        fun draw() = when {
-            curve != 0f -> drawCurved(canvas, reveal)
-            reveal == null -> layout.draw(canvas)
-            else -> drawLetters(canvas, reveal)
-        }
-        paint.strokeJoin = Paint.Join.ROUND
-        paint.strokeWidth = stroke
-        if (glow != null) {
-            // The letters (and outline) in the glow color, blurred around; the passes below cover the letters themselves.
-            paint.style = if (outline != null) Paint.Style.FILL_AND_STROKE else Paint.Style.FILL
-            paint.color = glow
-            paint.setShadowLayer(glowRadius, 0f, 0f, glow)
-            // Twice: one blurred pass spreads thin and reads as a soft shadow, not a glow.
-            repeat(2) { draw() }
-            paint.clearShadowLayer()
-        }
-        // The shadow goes on the first pass only, so it sits under the outline instead of over it.
-        // A zero radius would remove the shadow, so a sharp one still gets a tiny blur.
-        if (shadow != null) paint.setShadowLayer(maxOf(size * shadowBlur, 0.5f), 0f, size * shadowDistance, shadow)
-        if (outline != null) {
-            paint.style = Paint.Style.STROKE
-            paint.color = outline
+            if (box != null && boxOutline != null) {
+                boxPaint.style = Paint.Style.STROKE
+                boxPaint.strokeJoin = Paint.Join.ROUND
+                boxPaint.strokeWidth = boxStroke
+                boxPaint.color = boxOutline
+                if (isBubble) {
+                    canvas.drawPath(bubblePath, boxPaint)
+                    if (bubble == Bubble.Double) {
+                        boxPaint.strokeWidth = boxStroke * 0.4f
+                        boxPaint.color = box
+                        canvas.drawPath(bubblePath, boxPaint)
+                    }
+                } else {
+                    // Inside the caption box, so adding an outline doesn't change its size.
+                    val i = boxStroke / 2
+                    canvas.drawRoundRect(-width / 2 + i, -height / 2 + i, width / 2 - i, height / 2 - i, size * 0.25f, size * 0.25f, boxPaint)
+                }
+            }
+            // A curved block is taller by its rise; centered, the ends of an arch hang below and a smile's rise above.
+            canvas.translate(-layout.width / 2f, -layout.height / 2f + if (curve > 0) -rise / 2 else rise / 2)
+            fun draw() = when {
+                curve != 0f -> drawCurved(canvas, reveal)
+                reveal == null -> layout.draw(canvas)
+                else -> drawLetters(canvas, reveal)
+            }
+            paint.strokeJoin = Paint.Join.ROUND
+            paint.strokeWidth = stroke
+            if (glow != null) {
+                // The letters (and outline) in the glow color, blurred around; the passes below cover the letters themselves.
+                paint.style = if (outline != null) Paint.Style.FILL_AND_STROKE else Paint.Style.FILL
+                paint.color = glow
+                paint.setShadowLayer(glowRadius, 0f, 0f, glow)
+                // Twice: one blurred pass spreads thin and reads as a soft shadow, not a glow.
+                repeat(2) { draw() }
+                paint.clearShadowLayer()
+            }
+            // The shadow goes on the first pass only, so it sits under the outline instead of over it.
+            // A zero radius would remove the shadow, so a sharp one still gets a tiny blur.
+            if (shadow != null) paint.setShadowLayer(maxOf(size * shadowBlur, 0.5f), 0f, size * shadowDistance, shadow)
+            if (outline != null) {
+                paint.style = Paint.Style.STROKE
+                paint.color = outline
+                draw()
+                paint.clearShadowLayer()
+            }
+            paint.style = Paint.Style.FILL
+            paint.color = color
+            if (gradient != null) paint.shader = LinearGradient(0f, 0f, 0f, layout.height.toFloat(), color, gradient, Shader.TileMode.CLAMP)
             draw()
+            paint.shader = null
             paint.clearShadowLayer()
+            canvas.restoreToCount(count)
         }
-        paint.style = Paint.Style.FILL
-        paint.color = color
-        if (gradient != null) paint.shader = LinearGradient(0f, 0f, 0f, layout.height.toFloat(), color, gradient, Shader.TileMode.CLAMP)
-        draw()
-        paint.shader = null
-        paint.clearShadowLayer()
-        canvas.restoreToCount(count)
     }
 
     /** Where each letter (grapheme, so an emoji stays whole) starts in the drawn text, plus its end. */
@@ -781,6 +799,8 @@ data class ShapeLayer(
     override val animLoop: Loop = Loop.None,
     override val animInMs: Long? = null,
     override val animOutMs: Long? = null,
+    /** How the whole shape mixes with what's under it (photo projects; a video's layers are drawn apart from the video). */
+    val blend: LayerBlend = LayerBlend.Normal,
 ) : Layer {
     // Per layer, like the text paints: the video export draws copies of animated layers off the main thread.
     private val paint by lazy {
@@ -803,28 +823,30 @@ data class ShapeLayer(
     override val height get() = if (kind == ShapeKind.Line) stroke * 3 else h + pad
 
     override fun drawContent(canvas: Canvas) {
-        val count = if (opacity < 1f) canvas.saveLayerAlpha(-width / 2, -height / 2, width / 2, height / 2, (opacity * 255).roundToInt()) else canvas.save()
-        if (kind == ShapeKind.Line) {
-            lineColor?.let {
-                paint.style = Paint.Style.STROKE
-                paint.strokeWidth = stroke
-                paint.color = it
-                canvas.drawLine(-w / 2, 0f, w / 2, 0f, paint)
+        withBlend(canvas, blend, reach) {
+            val count = if (opacity < 1f) canvas.saveLayerAlpha(-width / 2, -height / 2, width / 2, height / 2, (opacity * 255).roundToInt()) else canvas.save()
+            if (kind == ShapeKind.Line) {
+                lineColor?.let {
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeWidth = stroke
+                    paint.color = it
+                    canvas.drawLine(-w / 2, 0f, w / 2, 0f, paint)
+                }
+            } else {
+                fill?.let {
+                    paint.style = Paint.Style.FILL
+                    paint.color = it
+                    drawShape(canvas)
+                }
+                outline?.let {
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeWidth = stroke
+                    paint.color = it
+                    drawShape(canvas)
+                }
             }
-        } else {
-            fill?.let {
-                paint.style = Paint.Style.FILL
-                paint.color = it
-                drawShape(canvas)
-            }
-            outline?.let {
-                paint.style = Paint.Style.STROKE
-                paint.strokeWidth = stroke
-                paint.color = it
-                drawShape(canvas)
-            }
+            canvas.restoreToCount(count)
         }
-        canvas.restoreToCount(count)
     }
 
     private fun drawShape(canvas: Canvas) {

@@ -266,6 +266,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                 animLoop = loop,
                 animInMs = inMs,
                 animOutMs = outMs,
+                blend = enumOr(j.optString("blend"), LayerBlend.Normal),
             )
             // Versions before video layers skip this type (the `else` below) rather than fail the whole project.
             "video" -> VideoLayer(
@@ -303,6 +304,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                 locked = j.optBoolean("locked"),
                 startMs = start,
                 endMs = end,
+                blend = enumOr(j.optString("blend"), LayerBlend.Normal),
             )
             // Versions before shapes skip this type too.
             "shape" -> ShapeLayer(
@@ -324,6 +326,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                 animLoop = loop,
                 animInMs = inMs,
                 animOutMs = outMs,
+                blend = enumOr(j.optString("blend"), LayerBlend.Normal),
             )
             // Versions before blur areas skip this type too.
             "censor" -> CensorLayer(
@@ -510,6 +513,7 @@ private fun Layer.toJson() = JSONObject().apply {
             put("lineSpacing", layer.lineSpacing.toDouble())
             layer.wrap?.let { put("wrap", it.toDouble()) }
             if (layer.curve != 0f) put("curve", layer.curve.toDouble())
+            if (layer.blend != LayerBlend.Normal) put("blend", layer.blend.name)
         }
         is VideoLayer -> {
             put("type", "video")
@@ -530,6 +534,7 @@ private fun Layer.toJson() = JSONObject().apply {
         }
         is DrawLayer -> {
             put("type", "draw")
+            if (layer.blend != LayerBlend.Normal) put("blend", layer.blend.name)
             put("strokes", JSONArray(layer.strokes.map { stroke ->
                 JSONObject().apply {
                     put("color", stroke.color)
@@ -549,6 +554,7 @@ private fun Layer.toJson() = JSONObject().apply {
             layer.outline?.let { put("outline", it) }
             put("stroke", layer.stroke.toDouble())
             put("opacity", layer.opacity.toDouble())
+            if (layer.blend != LayerBlend.Normal) put("blend", layer.blend.name)
         }
         is CensorLayer -> {
             put("type", "censor")

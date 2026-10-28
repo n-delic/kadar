@@ -443,7 +443,13 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         Panel.Animate -> if (selected != null) AnimationPanel(selected, vm) else video?.let { ClipAnimationPanel(it, clipIndex, vm) }
                         Panel.Opacity -> (selected as? ImageLayer)?.let { l -> KSlider(R.drawable.ic_opacity, l.opacity, 0.05f..1f, ::percent) { v -> vm.editImage { copy(opacity = v) } } }
                         Panel.ImageOutline -> (selected as? ImageLayer)?.let { ImageOutlinePanel(it, vm) }
-                        Panel.Blend -> (selected as? ImageLayer)?.let { BlendPanel(it, vm) }
+                        Panel.Blend -> when (val l = selected) {
+                            is ImageLayer -> BlendPanel(l.blend) { b -> vm.editImage { copy(blend = b) } }
+                            is TextLayer -> BlendPanel(l.blend) { b -> vm.editText { copy(blend = b) } }
+                            is DrawLayer -> BlendPanel(l.blend) { b -> vm.editDraw { copy(blend = b) } }
+                            is ShapeLayer -> BlendPanel(l.blend) { b -> vm.editShape { copy(blend = b) } }
+                            else -> {}
+                        }
                         Panel.Effects -> (selected as? ImageLayer)?.let { EffectsPanel(it, vm) }
                         Panel.Censor -> (selected as? CensorLayer)?.let { CensorPanel(it, vm) }
                         Panel.Transition -> video?.let { v -> transitionAt?.takeIf { it in 1 until v.segments.size }?.let { TransitionPanel(v, it, vm) } }
@@ -545,6 +551,8 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         IconTool(R.drawable.ic_flare, stringResource(R.string.tool_glow), panel == Panel.Glow) { toggle(Panel.Glow) }
                         IconTool(R.drawable.ic_chat_bubble, stringResource(R.string.tool_box), panel == Panel.Box) { toggle(Panel.Box) }
                         IconTool(R.drawable.ic_text_fields, stringResource(R.string.tool_style), panel == Panel.Style) { toggle(Panel.Style) }
+                        // A blend only makes sense against the layers under it, so photos offer it (a video's layers draw apart from the video).
+                        if (video == null) IconTool(R.drawable.ic_join, stringResource(R.string.tool_blend), panel == Panel.Blend) { toggle(Panel.Blend) }
                         if (video != null) IconTool(R.drawable.ic_animation, stringResource(R.string.tool_animate), panel == Panel.Animate) { toggle(Panel.Animate) }
                         timeTools()
                         IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
@@ -557,6 +565,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         ToolDivider()
                         IconTool(R.drawable.ic_draw, stringResource(R.string.tool_draw), onClick = ::draw)
                         flipTools()
+                        if (video == null) IconTool(R.drawable.ic_join, stringResource(R.string.tool_blend), panel == Panel.Blend) { toggle(Panel.Blend) }
                         timeTools()
                         IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)
                         IconTool(R.drawable.ic_flip_to_front, stringResource(R.string.tool_front), onClick = vm::bringToFront)
@@ -571,6 +580,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                             IconTool(R.drawable.ic_format_color_fill, stringResource(R.string.tool_fill), panel == Panel.ShapeFill) { toggle(Panel.ShapeFill) }
                         }
                         IconTool(R.drawable.ic_border_color, stringResource(R.string.tool_outline), panel == Panel.ShapeOutline) { toggle(Panel.ShapeOutline) }
+                        if (video == null) IconTool(R.drawable.ic_join, stringResource(R.string.tool_blend), panel == Panel.Blend) { toggle(Panel.Blend) }
                         if (video != null) IconTool(R.drawable.ic_animation, stringResource(R.string.tool_animate), panel == Panel.Animate) { toggle(Panel.Animate) }
                         timeTools()
                         IconTool(R.drawable.ic_content_copy, stringResource(R.string.duplicate), onClick = vm::duplicateSelected)

@@ -164,7 +164,8 @@ Feature parity with the big phone editors, built from how their features behave,
 - [x] Clip in/out animations: fade, zoom in or out, slide, spin, for the entrance and the exit separately
 - [ ] Keyframes for layers and clips (position, scale, rotation, opacity over time)
 - [x] Blur or pixelate part of the video (faces, usernames): a rectangle, ellipse or heart region on its own track, with strength
-- [ ] Blur areas: opacity, frosted glass and magnifier looks; censoring video layers too
+- [x] Blur areas: opacity, frosted glass and magnifier looks
+- [ ] Blur areas: censoring video layers too
 - [x] Green screen: remove a picked color from a video layer, with strength and soft-edge sliders
 - [ ] Video layers: blend modes (multiply, screen, overlay, darken, lighten) and shaped masks (linear, radial, rectangle, heart, star) with a soft edge
 - [x] More transitions: spin, flip, glitch, color split

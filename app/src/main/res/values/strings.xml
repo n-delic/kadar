@@ -28,6 +28,8 @@
     <string name="tool_effects">Effects</string>
     <string name="effect_blur">Blur</string>
     <string name="effect_pixelate">Pixelate</string>
+    <string name="effect_frosted">Frosted</string>
+    <string name="effect_magnify">Magnify</string>
     <string name="effect_posterize">Posterize</string>
     <string name="effect_duotone">Duotone</string>
     <string name="effect_sharpen">Sharpen</string>

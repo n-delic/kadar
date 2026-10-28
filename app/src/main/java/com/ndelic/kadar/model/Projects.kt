@@ -337,6 +337,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                 kind = enumOr(j.optString("kind"), CensorKind.Blur),
                 shape = enumOr(j.optString("shape"), CensorShape.Ellipse),
                 strength = j.optDouble("strength", 0.5).toFloat(),
+                opacity = j.optDouble("opacity", 1.0).toFloat(),
                 hidden = j.optBoolean("hidden"),
                 locked = j.optBoolean("locked"),
                 startMs = start,
@@ -563,6 +564,7 @@ private fun Layer.toJson() = JSONObject().apply {
             put("kind", layer.kind.name)
             put("shape", layer.shape.name)
             put("strength", layer.strength.toDouble())
+            if (layer.opacity != 1f) put("opacity", layer.opacity.toDouble())
         }
     }
 }

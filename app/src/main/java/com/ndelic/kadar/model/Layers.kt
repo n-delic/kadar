@@ -871,14 +871,15 @@ data class ShapeLayer(
     }
 }
 
-enum class CensorKind(@StringRes val label: Int) { Blur(R.string.effect_blur), Pixelate(R.string.effect_pixelate) }
+enum class CensorKind(@StringRes val label: Int) { Blur(R.string.effect_blur), Pixelate(R.string.effect_pixelate), Frosted(R.string.effect_frosted), Magnify(R.string.effect_magnify) }
 
 enum class CensorShape(@StringRes val label: Int) { Rect(R.string.shape_rect), Ellipse(R.string.shape_ellipse), Heart(R.string.shape_heart) }
 
 /**
  * A part of a video blurred or pixelated ([kind]): a [shape] filling its [w]×[h] box (own pixels), as coarse as [strength]
- * (0 to 1) says. Its pixels come from the clips under it (the `Censor` GL effect on every clip, in the preview and the
- * export alike), so it draws nothing here; the stage shows its selection box like any layer.
+ * (0 to 1) says, mixed over the clips under it by [opacity] (0 to 1). Its pixels come from the clips under it (the `Censor`
+ * GL effect on every clip, in the preview and the export alike), so it draws nothing here; the stage shows its selection
+ * box like any layer.
  */
 data class CensorLayer(
     override val id: Long,
@@ -888,6 +889,7 @@ data class CensorLayer(
     val kind: CensorKind = CensorKind.Blur,
     val shape: CensorShape = CensorShape.Ellipse,
     val strength: Float = 0.5f,
+    val opacity: Float = 1f,
     override val startMs: Long = 0,
     override val endMs: Long = Long.MAX_VALUE,
     override val hidden: Boolean = false,

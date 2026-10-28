@@ -18,17 +18,28 @@ class CensorTest {
     }
 
     @Test
+    fun magnifierZoomGrowsWithStrength() {
+        assertEquals(2f, censorZoom(0f), 0.01f)
+        assertEquals(4f, censorZoom(0.5f), 0.01f)
+        assertEquals(6f, censorZoom(1f), 0.01f)
+        assertEquals(censorZoom(2f), censorZoom(1f))
+    }
+
+    @Test
     fun onlyAreasShownAtTheTimeTopmostFirst() {
         val a = CensorLayer(1, Transform(100f, 200f), 50f, 40f, startMs = 0, endMs = 1000)
         val b = CensorLayer(2, Transform(300f, 400f, scale = 2f, rotation = 90f, stretch = 1.5f), 50f, 40f, CensorKind.Pixelate, CensorShape.Heart)
         val hidden = b.copy(id = 3, hidden = true)
         val u = CensorUniforms(listOf(a, b, hidden), 500, 1080, 1920)
         assertEquals(2, u.count)
-        // b is on top: its center, rotation, half size (scale and stretch applied), shape and a positive (pixelate) cell.
+        // b is on top: its center, rotation, half size (scale and stretch applied), pixelate heart (kind 1, shape 2)
+        // with its cell, and its opacity and magnifier zoom (the strength's, its kind ignores).
         assertArrayEquals(floatArrayOf(300f, 400f, 0f, 1f), u.place.copyOf(4), 1e-5f)
-        assertArrayEquals(floatArrayOf(75f, 40f, 2f, censorCell(0.5f, 1080, 1920)), u.shape.copyOf(4), 1e-4f)
+        assertArrayEquals(floatArrayOf(75f, 40f, 12f, censorCell(0.5f, 1080, 1920)), u.shape.copyOf(4), 1e-4f)
+        assertArrayEquals(floatArrayOf(1f, censorZoom(0.5f), 0f, 0f), u.extra.copyOf(4), 1e-5f)
         assertArrayEquals(floatArrayOf(100f, 200f, 1f, 0f), u.place.copyOfRange(4, 8), 1e-5f)
-        assertEquals(-censorCell(0.5f, 1080, 1920), u.shape[7], 1e-4f)
+        assertEquals(censorCell(0.5f, 1080, 1920), u.shape[7], 1e-4f)
+        assertEquals(1f, u.shape[6], 1e-4f)
         assertEquals(1, CensorUniforms(listOf(a, b), 1000, 1080, 1920).count)
     }
 

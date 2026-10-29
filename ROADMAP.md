@@ -146,6 +146,12 @@
 - Fix: the selection's side handles are small plain circles
 - Fix: every property slider updates live while it drags
 
+## v0.9.1: done
+
+- Fix: a tap on empty space (inside a selection too) lets the layer go; a tap picks what's actually drawn
+- Fix: shapes start as a round circle, not an oval
+- Fix: the image layer's opacity slider updates live while it drags
+
 ## Next
 
 Feature parity with the big phone editors, built from how their features behave, never from their code, assets or look (AGENTS.md rules 14 and 15). Offline only: no cloud AI.

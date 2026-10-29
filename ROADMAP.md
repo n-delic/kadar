@@ -156,7 +156,7 @@ Feature parity with the big phone editors, built from how their features behave,
 - [x] Clip tools: rotate and flip, crop the main clip
 - [ ] Clip tools: reverse
 - [x] Canvas: 1:2; zoom and move the clip inside the canvas; background color, blur strength
-- [ ] Canvas: a background image behind the clips
+- [x] Canvas: a background image behind the clips
 - [ ] Speed ramps (presets that slow down or speed up within a clip)
 - [ ] Timed video effects on their own track: slow zoom, jump zoom, shake, glitch, blur, flash, fade to black, film grain
 - [x] Audio: extract the sound of a video, voice effects (higher, deeper, chipmunk, robot), text-to-speech with the phone's offline voices

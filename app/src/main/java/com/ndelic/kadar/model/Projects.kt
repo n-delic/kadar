@@ -149,7 +149,8 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
         val used = project.layers.filterIsInstance<ImageLayer>().flatMap { listOfNotNull(it.file, it.source) }.toSet() +
             project.video?.voices.orEmpty().map { it.file.name } +
             project.video?.segments.orEmpty().filter { it.isImage }.map { File(it.uri.path!!).name } +
-            project.video?.segments.orEmpty().filter { !it.isImage }.map { previewCopyFile(dir, it.uri).name } + THUMB
+            project.video?.segments.orEmpty().filter { !it.isImage }.map { previewCopyFile(dir, it.uri).name } +
+            listOfNotNull(project.video?.bgImage) + THUMB
         dir.listFiles().orEmpty()
             .filter { (it.name.endsWith(".png") || it.name.endsWith(".jpg") || it.name.endsWith(VOICE_EXTENSION) || it.name.endsWith(SPEECH_EXTENSION) || it.name.startsWith(PREVIEW_COPY_PREFIX)) && it.name !in used }
             .forEach { it.delete() }
@@ -359,6 +360,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
         height = j.optInt("videoHeight", projectHeight),
         canvas = if (j.has("canvas")) j.getDouble("canvas").toFloat() else null,
         blur = j.optBoolean("blur"),
+        bgImage = j.optString("bgImage").ifEmpty { null },
         blurStrength = j.optDouble("blurStrength", 1.0).toFloat(),
         placement = ClipPlacement(j.optDouble("clipZoom", 1.0).toFloat(), j.optDouble("clipX", 0.0).toFloat(), j.optDouble("clipY", 0.0).toFloat()),
         // Before version 3 a project had at most one song, from the start of the video to its end.
@@ -613,6 +615,7 @@ private fun VideoClip.toJson() = JSONObject().apply {
     canvas?.let { put("canvas", it.toDouble()) }
     put("blur", blur)
     put("blurStrength", blurStrength.toDouble())
+    bgImage?.let { put("bgImage", it) }
     put("clipZoom", placement.zoom.toDouble())
     put("clipX", placement.x.toDouble())
     put("clipY", placement.y.toDouble())

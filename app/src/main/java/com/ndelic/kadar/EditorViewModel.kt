@@ -844,7 +844,22 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         p.copy(height = h, layers = p.layers.map { it.withTransform(it.t.copy(y = it.t.y + dy)) })
     }
 
-    fun setBackground(color: Int) = updateProject { it.copy(background = color, blur = false, video = it.video?.copy(blur = false)) }
+    fun setBackground(color: Int) = updateProject { it.copy(background = color, blur = false, video = it.video?.copy(blur = false, bgImage = null)) }
+
+    /** Copies a picked picture into the project as the canvas's background image under the clips. */
+    fun setVideoBackground(uri: Uri) = work(R.string.busy_adding_image) {
+        val s = _uiState.value
+        val dir = s.projectDir ?: return@work
+        val bitmap = withContext(Dispatchers.IO) { loadBitmap(app, uri, MAX_LAYER) }
+        val file = withContext(Dispatchers.IO) { store.writeImage(dir, bitmap) }
+        updateClip { copy(bgImage = file, blur = false) }
+    }
+
+    /** A file stored by name in the open project's folder, or null when no project is open. */
+    fun projectFile(name: String): File? = _uiState.value.projectDir?.let { File(it, name) }
+
+    /** The background picture behind the clips, resolved in the project folder. */
+    private fun backgroundUri(p: Project) = p.video?.bgImage?.let { name -> _uiState.value.projectDir?.let { Uri.fromFile(File(it, name)) } }
 
     /** Photos: a border just inside the canvas edge, or none. */
     fun setFrame(frame: Frame?) = updateProject { it.copy(frame = frame) }
@@ -1184,7 +1199,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val (w, h) = video.outputSize
         val bitrate = if (quality == ExportQuality.High) highBitrate(w, h, shortSide, clip.frameRate) else null
         saveRendered("mp4", "video/mp4", R.string.busy_saving_video, share) { out ->
-            exportVideo(app, clip.composition(p.layers, shortSide, frameClock = forced, background = p.background), out, bitrate) { pct -> _uiState.update { it.copy(progress = pct) } }
+            exportVideo(app, clip.composition(p.layers, shortSide, frameClock = forced, background = p.background, backgroundImage = backgroundUri(p)), out, bitrate) { pct -> _uiState.update { it.copy(progress = pct) } }
         }
     }
 
@@ -1200,7 +1215,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         try {
             saveRendered("gif", "image/gif", R.string.busy_saving_gif, share) { out ->
                 // Rendered small by Media3 first, so the GIF shows exactly what the MP4 export would; half the ring each.
-                exportVideo(app, clip.composition(p.layers, shortSide, frameClock = true, background = p.background), mp4, highBitrate(w, h, shortSide, clip.frameRate)) { pct ->
+                exportVideo(app, clip.composition(p.layers, shortSide, frameClock = true, background = p.background, backgroundImage = backgroundUri(p)), mp4, highBitrate(w, h, shortSide, clip.frameRate)) { pct ->
                     _uiState.update { it.copy(progress = pct / 2) }
                 }
                 out.outputStream().buffered().use { o -> mp4ToGif(mp4, o) { f -> _uiState.update { it.copy(progress = 50 + (f * 50).toInt()) } } }

@@ -195,12 +195,24 @@ private fun BlurDot(active: Boolean, onClick: () -> Unit) {
     }
 }
 
+/** The background-image dot: tap to pick a picture, tap again (picked) to drop it. */
+@Composable
+private fun ImageDot(active: Boolean, onPick: () -> Unit, onClear: () -> Unit) {
+    Box(
+        Modifier.size(40.dp).border(2.dp, if (active) Ink.accent else Color.Transparent, CircleShape).padding(4.dp)
+            .clip(CircleShape).background(Ink.raised).border(1.dp, Ink.line, CircleShape).clickable { if (active) onClear() else onPick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        KIcon(R.drawable.ic_image, Modifier.size(20.dp), if (active) Ink.accent else Ink.text, stringResource(R.string.canvas_image))
+    }
+}
+
 /**
  * Video canvas: reshape to a social-media ratio (9:16 for reels and stories), with bars in a color or the blurred clip.
  * While it's open, a drag or pinch on the stage moves or zooms the clips in the canvas.
  */
 @Composable
-fun VideoCanvasPanel(project: Project, clip: VideoClip, defaultExport: ExportSize, vm: EditorViewModel) {
+fun VideoCanvasPanel(project: Project, clip: VideoClip, defaultExport: ExportSize, vm: EditorViewModel, onPickImage: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             items(ASPECTS) { (label, ratio) ->
@@ -218,10 +230,12 @@ fun VideoCanvasPanel(project: Project, clip: VideoClip, defaultExport: ExportSiz
         PanelLabel(stringResource(R.string.background))
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (clip.canvas != null) {
-                BlurDot(clip.blurred) { vm.updateClip { copy(blur = true) } }
+                BlurDot(clip.blurred) { vm.updateClip { copy(blur = true, bgImage = null) } }
                 Spacer(Modifier.width(10.dp))
             }
-            Box(Modifier.weight(1f)) { ColorRow(project.background.takeUnless { clip.blurred }, allowNone = false) { c -> c?.let(vm::setBackground) } }
+            ImageDot(clip.bgImage != null, onPickImage) { vm.updateClip { copy(bgImage = null) } }
+            Spacer(Modifier.width(10.dp))
+            Box(Modifier.weight(1f)) { ColorRow(project.background.takeUnless { clip.blurred || clip.bgImage != null }, allowNone = false) { c -> c?.let(vm::setBackground) } }
         }
         if (clip.blurred) LabeledSlider(stringResource(R.string.canvas_blur), clip.blurStrength, 0.25f..3f, ::percent) { v -> vm.updateClip { copy(blurStrength = v) } }
         ExportSizeRow(project, defaultExport, vm)

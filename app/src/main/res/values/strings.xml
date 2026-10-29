@@ -387,6 +387,7 @@
     <string name="error_bg_model">The background remover is still downloading. Check the internet and try again.</string>
     <string name="canvas_place_hint">Drag or pinch the video to move or zoom it</string>
     <string name="canvas_frame">Frame</string>
+    <string name="canvas_image">Image</string>
     <string name="canvas_blur">Blur</string>
     <string name="discard_title">Discard changes?</string>
     <string name="discard_text">What you did here hasn\'t been applied yet.</string>

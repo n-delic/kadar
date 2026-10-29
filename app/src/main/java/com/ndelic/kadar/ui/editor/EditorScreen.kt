@@ -3,6 +3,8 @@
 package com.ndelic.kadar.ui.editor
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import java.io.File
 import android.graphics.Paint
 import android.graphics.SurfaceTexture
 import android.graphics.Typeface
@@ -170,6 +172,8 @@ import kotlin.math.atan2
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 enum class Panel { Sticker, Canvas, VideoCanvas, Speed, Audio, Presets, Font, Color, Stroke, Shadow, Glow, Box, Style, Adjust, Filters, Layers, Overlay, Animate, Opacity, ImageOutline, Shape, ShapeFill, ShapeOutline, Transition, ColorClip, Blend, Effects, Censor, ChromaKey }
@@ -194,6 +198,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
     val music = rememberLauncherForActivityResult(OpenDocument()) { it?.let { uri -> vm.addMusic(uri, positionMs) } }
     val videoSound = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let { uri -> vm.addMusic(uri, positionMs) } }
     val overlayVideo = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let { uri -> vm.addVideo(uri, positionMs) } }
+    val videoBackground = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::setVideoBackground) }
     val newClip = rememberLauncherForActivityResult(PickVisualMedia()) { it?.let(vm::addClip) }
     // The clip being replaced, by index, while the picker is open.
     var replacing by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -433,7 +438,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         Panel.ShapeFill -> (selected as? ShapeLayer)?.let { ShapeFillPanel(it, vm) }
                         Panel.ShapeOutline -> (selected as? ShapeLayer)?.let { ShapeOutlinePanel(it, vm) }
                         Panel.Layers -> LayersPanel(project.layers, state.selectedId, vm)
-                        Panel.VideoCanvas -> video?.let { VideoCanvasPanel(project, it, state.settings.exportSize, vm) }
+                        Panel.VideoCanvas -> video?.let { VideoCanvasPanel(project, it, state.settings.exportSize, vm, onPickImage = { videoBackground.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly)) }) }
                         Panel.ColorClip -> ColorRow(null, allowNone = false) { c ->
                             c?.let(vm::addColorClip)
                             panel = null
@@ -1002,13 +1007,20 @@ private fun Stage(
                 val base = project.blurBase()
                 val backdrop = remember(base?.bitmap, base?.adjust, base?.t?.flipX, base?.t?.flipY, project.width, project.height) { project.backdrop()?.asImageBitmap() }
                 backdrop?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds) }
+                // The background picture behind the clips, like the export's cropped fill; reloaded when another is picked.
+                project.video?.bgImage?.let { name ->
+                    val picture by produceState<Bitmap?>(null, name) {
+                        value = vm.projectFile(name)?.let { f -> withContext(Dispatchers.IO) { BitmapFactory.decodeFile(f.path) } }
+                    }
+                    picture?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+                }
                 project.video?.takeIf { it.blurred }?.let { BlurBackgroundPreview(it, stills, project.width, project.height, scale, player, clock) }
                 player?.let { p ->
                     VideoSurface(
                         p,
                         project.width,
                         project.height,
-                        translucent = project.video?.blurred == true,
+                        translucent = project.video?.blurred == true || project.video?.bgImage != null,
                         Modifier.fillMaxSize().graphicsLayer {
                             // Pushed out by the incoming clip, like the export's outgoingSettings.
                             val push = overlapping.firstOrNull { it.kind.pushes && clock.longValue in it } ?: return@graphicsLayer

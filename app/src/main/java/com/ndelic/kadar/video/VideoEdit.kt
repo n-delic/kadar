@@ -133,6 +133,8 @@ data class VideoClip(
     val canvas: Float? = null,
     /** Fills the canvas around the video with a blurred, zoomed copy of it instead of the background color. */
     val blur: Boolean = false,
+    /** A picture copied into the project folder, cropped to fill the canvas under the clips instead of the background color. */
+    val bgImage: String? = null,
     /** How strong the [blur] is, times [BLUR_SIGMA]. */
     val blurStrength: Float = 1f,
     /** Where every clip sits in the canvas after its fit. */
@@ -158,6 +160,7 @@ data class VideoClip(
             blur = false,
             blurStrength = 1f,
             placement = ClipPlacement(),
+            bgImage = null,
         )
     }
 
@@ -201,7 +204,7 @@ data class VideoClip(
      * The color painted around the clips ([BarFill]) on a [background] canvas, or null for none: under a blurred canvas
      * the bars stay see-through, and black bars come out black anyway, unless a clip fades and so needs black under it.
      */
-    fun barFill(background: Int) = background.takeIf { !blurred && (it != android.graphics.Color.BLACK || fades) }
+    fun barFill(background: Int) = background.takeIf { !blurred && bgImage == null && (it != android.graphics.Color.BLACK || fades) }
 
     private val fades get() = segments.any { it.animIn.kind == ClipAnimKind.Fade || it.animOut.kind == ClipAnimKind.Fade }
 
@@ -287,6 +290,7 @@ fun VideoClip.composition(
     looks: LiveLooks? = null,
     volumes: LiveVolumes? = null,
     background: Int = android.graphics.Color.BLACK,
+    backgroundImage: Uri? = null,
 ): Composition {
     // Media3's compositor takes every output frame time from sequence 0 and draws it on top, then the others in order.
     // So sequence 0 is an invisible frame clock at the clip's rate, then the overlays (topmost layer first), each padded
@@ -334,6 +338,8 @@ fun VideoClip.composition(
         val dips = spans.filter { !it.kind.overlaps }
         val items = played.mapIndexed { i, s -> blurredBackground(s, dips.filter { it.clip == i || it.clip == i + 1 }) }
         sequences += EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItems(items).build()
+    } else backgroundImage?.let {
+        sequences += backgroundImageSequence(it)
     }
     // Audio only, after every video sequence, so the compositor's input numbers above stay as they are.
     sequences += music.flatMapIndexed { i, m -> audioSequences(m.uri, m.startMs, m.durationMs, m.part, outputDurationMs, volumes?.music(i) ?: { m.part.volume }) }
@@ -493,6 +499,20 @@ private fun VideoClip.blurredBackground(s: Segment, dips: List<TransitionSpan>):
         colorDipEffect(dips),
     )
     return segmentItem(s, Effects(emptyList(), effects), removeAudio = true)
+}
+
+/**
+ * The background picture for the whole output, cropped to fill the canvas (the export only; the preview draws the
+ * picture itself, behind the player): one still under the clips, as long as the output.
+ */
+private fun VideoClip.backgroundImageSequence(uri: Uri): EditedMediaItemSequence {
+    val (w, h) = outputSize
+    val item = EditedMediaItem.Builder(MediaItem.Builder().setUri(uri).setImageDurationMs(outputDurationMs).build())
+        .setDurationUs(outputDurationMs * 1000)
+        .setFrameRate(outputFrameRate(frameRate))
+        .setEffects(Effects(emptyList(), listOf(Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP))))
+        .build()
+    return EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItem(item).build()
 }
 
 /** In pixels of [blurSize]'s frame: about 5% of the canvas's long side, at a [VideoClip.blurStrength] of 1. */

@@ -1199,7 +1199,7 @@ private fun Stage(
                 HandleDot(R.drawable.ic_close, cornerOf(l, -1f, scale), Color(0xFFFF3B5C))
                 HandleDot(R.drawable.ic_open_in_full, cornerOf(l, 1f, scale), Ink.accent)
                 tailOf(l, scale)?.let { HandleDot(R.drawable.ic_chat_bubble, it, Color.White) }
-                for (h in SIDES) if (l.hasSideHandles(h.vertical)) HandleDot(R.drawable.ic_arrow_range, sideOf(l, h, scale), Color.White, turned = h.vertical)
+                for (h in SIDES) if (l.hasSideHandles(h.vertical)) HandleDot(null, sideOf(l, h, scale), Color.White, small = true)
             }
         }
         if (picking != null) {
@@ -1255,22 +1255,28 @@ private fun sideOf(layer: Layer, h: Handle, scale: Float): Offset {
 /** The handle nearest to [point] within [radius]: on a one-line caption the side handles sit close to the corners. */
 private fun handleAt(layer: Layer, point: Offset, scale: Float, radius: Float): Handle? {
     val sides = SIDES.filter { layer.hasSideHandles(it.vertical) }.map { it to sideOf(layer, it, scale) }
+    val wide = setOf(Handle.Tail, Handle.Delete, Handle.Scale)
     return (
         listOfNotNull(
             tailOf(layer, scale)?.let { Handle.Tail to it },
             Handle.Delete to cornerOf(layer, -1f, scale),
             Handle.Scale to cornerOf(layer, 1f, scale),
         ) + sides
-    ).map { (h, at) -> h to (point - at).getDistance() }.filter { it.second < radius }.minByOrNull { it.second }?.first
+    ).map { (h, at) -> h to (point - at).getDistance() }
+        .filter { (h, d) -> d < if (h in wide) radius else radius * SIDE_HANDLE_HIT }
+        .minByOrNull { it.second }?.first
 }
 
+/** The side handles are drawn [SIDE_HANDLE_SCALE] smaller than the corner ones, so they grab a smaller area. */
+private const val SIDE_HANDLE_HIT = 0.65f
+
 @Composable
-private fun HandleDot(icon: Int, at: Offset, background: Color, turned: Boolean = false) {
-    val half = with(LocalDensity.current) { 14.dp.roundToPx() }
+private fun HandleDot(icon: Int?, at: Offset, background: Color, turned: Boolean = false, small: Boolean = false) {
+    val half = with(LocalDensity.current) { (if (small) 9.dp else 14.dp).roundToPx() }
     Box(
         Modifier
             .offset { IntOffset(at.x.roundToInt() - half, at.y.roundToInt() - half) }
-            .size(28.dp)
+            .size(if (small) 18.dp else 28.dp)
             // Handles can sit at the screen edge (a full-width caption's sides); keep the back gesture off them.
             .systemGestureExclusion()
             .clip(CircleShape)
@@ -1279,7 +1285,7 @@ private fun HandleDot(icon: Int, at: Offset, background: Color, turned: Boolean 
             .border(1.5.dp, Color.Black.copy(alpha = 0.35f), CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        KIcon(icon, Modifier.size(16.dp).rotate(if (turned) 90f else 0f), if (background == Ink.accent || background == Color.White) Ink.onAccent else Color.White)
+        if (icon != null) KIcon(icon, Modifier.size(16.dp).rotate(if (turned) 90f else 0f), if (background == Ink.accent || background == Color.White) Ink.onAccent else Color.White)
     }
 }
 

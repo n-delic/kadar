@@ -159,6 +159,7 @@
     <string name="tool_outline">Outline</string>
 
     <!-- Panels -->
+    <string name="sticker_pack">Sticker pack</string>
     <string name="my_stickers">My stickers</string>
     <string name="my_stickers_empty">Remove the background of an image, then tap Save sticker to keep it here.</string>
     <string name="delete_sticker_title">Delete sticker?</string>
@@ -385,6 +386,7 @@
     <string name="error_gallery_file">Could not create a file in the gallery</string>
     <string name="error_bg_model">The background remover is still downloading. Check the internet and try again.</string>
     <string name="canvas_place_hint">Drag or pinch the video to move or zoom it</string>
+    <string name="canvas_frame">Frame</string>
     <string name="canvas_blur">Blur</string>
     <string name="discard_title">Discard changes?</string>
     <string name="discard_text">What you did here hasn\'t been applied yet.</string>

@@ -20,6 +20,7 @@ Every non-code asset in Kadar, with its author, source and license. Rules for ad
 | `app/src/main/res/drawable/ic_*.xml` (all except `ic_launcher_*`) | Google | Material Symbols Rounded, https://github.com/google/material-design-icons, converted by `scripts/add-icons.sh` | Apache-2.0 (`third_party/MaterialSymbols-LICENSE.txt`) |
 | `app/src/main/res/drawable/ic_launcher_background.xml`, `ic_launcher_foreground.xml` | Kadar contributors | Original work: Kadar app icon (viewfinder corners around a play mark) | GPL-3.0-or-later |
 | Emoji stickers | Device emoji font | Drawn from the phone's own system emoji font at runtime; no emoji images are bundled | Device font license |
+| `app/src/main/assets/stickers/*.png` (the bundled sticker pack) | Kadar contributors | Original work: flat stickers drawn by `scripts/make-stickers.py` | GPL-3.0-or-later |
 
 ## Brand
 

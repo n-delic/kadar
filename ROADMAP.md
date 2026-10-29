@@ -182,7 +182,8 @@ Feature parity with the big phone editors, built from how their features behave,
 - [x] Effects: blur, pixelate, glitch, posterize, pop art, vignette, sharpen, noise, duotone, with strength
 - [x] Blend modes for image layers in photos (normal, multiply, screen, overlay, darken, lighten, add)
 - [x] Blend modes for text, shapes and drawings
-- [ ] Canvas tools: free crop and rotate of the whole picture, resize, perspective, border and frame, fit with a blurred or colored background
+- [x] Canvas tools: border and frame
+- [ ] Canvas tools: free crop and rotate of the whole picture, resize, perspective, fit with a blurred or colored background
 - [ ] Clone and stretch/warp brushes, curves, tilt-shift, motion trail
 - [ ] Collage: a grid of photos (2 to 9 cells) with inner spacing, outer padding, rounded corners and a background; long-press to swap two photos; a free layout; stitch photos into one long strip
 - [x] Curved text (a bend slider) and gradient text fill

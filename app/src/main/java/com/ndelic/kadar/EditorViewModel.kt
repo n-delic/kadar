@@ -41,6 +41,7 @@ import com.ndelic.kadar.model.Anim
 import com.ndelic.kadar.model.AppSettings
 import com.ndelic.kadar.model.CensorLayer
 import com.ndelic.kadar.model.CropRect
+import com.ndelic.kadar.model.Frame
 import com.ndelic.kadar.model.CutShape
 import com.ndelic.kadar.model.DrawLayer
 import com.ndelic.kadar.model.ExportQuality
@@ -128,6 +129,9 @@ import kotlinx.coroutines.withContext
 
 data class Sticker(val file: File, val thumb: Bitmap)
 
+/** A sticker from the bundled pack: [name] is the asset's name in `assets/stickers`. */
+data class BundledSticker(val name: String, val thumb: Bitmap)
+
 data class EditorUiState(
     val projects: List<SavedProject> = emptyList(),
     /** False until the project list (and its thumbnails) is first read; the intro waits for it. */
@@ -142,6 +146,8 @@ data class EditorUiState(
     /** Whether the running task can be stopped now ([EditorViewModel.cancelWork]). */
     val cancellable: Boolean = false,
     val stickers: List<Sticker> = emptyList(),
+    /** The bundled sticker pack (own work, see ATTRIBUTION.md), read once from assets. */
+    val pack: List<BundledSticker> = emptyList(),
     val settings: AppSettings = AppSettings(),
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
@@ -223,6 +229,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             refreshProjects()
         }
         loadStickers()
+        loadPack()
         viewModelScope.launch {
             @kotlin.OptIn(FlowPreview::class)
             uiState.map { it.projectDir to it.project }.distinctUntilChanged().debounce(800).collect { (dir, project) ->
@@ -399,7 +406,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             videoFrameOf = first.uri to first.startMs
         }
         val frame = videoFrame?.let { f -> first?.shaped(f) ?: f }
-        val thumb = renderLayers(project.width, project.height, project.background, project.layers, THUMB_SIZE / max(project.width, project.height), frame, project.backdrop(), frame?.let { project.video?.frameRect(it.width, it.height) })
+        val thumb = renderLayers(project.width, project.height, project.background, project.layers, THUMB_SIZE / max(project.width, project.height), frame, project.backdrop(), frame?.let { project.video?.frameRect(it.width, it.height) }, project.frame)
         try {
             saveLock.withLock { withContext(Dispatchers.IO) { store.save(dir, project, thumb) } }
             lastSaved = project
@@ -457,6 +464,14 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun addSticker(sticker: Sticker) = work(R.string.busy_adding_sticker) {
         addBitmapLayer(withContext(Dispatchers.IO) { BitmapFactory.decodeFile(sticker.file.path) ?: throw UserError(R.string.error_sticker_damaged) })
+    }
+
+    fun addBundledSticker(sticker: BundledSticker) = work(R.string.busy_adding_sticker) {
+        val p = _uiState.value.project ?: return@work
+        val bitmap = withContext(Dispatchers.IO) {
+            app.assets.open("stickers/${sticker.name}.png").use { BitmapFactory.decodeStream(it) } ?: throw UserError(R.string.error_sticker_damaged)
+        }
+        addBitmapLayer(bitmap, height = min(p.width, p.height) * 0.35f)
     }
 
     /** Adds [bitmap] centered, at [height] canvas pixels tall, or fitted into 60% of the canvas by default. */
@@ -655,7 +670,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             if (l.id == video?.id) layerFrame(video, positionMs)?.let { rawFrameLayer(video, it) } ?: l else l
         }
         val frame = frameAt(positionMs)
-        return renderLayers(p.width, p.height, p.background, layers, min(1f, PICK_SIZE / max(p.width, p.height)), frame, underAt = frame?.let { p.video?.frameRect(it.width, it.height) })
+        return renderLayers(p.width, p.height, p.background, layers, min(1f, PICK_SIZE / max(p.width, p.height)), frame, underAt = frame?.let { p.video?.frameRect(it.width, it.height) }, frame = p.frame)
     }
 
     /** Video layer [l]'s [frame], cropped like it, as a picture drawn where it shows. */
@@ -790,6 +805,19 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private fun loadPack() {
+        viewModelScope.launch {
+            val pack = withContext(Dispatchers.IO) {
+                app.assets.list("stickers").orEmpty().sorted().mapNotNull { name ->
+                    app.assets.open("stickers/$name").use {
+                        BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = 8 })
+                    }?.let { BundledSticker(name.removeSuffix(".png"), it) }
+                }
+            }
+            _uiState.update { it.copy(pack = pack) }
+        }
+    }
+
     // Fonts
 
     /** Copies a picked font file into app storage, lists it and gives it to the selected text. */
@@ -817,6 +845,9 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     fun setBackground(color: Int) = updateProject { it.copy(background = color, blur = false, video = it.video?.copy(blur = false)) }
+
+    /** Photos: a border just inside the canvas edge, or none. */
+    fun setFrame(frame: Frame?) = updateProject { it.copy(frame = frame) }
 
     /** Photos: the canvas shows the bottom picture blurred behind everything, until a color is picked. */
     fun setBlur() = updateProject { it.copy(blur = true) }
@@ -1128,7 +1159,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val shortSide = exportShortSide
         val scale = shortSide?.let { min(1f, it / min(p.width, p.height).toFloat()) } ?: 1f
         val backdrop = p.backdrop()
-        val bitmap = renderLayers(p.width, p.height, p.background, p.layers, scale, backdrop = backdrop)
+        val bitmap = renderLayers(p.width, p.height, p.background, p.layers, scale, backdrop = backdrop, frame = p.frame)
         if (p.transparent) {
             save(PhotoFormat.Png, bitmap, share)
         } else {

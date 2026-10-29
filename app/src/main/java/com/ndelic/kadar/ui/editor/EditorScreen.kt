@@ -142,6 +142,7 @@ import com.ndelic.kadar.model.VideoLayer
 import com.ndelic.kadar.model.backdrop
 import com.ndelic.kadar.model.blurBase
 import com.ndelic.kadar.model.defaultTextSize
+import com.ndelic.kadar.model.drawFrame
 import com.ndelic.kadar.model.drawLayer
 import com.ndelic.kadar.model.hasSideHandles
 import com.ndelic.kadar.model.motionAt
@@ -413,7 +414,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
             ) { p ->
                 if (p != null) Box(Modifier.fullWidthPanel()) {
                     when (p) {
-                        Panel.Sticker -> StickerPanel(state.stickers, vm)
+                        Panel.Sticker -> StickerPanel(state.stickers, state.pack, vm)
                         Panel.Canvas -> CanvasPanel(project, state.settings.exportSize, vm)
                         Panel.Speed -> video?.let { SpeedPanel(it, clipIndex, vm) }
                         Panel.Audio -> video?.let { v ->
@@ -1168,6 +1169,8 @@ private fun Stage(
                     },
                 ) {
                     drawLayers(groups.last()) { c ->
+                        // The frame is content, so it draws over the layers and under the selection.
+                        project.frame?.let { c.drawFrame(it, project.width, project.height) }
                         selected?.let { c.drawSelection(it, scale) }
                         if (snaps.x) c.drawLine(cx, 0f, cx, project.height.toFloat(), guidePaint.also { it.strokeWidth = 2 / scale })
                         if (snaps.y) c.drawLine(0f, cy, project.width.toFloat(), cy, guidePaint.also { it.strokeWidth = 2 / scale })

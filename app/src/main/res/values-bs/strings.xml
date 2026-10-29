@@ -159,6 +159,7 @@
     <string name="tool_outline">Obrub</string>
 
     <!-- Panels -->
+    <string name="sticker_pack">Paket stikera</string>
     <string name="my_stickers">Moji stikeri</string>
     <string name="my_stickers_empty">Ukloni pozadinu slike alatom Izdvoji, pa dodirni U stikere da je sačuvaš ovdje.</string>
     <string name="delete_sticker_title">Obrisati stiker?</string>
@@ -379,6 +380,7 @@
     <string name="error_gallery_file">Nije moguće napraviti fajl u galeriji</string>
     <string name="error_bg_model">Alat za uklanjanje pozadine se još preuzima. Provjeri internet i pokušaj ponovo.</string>
     <string name="canvas_place_hint">Povuci ili raširi video prstima da ga pomjeriš ili uvećaš</string>
+    <string name="canvas_frame">Okvir</string>
     <string name="canvas_blur">Zamućeno</string>
     <string name="discard_title">Odbaciti promjene?</string>
     <string name="discard_text">Ovo što si uradio ovdje još nije primijenjeno.</string>

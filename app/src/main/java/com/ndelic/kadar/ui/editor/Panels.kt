@@ -53,11 +53,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ndelic.kadar.BundledSticker
 import com.ndelic.kadar.EditorViewModel
 import com.ndelic.kadar.R
 import com.ndelic.kadar.Sticker
 import com.ndelic.kadar.model.Adjust
+import com.ndelic.kadar.model.Frame
 import com.ndelic.kadar.model.CensorLayer
+import com.ndelic.kadar.model.DEFAULT_FRAME_WIDTH
 import com.ndelic.kadar.model.DrawLayer
 import com.ndelic.kadar.model.ExportSize
 import com.ndelic.kadar.model.Font
@@ -101,11 +104,23 @@ private val ASPECTS = listOf<Pair<String?, Float?>>(null to null) + CANVAS_RATIO
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun StickerPanel(stickers: List<Sticker>, vm: EditorViewModel) {
+fun StickerPanel(stickers: List<Sticker>, pack: List<BundledSticker>, vm: EditorViewModel) {
     var deleting by remember { mutableStateOf<Sticker?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         LazyHorizontalGrid(GridCells.Fixed(2), Modifier.height(104.dp)) {
             items(EMOJIS) { e -> Text(e, fontSize = 30.sp, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { vm.addEmoji(e) }.padding(6.dp)) }
+        }
+        if (pack.isNotEmpty()) {
+            PanelLabel(stringResource(R.string.sticker_pack))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(pack, key = { it.name }) { s ->
+                    Image(
+                        s.thumb.asImageBitmap(),
+                        contentDescription = stringResource(R.string.sticker),
+                        modifier = Modifier.size(64.dp).clip(RoundedCornerShape(10.dp)).clickable { vm.addBundledSticker(s) },
+                    )
+                }
+            }
         }
         PanelLabel(stringResource(R.string.my_stickers))
         if (stickers.isEmpty()) {
@@ -156,6 +171,13 @@ fun CanvasPanel(project: Project, defaultExport: ExportSize, vm: EditorViewModel
                 val picked = if (project.blur) android.graphics.Color.TRANSPARENT else project.background.takeIf { it != android.graphics.Color.TRANSPARENT }
                 ColorRow(picked, allowNone = true) { vm.setBackground(it ?: android.graphics.Color.TRANSPARENT) }
             }
+        }
+        PanelLabel(stringResource(R.string.canvas_frame))
+        ColorRow(project.frame?.color, allowNone = true) { c ->
+            vm.setFrame(c?.let { Frame(project.frame?.width ?: DEFAULT_FRAME_WIDTH, it) })
+        }
+        project.frame?.let {
+            KSlider(R.drawable.ic_border_color, it.width, 0.01f..0.15f, ::percent) { v -> vm.setFrame(project.frame?.copy(width = v)) }
         }
         ExportSizeRow(project, defaultExport, vm)
     }

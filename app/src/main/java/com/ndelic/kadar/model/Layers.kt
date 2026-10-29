@@ -949,10 +949,10 @@ fun Canvas.drawLayer(layer: Layer, reveal: Reveal? = null) {
 
 /**
  * Renders the layers, [scale] times the canvas size, over [under] at [underAt] (fitted into the canvas when null; a video frame for thumbnails),
- * over [backdrop] stretched to fill it (a blurred photo canvas, [Project.backdrop]).
+ * over [backdrop] stretched to fill it (a blurred photo canvas, [Project.backdrop]), with [frame] banded just inside the edge.
  * The same drawing code backs the on-screen editor, so exports match it.
  */
-fun renderLayers(width: Int, height: Int, background: Int, layers: List<Layer>, scale: Float = 1f, under: Bitmap? = null, backdrop: Bitmap? = null, underAt: RectF? = null): Bitmap =
+fun renderLayers(width: Int, height: Int, background: Int, layers: List<Layer>, scale: Float = 1f, under: Bitmap? = null, backdrop: Bitmap? = null, underAt: RectF? = null, frame: Frame? = null): Bitmap =
     Bitmap.createBitmap((width * scale).roundToInt().coerceAtLeast(1), (height * scale).roundToInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888).also { bitmap ->
         Canvas(bitmap).apply {
             drawColor(background)
@@ -960,8 +960,21 @@ fun renderLayers(width: Int, height: Int, background: Int, layers: List<Layer>, 
             backdrop?.let { drawBitmap(it, null, RectF(0f, 0f, width.toFloat(), height.toFloat()), bitmapPaint) }
             under?.let { drawBitmap(it, null, underAt ?: fitRect(it.width, it.height, width, height), bitmapPaint) }
             layers.forEach { if (!it.hidden) drawLayer(it) }
+            frame?.let { drawFrame(it, width, height) }
         }
     }
+
+/** A border banded just inside the canvas edge: [width] is its thickness as a share of the canvas's short side. */
+data class Frame(val width: Float, val color: Int)
+
+/** How thick a new frame starts. */
+const val DEFAULT_FRAME_WIDTH = 0.05f
+
+fun Canvas.drawFrame(frame: Frame, width: Int, height: Int) {
+    val w = frame.width * minOf(width, height)
+    val i = w / 2
+    drawRect(i, i, width - i, height - i, Paint().apply { style = Paint.Style.STROKE; strokeWidth = w; color = frame.color })
+}
 
 /** [w]×[h] scaled to fit inside [boxW]×[boxH], centered (letterboxed). */
 fun fitRect(w: Int, h: Int, boxW: Int, boxH: Int): RectF {

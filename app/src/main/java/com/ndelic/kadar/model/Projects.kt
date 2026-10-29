@@ -41,6 +41,8 @@ data class Project(
     val blur: Boolean = false,
     /** The layer id of the photo the project was opened with, whose crop is the canvas's ([fittedTo]); null for blank canvases and videos. */
     val photoId: Long? = null,
+    /** Photos only: a border banded just inside the canvas edge, or null for none. */
+    val frame: Frame? = null,
 ) {
     /** The canvas cut to [photo]'s picture as placed, every layer kept at its spot on it (the "Original" aspect too). */
     fun fittedTo(photo: ImageLayer): Project {
@@ -173,6 +175,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
             name = j.optString("name").ifEmpty { null },
             blur = j.optBoolean("blur"),
             photoId = if (j.has("photoId")) j.getLong("photoId") else null,
+            frame = j.optJSONObject("frame")?.let { Frame(it.getDouble("width").toFloat(), it.getInt("color")) },
         )
     }
 
@@ -437,6 +440,7 @@ private fun Project.toJson() = JSONObject().apply {
     name?.let { put("name", it) }
     if (blur) put("blur", true)
     photoId?.let { put("photoId", it) }
+    frame?.let { put("frame", JSONObject().put("width", it.width.toDouble()).put("color", it.color)) }
 }
 
 private fun Layer.toJson() = JSONObject().apply {

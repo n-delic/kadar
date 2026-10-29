@@ -84,7 +84,7 @@ fun FiltersPanel(source: Bitmap?, adjust: Adjust, onApplyAll: (() -> Unit)? = nu
         }
         // On the strength slider's row, so the panel doesn't get taller.
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) { if (adjust.look != Look.None) KSlider(null, adjust.amount, 0f..1f, ::percent, onDrag = { onDrag(adjust.copy(amount = it)) }) { onChange(adjust.copy(amount = it)) } }
+            Box(Modifier.weight(1f)) { if (adjust.look != Look.None) KSlider(null, adjust.amount, 0f..1f, ::percent, onDrag = { v, _ -> onDrag(adjust.copy(amount = v)) }) { onChange(adjust.copy(amount = it)) } }
             onApplyAll?.let { ApplyAll(it) }
             CompareButton(onCompare)
         }

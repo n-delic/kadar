@@ -16,8 +16,8 @@ fun ShadowPanel(layer: TextLayer, vm: EditorViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         ColorRow(layer.shadow, allowNone = true) { vm.editText { copy(shadow = it) } }
         if (layer.shadow != null) {
-            LabeledSlider(stringResource(R.string.shadow_blur), layer.shadowBlur, 0f..0.3f) { v -> vm.editText { copy(shadowBlur = v) } }
-            LabeledSlider(stringResource(R.string.shadow_distance), layer.shadowDistance, 0f..0.3f) { v -> vm.editText { copy(shadowDistance = v) } }
+            LabeledSlider(stringResource(R.string.shadow_blur), layer.shadowBlur, 0f..0.3f, onDrag = { v, first -> vm.editText(record = first) { copy(shadowBlur = v) } }) { v -> vm.editText { copy(shadowBlur = v) } }
+            LabeledSlider(stringResource(R.string.shadow_distance), layer.shadowDistance, 0f..0.3f, onDrag = { v, first -> vm.editText(record = first) { copy(shadowDistance = v) } }) { v -> vm.editText { copy(shadowDistance = v) } }
         }
     }
 }

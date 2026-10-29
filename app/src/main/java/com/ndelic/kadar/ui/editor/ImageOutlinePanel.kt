@@ -23,7 +23,7 @@ fun ImageOutlinePanel(layer: ImageLayer, vm: EditorViewModel) {
         }
         ColorRow(layer.outline, allowNone = true) { vm.editImage { copy(outline = it) } }
         if (layer.outline != null) {
-            LabeledSlider(stringResource(R.string.outline_width), layer.outlineWidth, 0.01f..0.1f) { v -> vm.editImage { copy(outlineWidth = v) } }
+            LabeledSlider(stringResource(R.string.outline_width), layer.outlineWidth, 0.01f..0.1f, onDrag = { v, first -> vm.editImage(record = first) { copy(outlineWidth = v) } }) { v -> vm.editImage { copy(outlineWidth = v) } }
         }
     }
 }

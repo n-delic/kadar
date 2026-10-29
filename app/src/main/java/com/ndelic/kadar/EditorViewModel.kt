@@ -536,17 +536,17 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun setSelectedTransform(t: Transform, first: Boolean) = updateSelected(record = first) { it.withTransform(t.copy(scale = t.scale.coerceIn(0.02f, 50f))) }
 
-    fun editText(change: TextLayer.() -> TextLayer) = updateSelected { if (it is TextLayer) it.change() else it }
+    fun editText(record: Boolean = true, change: TextLayer.() -> TextLayer) = updateSelected(record) { if (it is TextLayer) it.change() else it }
 
-    fun editImage(change: ImageLayer.() -> ImageLayer) = updateSelected { if (it is ImageLayer) it.change() else it }
+    fun editImage(record: Boolean = true, change: ImageLayer.() -> ImageLayer) = updateSelected(record) { if (it is ImageLayer) it.change() else it }
 
-    fun editVideo(change: VideoLayer.() -> VideoLayer) = updateSelected { if (it is VideoLayer) it.change() else it }
+    fun editVideo(record: Boolean = true, change: VideoLayer.() -> VideoLayer) = updateSelected(record) { if (it is VideoLayer) it.change() else it }
 
-    fun editShape(change: ShapeLayer.() -> ShapeLayer) = updateSelected { if (it is ShapeLayer) it.change() else it }
+    fun editShape(record: Boolean = true, change: ShapeLayer.() -> ShapeLayer) = updateSelected(record) { if (it is ShapeLayer) it.change() else it }
 
-    fun editDraw(change: DrawLayer.() -> DrawLayer) = updateSelected { if (it is DrawLayer) it.change() else it }
+    fun editDraw(record: Boolean = true, change: DrawLayer.() -> DrawLayer) = updateSelected(record) { if (it is DrawLayer) it.change() else it }
 
-    fun editCensor(change: CensorLayer.() -> CensorLayer) = updateSelected { if (it is CensorLayer) it.change() else it }
+    fun editCensor(record: Boolean = true, change: CensorLayer.() -> CensorLayer) = updateSelected(record) { if (it is CensorLayer) it.change() else it }
 
     /** Tail drags on the stage; like gestures, only the first update of a drag ([first]) becomes an undo step. */
     fun setTail(x: Float, y: Float, first: Boolean) = updateSelected(record = first) { if (it is TextLayer) it.copy(tail = x to y) else it }

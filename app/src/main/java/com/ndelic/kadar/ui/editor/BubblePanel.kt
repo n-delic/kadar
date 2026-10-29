@@ -32,7 +32,7 @@ fun BubblePanel(layer: TextLayer, vm: EditorViewModel) {
         if (layer.box != null) {
             PanelLabel(stringResource(R.string.fill))
             ColorRow(layer.box, allowNone = false) { c -> c?.let { vm.editText { copy(box = it) } } }
-            LabeledSlider(stringResource(R.string.opacity), layer.boxOpacity, 0f..1f, ::percent) { v -> vm.editText { copy(boxOpacity = v) } }
+            LabeledSlider(stringResource(R.string.opacity), layer.boxOpacity, 0f..1f, ::percent, onDrag = { v, first -> vm.editText(record = first) { copy(boxOpacity = v) } }) { v -> vm.editText { copy(boxOpacity = v) } }
             PanelLabel(stringResource(R.string.outline))
             ColorRow(layer.boxOutline, allowNone = true) { vm.editText { copy(boxOutline = it) } }
         }

@@ -21,8 +21,8 @@ fun ChromaKeyPanel(layer: VideoLayer, vm: EditorViewModel) {
         }
         layer.key?.let { key ->
             ColorRow(key, allowNone = false) { c -> c?.let { vm.editVideo { copy(key = it) } } }
-            LabeledSlider(stringResource(R.string.key_strength), layer.keyStrength, 0f..1f) { v -> vm.editVideo { copy(keyStrength = v) } }
-            LabeledSlider(stringResource(R.string.key_softness), layer.keySoftness, 0f..1f) { v -> vm.editVideo { copy(keySoftness = v) } }
+            LabeledSlider(stringResource(R.string.key_strength), layer.keyStrength, 0f..1f, onDrag = { v, first -> vm.editVideo(record = first) { copy(keyStrength = v) } }) { v -> vm.editVideo { copy(keyStrength = v) } }
+            LabeledSlider(stringResource(R.string.key_softness), layer.keySoftness, 0f..1f, onDrag = { v, first -> vm.editVideo(record = first) { copy(keySoftness = v) } }) { v -> vm.editVideo { copy(keySoftness = v) } }
         }
     }
 }

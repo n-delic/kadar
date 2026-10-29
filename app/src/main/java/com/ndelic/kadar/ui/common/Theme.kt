@@ -221,7 +221,11 @@ private fun ColorDot(color: Int?, active: Boolean, onClick: () -> Unit) {
     )
 }
 
-/** Thin-track slider that commits only when the finger lifts (one undo step); [onDrag] gets the value meanwhile. */
+/**
+ * Thin-track slider that commits only when the finger lifts (one undo step). [onDrag] gets the value while it moves,
+ * with [Boolean] telling whether this is the gesture's first tick, so the first live update can record the undo step
+ * (like a gesture's first move) and the rest can keep changing the value without recording.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KSlider(
@@ -229,20 +233,25 @@ fun KSlider(
     value: Float,
     range: ClosedFloatingPointRange<Float>,
     valueLabel: (Float) -> String,
-    onDrag: (Float) -> Unit = {},
+    onDrag: (Float, Boolean) -> Unit = { _, _ -> },
     onCommit: (Float) -> Unit,
 ) {
     var current by remember(value) { mutableFloatStateOf(value) }
+    var dragging by remember { mutableStateOf(false) }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         icon?.let { KIcon(it, Modifier.size(22.dp), Ink.dim) }
         Slider(
             value = current,
             onValueChange = {
                 current = it
-                onDrag(it)
+                onDrag(it, !dragging)
+                dragging = true
             },
             valueRange = range,
-            onValueChangeFinished = { onCommit(current) },
+            onValueChangeFinished = {
+                dragging = false
+                onCommit(current)
+            },
             modifier = Modifier.weight(1f),
             thumb = { Box(Modifier.size(18.dp).clip(CircleShape).background(Ink.text)) },
             track = { state ->

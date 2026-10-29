@@ -16,9 +16,9 @@ import com.ndelic.kadar.ui.common.PanelLabel
 fun VideoLayerPanel(layer: VideoLayer, vm: EditorViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         PanelLabel(stringResource(R.string.opacity))
-        KSlider(null, layer.opacity, 0f..1f, ::percent) { v -> vm.editVideo { copy(opacity = v) } }
+        KSlider(null, layer.opacity, 0f..1f, ::percent, onDrag = { v, first -> vm.editVideo(record = first) { copy(opacity = v) } }) { v -> vm.editVideo { copy(opacity = v) } }
         PanelLabel(stringResource(R.string.sound))
-        KSlider(R.drawable.ic_volume_up, layer.volume, 0f..1f, ::percent) { v -> vm.editVideo { copy(volume = v) } }
+        KSlider(R.drawable.ic_volume_up, layer.volume, 0f..1f, ::percent, onDrag = { v, first -> vm.editVideo(record = first) { copy(volume = v) } }) { v -> vm.editVideo { copy(volume = v) } }
         // At least a second of the clip stays playable.
         val lastStart = layer.durationMs - 1000
         if (lastStart > 0) {

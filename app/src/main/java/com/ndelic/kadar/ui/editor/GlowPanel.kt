@@ -19,7 +19,7 @@ fun GlowPanel(layer: TextLayer, vm: EditorViewModel) {
         ColorRow(layer.glow, allowNone = true) { vm.editText { copy(glow = it) } }
         if (layer.glow != null) {
             PanelLabel(stringResource(R.string.glow_size))
-            KSlider(null, layer.glowSize, 0.1f..1f, ::percent) { v -> vm.editText { copy(glowSize = v) } }
+            KSlider(null, layer.glowSize, 0.1f..1f, ::percent, onDrag = { v, first -> vm.editText(record = first) { copy(glowSize = v) } }) { v -> vm.editText { copy(glowSize = v) } }
         }
     }
 }

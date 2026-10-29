@@ -237,7 +237,7 @@ fun VideoCanvasPanel(project: Project, clip: VideoClip, defaultExport: ExportSiz
             Spacer(Modifier.width(10.dp))
             Box(Modifier.weight(1f)) { ColorRow(project.background.takeUnless { clip.blurred || clip.bgImage != null }, allowNone = false) { c -> c?.let(vm::setBackground) } }
         }
-        if (clip.blurred) LabeledSlider(stringResource(R.string.canvas_blur), clip.blurStrength, 0.25f..3f, ::percent) { v -> vm.updateClip { copy(blurStrength = v) } }
+        if (clip.blurred) LabeledSlider(stringResource(R.string.canvas_blur), clip.blurStrength, 0.25f..3f, ::percent, onDrag = { v, first -> vm.updateClip(record = first) { copy(blurStrength = v) } }) { v -> vm.updateClip { copy(blurStrength = v) } }
         ExportSizeRow(project, defaultExport, vm)
     }
 }
@@ -278,7 +278,7 @@ fun AdjustPanel(adjust: Adjust, onApplyAll: (() -> Unit)? = null, onCompare: (Bo
         // A dot marks the sliders that are moved, since only one shows at a time.
         TextTabs(AdjustSlider.entries, slider, label = { stringResource(it.label) + if (it.value(adjust) != 0f) " •" else "" }) { slider = it }
         key(slider) {
-            KSlider(null, slider.value(adjust), slider.range, { "${(it * 100).roundToInt()}" }, onDrag = { onDrag(adjust.(slider.set)(it)) }) { onChange(adjust.(slider.set)(it)) }
+            KSlider(null, slider.value(adjust), slider.range, { "${(it * 100).roundToInt()}" }, onDrag = { v, _ -> onDrag(adjust.(slider.set)(v)) }) { onChange(adjust.(slider.set)(it)) }
         }
     }
 }
@@ -289,11 +289,12 @@ fun LabeledSlider(
     value: Float,
     range: ClosedFloatingPointRange<Float> = -1f..1f,
     valueLabel: (Float) -> String = { "${(it * 100).roundToInt()}" },
+    onDrag: ((Float, Boolean) -> Unit)? = null,
     onCommit: (Float) -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, color = Ink.dim, fontSize = 12.sp, modifier = Modifier.width(76.dp))
-        Box(Modifier.weight(1f)) { KSlider(null, value, range, valueLabel, onCommit = onCommit) }
+        Box(Modifier.weight(1f)) { KSlider(null, value, range, valueLabel, onDrag = onDrag ?: { _, _ -> }, onCommit = onCommit) }
     }
 }
 
@@ -307,10 +308,10 @@ fun TextStylePanel(layer: TextLayer, vm: EditorViewModel) {
             CircleButton(R.drawable.ic_format_underlined, stringResource(R.string.text_underline), active = layer.underline) { vm.editText { copy(underline = !underline) } }
             CircleButton(R.drawable.ic_uppercase, stringResource(R.string.text_caps), active = layer.caps) { vm.editText { copy(caps = !caps) } }
         }
-        LabeledSlider(stringResource(R.string.spacing), layer.spacing * 2) { v -> vm.editText { copy(spacing = v / 2) } }
-        LabeledSlider(stringResource(R.string.line_height), layer.lineSpacing, 0.6f..2f, { "${(it * 10).roundToInt() / 10f}" }) { v -> vm.editText { copy(lineSpacing = v) } }
-        LabeledSlider(stringResource(R.string.text_curve), layer.curve, -1f..1f, ::percent) { v -> vm.editText { copy(curve = v) } }
-        LabeledSlider(stringResource(R.string.opacity), layer.opacity, 0.05f..1f, ::percent) { v -> vm.editText { copy(opacity = v) } }
+        LabeledSlider(stringResource(R.string.spacing), layer.spacing * 2, onDrag = { v, first -> vm.editText(record = first) { copy(spacing = v / 2) } }) { v -> vm.editText { copy(spacing = v / 2) } }
+        LabeledSlider(stringResource(R.string.line_height), layer.lineSpacing, 0.6f..2f, { "${(it * 10).roundToInt() / 10f}" }, onDrag = { v, first -> vm.editText(record = first) { copy(lineSpacing = v) } }) { v -> vm.editText { copy(lineSpacing = v) } }
+        LabeledSlider(stringResource(R.string.text_curve), layer.curve, -1f..1f, ::percent, onDrag = { v, first -> vm.editText(record = first) { copy(curve = v) } }) { v -> vm.editText { copy(curve = v) } }
+        LabeledSlider(stringResource(R.string.opacity), layer.opacity, 0.05f..1f, ::percent, onDrag = { v, first -> vm.editText(record = first) { copy(opacity = v) } }) { v -> vm.editText { copy(opacity = v) } }
     }
 }
 
@@ -435,7 +436,7 @@ fun AudioPanel(
         val part = audio?.let { clip.audioPart(it) }
         if (audio != null && part != null) {
             PanelLabel(stringResource(if (audio.voice) R.string.voiceover else R.string.music))
-            KSlider(R.drawable.ic_volume_up, part.volume, 0f..1f, ::percent, onDrag = { v -> onDrag(clip.withAudio(audio) { listOf(it.copy(volume = v)) }) }) { v -> vm.editAudio { copy(volume = v) } }
+            KSlider(R.drawable.ic_volume_up, part.volume, 0f..1f, ::percent, onDrag = { v, _ -> onDrag(clip.withAudio(audio) { listOf(it.copy(volume = v)) }) }) { v -> vm.editAudio { copy(volume = v) } }
             if (audio.voice) {
                 TextTabs(VoiceEffect.entries, clip.voices[audio.index].effect, label = { stringResource(it.label) }, onSelect = vm::setVoiceEffect)
             } else {
@@ -458,7 +459,7 @@ fun AudioPanel(
             return@Column
         }
         PanelLabel(stringResource(R.string.video_sound))
-        val onClipDrag = { v: Float -> onDrag(clip.copy(segments = clip.segments.mapIndexed { i, s -> if (i == index) s.copy(volume = v) else s })) }
+        val onClipDrag = { v: Float, _: Boolean -> onDrag(clip.copy(segments = clip.segments.mapIndexed { i, s -> if (i == index) s.copy(volume = v) else s })) }
         KSlider(R.drawable.ic_volume_up, clip.segments[index].volume, 0f..1f, ::percent, onDrag = onClipDrag) { v -> vm.updateSegment(index) { copy(volume = v) } }
         PanelLabel(stringResource(R.string.music))
         ActionRow(R.drawable.ic_add, stringResource(R.string.music_add), onAddMusic)
@@ -521,7 +522,9 @@ fun FontPanel(layer: TextLayer, fonts: List<Font>, defaultSize: Float, vm: Edito
             }
         }
         // Size is the layer's placement scale, like a pinch, so the wrap and the bubble tail keep their shape.
-        LabeledSlider(stringResource(R.string.text_size), layer.size * layer.t.scale / defaultSize, 0.2f..4f, ::percent) { v ->
+        LabeledSlider(stringResource(R.string.text_size), layer.size * layer.t.scale / defaultSize, 0.2f..4f, ::percent, onDrag = { v, first ->
+            vm.editText(record = first) { copy(t = t.copy(scale = v * defaultSize / size)) }
+        }) { v ->
             vm.editText { copy(t = t.copy(scale = v * defaultSize / size)) }
         }
     }

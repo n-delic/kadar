@@ -10,6 +10,13 @@ import kotlin.math.hypot
 class ShapesTest {
 
     @Test
+    fun circleStartsRound() {
+        val (w, h) = shapeSize(ShapeKind.Ellipse, 100f)
+        assertEquals(100f, w)
+        assertEquals(100f, h)
+    }
+
+    @Test
     fun starStartsAtTheTopAndFillsItsBox() {
         val p = starPoints(100f, 200f)
         assertEquals(20, p.size)

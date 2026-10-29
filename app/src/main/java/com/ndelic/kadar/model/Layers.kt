@@ -97,6 +97,7 @@ data class Transform(
 /** The narrowest a side handle squeezes a layer, in canvas pixels. */
 private const val MIN_SIDE = 16f
 
+
 /** Draws [draw] into one offscreen layer that mixes the whole content with what's under it by [blend]; Normal draws directly. */
 private fun withBlend(canvas: Canvas, blend: LayerBlend, reach: Float, draw: () -> Unit) {
     if (blend == LayerBlend.Normal) return draw()
@@ -931,6 +932,7 @@ fun newShape(id: Long, kind: ShapeKind, at: Transform, size: Float): ShapeLayer 
 fun shapeSize(kind: ShapeKind, size: Float) = when (kind) {
     ShapeKind.Arrow -> size to size * 0.45f
     ShapeKind.Star -> size to size
+    ShapeKind.Ellipse -> size to size
     ShapeKind.Line -> size to size * 0.04f
     else -> size to size * 0.7f
 }
@@ -974,6 +976,45 @@ fun Canvas.drawFrame(frame: Frame, width: Int, height: Int) {
     val w = frame.width * minOf(width, height)
     val i = w / 2
     drawRect(i, i, width - i, height - i, Paint().apply { style = Paint.Style.STROKE; strokeWidth = w; color = frame.color })
+}
+
+private val tapMasks = java.util.WeakHashMap<Layer, Bitmap>()
+
+/** How much smaller the tap-check render of a layer is than its box. */
+private const val TAP_MASK_SCALE = 4
+
+/**
+ * Whether the layer draws something visible at canvas point ([px], [py]), so a tap there selects it — its box alone
+ * isn't enough, or empty space inside a selection would never let go. The check is the picture's own alpha, or a small
+ * cached render of the layer's drawing (the same [Layer.drawContent] the stage shows), so bubbles, glows and strokes
+ * count and empty corners don't. Video layers and blur areas cover their whole box.
+ */
+fun Layer.drawsAt(px: Float, py: Float): Boolean = when (this) {
+    is ImageLayer -> {
+        val (lx, ly) = t.toLocal(px, py)
+        val x = (if (t.flipX) width - lx - width / 2 else lx + width / 2).toInt().coerceIn(0, bitmap.width - 1)
+        val y = (if (t.flipY) height - ly - height / 2 else ly + height / 2).toInt().coerceIn(0, bitmap.height - 1)
+        bitmap.getPixel(x, y) ushr 24 > 8
+    }
+    is VideoLayer, is CensorLayer -> true
+    else -> tapMasks.getOrPut(this) { tapMask() }?.let { mask ->
+        val (lx, ly) = t.toLocal(px, py)
+        val x = (if (t.flipX) width - lx - width / 2 else lx + width / 2).toInt() / TAP_MASK_SCALE
+        val y = (if (t.flipY) height - ly - height / 2 else ly + height / 2).toInt() / TAP_MASK_SCALE
+        mask.getPixel(x.coerceIn(0, mask.width - 1), y.coerceIn(0, mask.height - 1)) ushr 24 > 8
+    } ?: false
+}
+
+/** [Layer.drawContent] over the layer's box, at [TAP_MASK_SCALE] of the size, or null for an empty box. */
+private fun Layer.tapMask(): Bitmap? {
+    val w = (width / TAP_MASK_SCALE).roundToInt().coerceAtLeast(1)
+    val h = (height / TAP_MASK_SCALE).roundToInt().coerceAtLeast(1)
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    canvas.scale(1f / TAP_MASK_SCALE, 1f / TAP_MASK_SCALE)
+    canvas.translate(width / 2f, height / 2f)
+    if (this is TextLayer) drawContent(canvas, null) else drawContent(canvas)
+    return bitmap.takeIf { it.hasAlpha() }
 }
 
 /** [w]×[h] scaled to fit inside [boxW]×[boxH], centered (letterboxed). */

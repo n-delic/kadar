@@ -145,6 +145,7 @@ import com.ndelic.kadar.model.backdrop
 import com.ndelic.kadar.model.blurBase
 import com.ndelic.kadar.model.defaultTextSize
 import com.ndelic.kadar.model.drawFrame
+import com.ndelic.kadar.model.drawsAt
 import com.ndelic.kadar.model.drawLayer
 import com.ndelic.kadar.model.hasSideHandles
 import com.ndelic.kadar.model.motionAt
@@ -447,7 +448,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         Panel.Overlay -> (selected as? VideoLayer)?.let { VideoLayerPanel(it, vm) }
                         Panel.ChromaKey -> (selected as? VideoLayer)?.let { ChromaKeyPanel(it, vm) }
                         Panel.Animate -> if (selected != null) AnimationPanel(selected, vm) else video?.let { ClipAnimationPanel(it, clipIndex, vm) }
-                        Panel.Opacity -> (selected as? ImageLayer)?.let { l -> KSlider(R.drawable.ic_opacity, l.opacity, 0.05f..1f, ::percent) { v -> vm.editImage { copy(opacity = v) } } }
+                        Panel.Opacity -> (selected as? ImageLayer)?.let { l -> KSlider(R.drawable.ic_opacity, l.opacity, 0.05f..1f, ::percent, onDrag = { v, first -> vm.editImage(record = first) { copy(opacity = v) } }) { v -> vm.editImage { copy(opacity = v) } } }
                         Panel.ImageOutline -> (selected as? ImageLayer)?.let { ImageOutlinePanel(it, vm) }
                         Panel.Blend -> when (val l = selected) {
                             is ImageLayer -> BlendPanel(l.blend) { b -> vm.editImage { copy(blend = b) } }
@@ -1170,11 +1171,13 @@ private fun Stage(
                             }
                             snaps.clear()
                             if (!moved) {
-                                // A tap selects what's under it (or deselects on empty canvas); a second quick tap on text opens the editor.
-                                vm.select(hit?.id)
-                                val isDoubleTap = hit != null && lastTap[0] == hit.id && down.uptimeMillis - lastTap[1] < 350
-                                if (isDoubleTap && hit is TextLayer) editText(hit)
-                                lastTap[0] = hit?.id ?: -1
+                                // A tap picks a layer's own pixels, not its whole box, so empty space deselects — or
+                                // selects what's drawn under it. Dragging still starts on the box, as before.
+                                val tapped = layers.lastOrNull { !it.locked && it.t.contains(it.width, it.height, p.x, p.y) && it.drawsAt(p.x, p.y) }
+                                vm.select(tapped?.id)
+                                val isDoubleTap = tapped != null && lastTap[0] == tapped.id && down.uptimeMillis - lastTap[1] < 350
+                                if (isDoubleTap && tapped is TextLayer) editText(tapped)
+                                lastTap[0] = tapped?.id ?: -1
                                 lastTap[1] = down.uptimeMillis
                             }
                         }

@@ -136,6 +136,16 @@
 - Photo: effects (blur, pixelate, posterize, duotone, sharpen, glitch, pop art), blend modes, vignette and grain, outlines around cut-outs, cutting a picture to a shape
 - Text: curved text, gradient fill, pill and double-outline bubbles; Draw: neon, dotted, spray and soft pens
 
+## v0.9.0: done
+
+- Blend modes for text, shape and drawing layers in photos
+- Blur areas: frosted glass and magnifier looks, each with an opacity slider
+- Photo canvas: a frame banded just inside the edge
+- A bundled sticker pack of flat stickers to start from
+- Video canvas: a background image behind the clips
+- Fix: the selection's side handles are small plain circles
+- Fix: every property slider updates live while it drags
+
 ## Next
 
 Feature parity with the big phone editors, built from how their features behave, never from their code, assets or look (AGENTS.md rules 14 and 15). Offline only: no cloud AI.

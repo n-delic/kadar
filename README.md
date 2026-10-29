@@ -46,7 +46,8 @@ phone.
   star, triangle or diamond. Cropping the photo you started from crops the whole canvas.
 - **Filters, adjust and effects.** Eight looks with a strength slider; brightness, contrast, saturation,
   warmth, tint, hue, fade, vignette and grain; blur, pixelate, posterize, duotone, sharpen, glitch and
-  pop art; blend modes (multiply, screen, overlay and more). Hold to compare with the original.
+  pop art; blend modes (multiply, screen, overlay and more) for pictures, text, shapes and drawings
+  alike. Hold to compare with the original.
 - **Draw.** Marker, highlighter, neon, dotted, spray and soft pens. Each drawing is a layer you can move,
   resize and draw more onto.
 - **Shapes.** Rectangles, rounded rectangles, ellipses, arrows, stars and lines, with fill and outline.
@@ -56,8 +57,10 @@ phone.
   one-tap style presets. Double-tap text to edit it.
 - **Snapping.** Layers snap to the center of the canvas and to 0° and 90°, with guide lines.
 - **Canvas.** Original size or 1:1, 4:5, 9:16, 16:9 and more, on a color, a blurred copy of the photo or a
-  transparent background (exported as PNG). Start from a photo or a blank canvas.
-- **My stickers.** Save any cut-out and reuse it in every project.
+  transparent background (exported as PNG), with an optional frame around the edge. Start from a photo or
+  a blank canvas.
+- **My stickers.** Save any cut-out and reuse it in every project, and start from the bundled pack of
+  flat stickers.
 
 ### Video
 
@@ -73,14 +76,15 @@ phone.
   split it, long-press to reorder, and hide or lock it from the left. Pinch to zoom in on long videos.
 - **Video over video.** Put more clips on top, picture-in-picture style: move, resize, rotate, crop and
   fade them, start them from the middle, give them their own volume and look, or key out a green screen.
-- **Blur areas.** Blur or pixelate faces and usernames with a rectangle, ellipse or heart on its own track.
+- **Blur areas.** Blur, pixelate, frost or magnify faces and usernames with a rectangle, ellipse or heart
+  on its own track, each as strong or subtle as you like.
 - **Animations.** Captions, stickers and shapes fade, pop, zoom or slide in and out, type out letter by
   letter, or wiggle, pulse and bounce.
 - **Music and sound.** Add songs or the sound of another video, move and trim them on their own tracks,
   set their volume and fades; they loop to fill their part. Record a voiceover from the playhead, or have
   the phone's offline voice read a line, with higher, deeper, chipmunk or robot voice effects.
 - **Canvas.** Turn a landscape clip into 9:16 for reels and stories, 1:1, 4:5 or 1:2, zoom and move the
-  clip inside it, with colored bars or a blurred copy of the video behind it.
+  clip inside it, with colored bars, a blurred copy of the video or any picture behind it.
 - **Filters and adjust** per clip, the same looks as for photos, shown live while you drag.
 - **What you see is what you export.** The preview runs the same edit the exporter does.
 

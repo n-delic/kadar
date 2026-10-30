@@ -8,12 +8,13 @@ import java.util.WeakHashMap
 import kotlin.math.ceil
 import kotlin.math.ln
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
-/** How an image layer's outline ([ImageLayer.outline]) follows the picture's shape: a hard edge, a soft glow, or a soft shadow down and right. */
-enum class OutlineStyle(@StringRes val label: Int) { Solid(R.string.outline_solid), Glow(R.string.tool_glow), Shadow(R.string.shadow) }
+/** How an image layer's outline ([ImageLayer.outline]) follows the picture's shape: a hard edge, round dots along it, a soft glow, or a soft shadow down and right. */
+enum class OutlineStyle(@StringRes val label: Int) { Solid(R.string.outline_solid), Dotted(R.string.outline_dotted), Glow(R.string.tool_glow), Shadow(R.string.shadow) }
 
 /** A new outline's width, as a part of the picture's longer side. */
 const val DEFAULT_OUTLINE_WIDTH = 0.03f
@@ -61,12 +62,40 @@ private fun buildMask(picture: Bitmap, key: MaskKey): OutlineMask {
     val inside = BooleanArray(gw * gh)
     for (y in 0 until mh) for (x in 0 until mw) inside[(y + padY) * gw + x + padX] = pixels[y * mw + x] ushr 24 >= 128
     val d = distanceField(inside, gw, gh, key.stretch)
-    val argb = Bitmap.createBitmap(IntArray(gw * gh) { (outlineAlpha(key.style, d[it], r) * 255).roundToInt() shl 24 }, gw, gh, Bitmap.Config.ARGB_8888)
-    val mask = argb.extractAlpha()
+    // Dotted keeps the solid edge and turns it into round dots.
+    val style = if (key.style == OutlineStyle.Dotted) OutlineStyle.Solid else key.style
+    val argb = Bitmap.createBitmap(IntArray(gw * gh) { (outlineAlpha(style, d[it], r) * 255).roundToInt() shl 24 }, gw, gh, Bitmap.Config.ARGB_8888)
+    val mask = (if (key.style == OutlineStyle.Dotted) dotted(argb, r * 2.2f) else argb).extractAlpha()
     argb.recycle()
     val sx = w / mw.toFloat()
     val sy = h / mh.toFloat()
     return OutlineMask(mask, RectF(-w / 2f - padX * sx, -h / 2f - padY * sy, w / 2f + padX * sx, h / 2f + padY * sy))
+}
+
+/** The solid [outline] turned into round dots [spacing] apart, kept as an alpha mask. */
+private fun dotted(outline: Bitmap, spacing: Float): Bitmap {
+    val step = max(4f, spacing).roundToInt()
+    val cols = ceil(outline.width / step.toFloat()).toInt()
+    val rows = ceil(outline.height / step.toFloat()).toInt()
+    val small = Bitmap.createScaledBitmap(outline, cols, rows, true)
+    val pixels = IntArray(cols * rows).also { small.getPixels(it, 0, cols, 0, 0, cols, rows) }
+    small.recycle()
+    val dots = IntArray(outline.width * outline.height)
+    val radius = step / 2.6f
+    val radius2 = radius * radius
+    for (row in 0 until rows) for (col in 0 until cols) {
+        if (pixels[row * cols + col] ushr 24 < 40) continue
+        val cx = col * step + step / 2
+        val cy = row * step + step / 2
+        for (y in max(0, cy - step / 2)..min(outline.height - 1, cy + step / 2)) {
+            for (x in max(0, cx - step / 2)..min(outline.width - 1, cx + step / 2)) {
+                val dx = (x - cx).toFloat()
+                val dy = (y - cy).toFloat()
+                if (dx * dx + dy * dy <= radius2) dots[y * outline.width + x] = 0xFF shl 24
+            }
+        }
+    }
+    return Bitmap.createBitmap(dots, outline.width, outline.height, Bitmap.Config.ARGB_8888)
 }
 
 /** [stretch] rounded to the nearest power of [STRETCH_STEP]; 1 stays 1. */

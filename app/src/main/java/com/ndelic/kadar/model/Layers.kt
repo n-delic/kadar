@@ -872,7 +872,7 @@ data class ShapeLayer(
     }
 }
 
-enum class CensorKind(@StringRes val label: Int) { Blur(R.string.effect_blur), Pixelate(R.string.effect_pixelate), Frosted(R.string.effect_frosted), Magnify(R.string.effect_magnify) }
+enum class CensorKind(@StringRes val label: Int) { Blur(R.string.effect_blur), Pixelate(R.string.effect_pixelate), Frosted(R.string.effect_frosted), Magnify(R.string.effect_magnify), Triangles(R.string.effect_triangles), Dots(R.string.effect_dots) }
 
 enum class CensorShape(@StringRes val label: Int) { Rect(R.string.shape_rect), Ellipse(R.string.shape_ellipse), Heart(R.string.shape_heart) }
 

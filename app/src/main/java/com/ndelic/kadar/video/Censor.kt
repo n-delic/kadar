@@ -116,7 +116,8 @@ void main() {
 // Canvas pixels with y down, like the layers; texture coordinates have y up. A heart is the curve
 // (x² + y² - 1)³ = x²y³, which spans x ±1.1375 and y -1 to 1.235, fitted into the box.
 // uShape's z is the kind (the CensorKind ordinal times 10) plus the shape ordinal; uExtra holds the
-// area's opacity and the magnifier's zoom. Frosted is the smooth blur mixed toward white.
+// area's opacity and the magnifier's zoom. Frosted is the smooth blur mixed toward white, triangles and
+// halftone dots are worked out of the cell averages like pixelate is.
 private val FRAGMENT = """
 precision highp float;
 uniform sampler2D uTexSampler;
@@ -167,9 +168,23 @@ void main() {
         if (kind > 1.5) c = mix(c, vec4(1.0), 0.25);
       } else if (kind < 1.5) {
         c = cellAverage(floor(p / size), size);
-      } else {
+      } else if (kind < 3.5) {
         vec2 src = uPlace[k].xy + d / uExtra[k].y;
         c = texture2D(uTexSampler, vec2(src.x / uSize.x, 1.0 - src.y / uSize.y));
+      } else if (kind < 4.5) {
+        // Triangles: both halves of each cell along its diagonal, shaded apart with a per-cell jitter, for a low-poly look.
+        vec2 cell = floor(p / size);
+        bool up = (p.x / size - cell.x) + (p.y / size - cell.y) > 1.0;
+        c = cellAverage(cell + (up ? vec2(1.0) : vec2(0.0)), size);
+        float jitter = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+        c *= up ? 1.0 : 0.86 + 0.2 * jitter;
+      } else {
+        // Halftone: a black dot per cell, bigger the darker the cell's average.
+        vec2 cell = floor(p / size);
+        vec4 avg = cellAverage(cell, size);
+        float lum = clamp(dot(avg.rgb, vec3(0.299, 0.587, 0.114)), 0.0, 1.0);
+        float r = size * 0.55 * sqrt(1.0 - lum);
+        c = distance(p, (cell + 0.5) * size) < r ? vec4(0.04, 0.04, 0.04, 1.0) : vec4(1.0);
       }
       c = mix(orig, c, uExtra[k].x);
       break;

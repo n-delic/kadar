@@ -28,6 +28,8 @@
     <string name="effect_blur">Zamućenje</string>
     <string name="effect_pixelate">Pikselizacija</string>
     <string name="effect_frosted">Mat staklo</string>
+    <string name="effect_triangles">Trokuti</string>
+    <string name="effect_dots">Tačkice</string>
     <string name="effect_magnify">Povećalo</string>
     <string name="effect_posterize">Posterizacija</string>
     <string name="effect_duotone">Dvotonski</string>

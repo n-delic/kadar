@@ -458,7 +458,7 @@ fun AudioPanel(
         val part = audio?.let { clip.audioPart(it) }
         if (audio != null && part != null) {
             PanelLabel(stringResource(if (audio.voice) R.string.voiceover else R.string.music))
-            KSlider(R.drawable.ic_volume_up, part.volume, 0f..1f, ::percent, onDrag = { v, _ -> onDrag(clip.withAudio(audio) { listOf(it.copy(volume = v)) }) }) { v -> vm.editAudio { copy(volume = v) } }
+            KSlider(R.drawable.ic_volume_up, part.volume, 0f..2f, ::percent, onDrag = { v, _ -> onDrag(clip.withAudio(audio) { listOf(it.copy(volume = v)) }) }) { v -> vm.editAudio { copy(volume = v) } }
             if (audio.voice) {
                 TextTabs(VoiceEffect.entries, clip.voices[audio.index].effect, label = { stringResource(it.label) }, onSelect = vm::setVoiceEffect)
             } else {
@@ -482,7 +482,7 @@ fun AudioPanel(
         }
         PanelLabel(stringResource(R.string.video_sound))
         val onClipDrag = { v: Float, _: Boolean -> onDrag(clip.copy(segments = clip.segments.mapIndexed { i, s -> if (i == index) s.copy(volume = v) else s })) }
-        KSlider(R.drawable.ic_volume_up, clip.segments[index].volume, 0f..1f, ::percent, onDrag = onClipDrag) { v -> vm.updateSegment(index) { copy(volume = v) } }
+        KSlider(R.drawable.ic_volume_up, clip.segments[index].volume, 0f..2f, ::percent, onDrag = onClipDrag) { v -> vm.updateSegment(index) { copy(volume = v) } }
         PanelLabel(stringResource(R.string.music))
         ActionRow(R.drawable.ic_add, stringResource(R.string.music_add), onAddMusic)
         ActionRow(R.drawable.ic_movie, stringResource(R.string.video_sound_add), onAddVideoSound)

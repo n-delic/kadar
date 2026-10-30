@@ -132,6 +132,17 @@ fun scaleDown(bitmap: Bitmap, maxSide: Int): Bitmap {
  * [bitmap] mirrored ([flipX], [flipY]) and turned by [degrees] about its center into a new [outW]×[outH] bitmap whose
  * center is ([dx], [dy]) from the turned picture's center; what the picture doesn't cover is transparent.
  */
+/** A vertical gradient from [top] to [bottom], as a background picture. */
+fun gradientBitmap(w: Int, h: Int, top: Int, bottom: Int): Bitmap {
+    val colors = intArrayOf(top, bottom)
+    val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    android.graphics.Canvas(bitmap).drawRect(
+        0f, 0f, w.toFloat(), h.toFloat(),
+        android.graphics.Paint().apply { shader = android.graphics.LinearGradient(0f, 0f, 0f, h.toFloat(), colors, floatArrayOf(0f, 1f), android.graphics.Shader.TileMode.CLAMP) },
+    )
+    return bitmap
+}
+
 fun turnBitmap(bitmap: Bitmap, degrees: Float, outW: Int, outH: Int, dx: Float = 0f, dy: Float = 0f, flipX: Boolean = false, flipY: Boolean = false): Bitmap =
     Bitmap.createBitmap(outW.coerceAtLeast(1), outH.coerceAtLeast(1), Bitmap.Config.ARGB_8888).also {
         Canvas(it).apply {

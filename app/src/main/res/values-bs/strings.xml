@@ -381,6 +381,7 @@
     <string name="error_bg_model">Alat za uklanjanje pozadine se još preuzima. Provjeri internet i pokušaj ponovo.</string>
     <string name="canvas_place_hint">Povuci ili raširi video prstima da ga pomjeriš ili uvećaš</string>
     <string name="canvas_frame">Okvir</string>
+    <string name="canvas_gradient">Gradijent</string>
     <string name="canvas_image">Slika</string>
     <string name="canvas_blur">Zamućeno</string>
     <string name="discard_title">Odbaciti promjene?</string>

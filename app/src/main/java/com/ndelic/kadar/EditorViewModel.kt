@@ -22,6 +22,7 @@ import com.ndelic.kadar.media.displayName
 import com.ndelic.kadar.media.downloadImage
 import com.ndelic.kadar.media.importFont
 import com.ndelic.kadar.media.loadBitmap
+import com.ndelic.kadar.media.gradientBitmap
 import com.ndelic.kadar.media.loadFont
 import com.ndelic.kadar.media.mediaInfo
 import com.ndelic.kadar.media.offlineVoices
@@ -851,6 +852,17 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val s = _uiState.value
         val dir = s.projectDir ?: return@work
         val bitmap = withContext(Dispatchers.IO) { loadBitmap(app, uri, MAX_LAYER) }
+        val file = withContext(Dispatchers.IO) { store.writeImage(dir, bitmap) }
+        updateClip { copy(bgImage = file, blur = false) }
+    }
+
+    /** Draws a vertical gradient picture at the canvas size and puts it behind the clips. */
+    fun setVideoBackgroundGradient(top: Int, bottom: Int) = work(R.string.busy_adding_image) {
+        val s = _uiState.value
+        val p = s.project ?: return@work
+        val dir = s.projectDir ?: return@work
+        val (w, h) = p.video?.outputSize ?: Pair(p.width, p.height)
+        val bitmap = withContext(Dispatchers.IO) { gradientBitmap(w, h, top, bottom) }
         val file = withContext(Dispatchers.IO) { store.writeImage(dir, bitmap) }
         updateClip { copy(bgImage = file, blur = false) }
     }

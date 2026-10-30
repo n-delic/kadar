@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -238,9 +239,30 @@ fun VideoCanvasPanel(project: Project, clip: VideoClip, defaultExport: ExportSiz
             Box(Modifier.weight(1f)) { ColorRow(project.background.takeUnless { clip.blurred || clip.bgImage != null }, allowNone = false) { c -> c?.let(vm::setBackground) } }
         }
         if (clip.blurred) LabeledSlider(stringResource(R.string.canvas_blur), clip.blurStrength, 0.25f..3f, ::percent, onDrag = { v, first -> vm.updateClip(record = first) { copy(blurStrength = v) } }) { v -> vm.updateClip { copy(blurStrength = v) } }
+        PanelLabel(stringResource(R.string.canvas_gradient))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(GRADIENTS) { (top, bottom) ->
+                Box(
+                    Modifier.size(width = 44.dp, height = 30.dp).clip(RoundedCornerShape(8.dp))
+                        .background(Brush.verticalGradient(listOf(Color(top), Color(bottom))))
+                        .border(1.dp, Ink.line, RoundedCornerShape(8.dp))
+                        .clickable { vm.setVideoBackgroundGradient(top, bottom) },
+                )
+            }
+        }
         ExportSizeRow(project, defaultExport, vm)
     }
 }
+
+/** The gradient presets, top color to bottom. */
+private val GRADIENTS = listOf(
+    0xFF7C4DFF.toInt() to 0xFFFF8A3C.toInt(),
+    0xFF2E6BFF.toInt() to 0xFF35D0C4.toInt(),
+    0xFFFF5E8A.toInt() to 0xFF7C4DFF.toInt(),
+    0xFF12222E.toInt() to 0xFF2C5364.toInt(),
+    0xFFC8F135.toInt() to 0xFF16A085.toInt(),
+    0xFFFF4E4E.toInt() to 0xFFFFB13C.toInt(),
+)
 
 /** The sliders on [Adjust], picked one at a time from tabs so the panel stays short. */
 private enum class AdjustSlider(@StringRes val label: Int, val value: (Adjust) -> Float, val set: Adjust.(Float) -> Adjust, val range: ClosedFloatingPointRange<Float> = -1f..1f) {

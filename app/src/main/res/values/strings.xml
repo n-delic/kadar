@@ -179,6 +179,7 @@
     <string name="hold_to_compare">Hold to compare with the original</string>
     <string name="shadow">Shadow</string>
     <string name="spacing">Spacing</string>
+    <string name="text_perspective">Perspective</string>
     <string name="text_curve">Curve</string>
     <string name="line_height">Line height</string>
     <string name="glow_size">Glow size</string>

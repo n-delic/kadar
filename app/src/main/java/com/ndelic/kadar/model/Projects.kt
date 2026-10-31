@@ -265,6 +265,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
                 lineSpacing = j.optDouble("lineSpacing", 1.0).toFloat(),
                 wrap = if (j.has("wrap")) j.getDouble("wrap").toFloat() else null,
                 curve = j.optDouble("curve", 0.0).toFloat(),
+                perspective = j.optDouble("perspective", 0.0).toFloat(),
                 hidden = j.optBoolean("hidden"),
                 locked = j.optBoolean("locked"),
                 startMs = start,
@@ -525,6 +526,7 @@ private fun Layer.toJson() = JSONObject().apply {
             put("lineSpacing", layer.lineSpacing.toDouble())
             layer.wrap?.let { put("wrap", it.toDouble()) }
             if (layer.curve != 0f) put("curve", layer.curve.toDouble())
+            if (layer.perspective != 0f) put("perspective", layer.perspective.toDouble())
             if (layer.blend != LayerBlend.Normal) put("blend", layer.blend.name)
         }
         is VideoLayer -> {

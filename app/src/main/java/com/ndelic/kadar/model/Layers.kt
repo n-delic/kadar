@@ -7,6 +7,7 @@ import android.graphics.Canvas
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.DashPathEffect
 import android.graphics.LinearGradient
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
@@ -495,6 +496,8 @@ data class TextLayer(
     val wrap: Float? = null,
     /** -1 to 1: how far the lines bend, an arch above 0 and a smile below; 0 keeps them straight. */
     val curve: Float = 0f,
+    /** -1 to 1: a trapezoid slant, the top edge narrowing above 0 and the bottom edge below; 0 keeps it flat. */
+    val perspective: Float = 0f,
     override val startMs: Long = 0,
     override val endMs: Long = Long.MAX_VALUE,
     override val hidden: Boolean = false,
@@ -609,6 +612,18 @@ data class TextLayer(
             }
             // A curved block is taller by its rise; centered, the ends of an arch hang below and a smile's rise above.
             canvas.translate(-layout.width / 2f, -layout.height / 2f + if (curve > 0) -rise / 2 else rise / 2)
+            if (perspective != 0f) {
+                // A trapezoid: the slanted edge pulls in by up to a quarter of the width on each side.
+                val w = layout.width.toFloat()
+                val h = layout.height.toFloat()
+                val inset = w * abs(perspective) * 0.25f
+                val src = floatArrayOf(0f, 0f, w, 0f, 0f, h, w, h)
+                val dst = if (perspective > 0)
+                    floatArrayOf(inset, 0f, w - inset, 0f, 0f, h, w, h)
+                else
+                    floatArrayOf(0f, 0f, w, 0f, inset, h, w - inset, h)
+                Matrix().apply { setPolyToPoly(src, 0, dst, 0, 4) }.let { m -> canvas.save(); canvas.concat(m) }
+            }
             fun draw() = when {
                 curve != 0f -> drawCurved(canvas, reveal)
                 reveal == null -> layout.draw(canvas)
@@ -640,6 +655,7 @@ data class TextLayer(
             draw()
             paint.shader = null
             paint.clearShadowLayer()
+            if (perspective != 0f) canvas.restore()
             canvas.restoreToCount(count)
         }
     }

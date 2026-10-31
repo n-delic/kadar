@@ -184,11 +184,14 @@ Feature parity with the big phone editors, built from how their features behave,
 - [x] Canvas: 1:2; zoom and move the clip inside the canvas; background color, blur strength
 - [x] Canvas: a background image behind the clips
 - [ ] Speed ramps (presets that slow down or speed up within a clip)
+- [ ] Smooth speed interpolation (frame blending) for slow motion
 - [ ] Timed video effects on their own track: slow zoom, jump zoom, shake, glitch, blur, flash, fade to black, film grain
 - [x] Audio: extract the sound of a video, voice effects (higher, deeper, chipmunk, robot), text-to-speech with the phone's offline voices
-- [x] A bundled sound-effect pack (8 synthesized sounds added at the playhead); several music tracks
+- [x] A bundled sound-effect pack (8 synthesized sounds added at the playhead)
+- [ ] A bundled music pack
 - [x] Clip in/out animations: fade, zoom in or out, slide, spin, for the entrance and the exit separately
 - [ ] Keyframes for layers and clips (position, scale, rotation, opacity over time)
+- [ ] Motion tracking: a layer follows a face or object through the clip
 - [x] Blur or pixelate part of the video (faces, usernames): a rectangle, ellipse or heart region on its own track, with strength
 - [x] Blur areas: opacity, frosted glass, magnifier, triangle mosaic and halftone dots
 - [ ] Blur areas: censoring video layers too
@@ -209,17 +212,19 @@ Feature parity with the big phone editors, built from how their features behave,
 - [x] Blend modes for image layers in photos (normal, multiply, screen, overlay, darken, lighten, add)
 - [x] Blend modes for text, shapes and drawings
 - [x] Canvas tools: border and frame
-- [ ] Canvas tools: free crop and rotate of the whole picture, resize, perspective, fit with a blurred or colored background
+- [ ] Canvas tools: free crop and rotate of the whole picture, resize, perspective, fit with a blurred, colored or gradient background
 - [ ] Clone and stretch/warp brushes, curves, tilt-shift, motion trail
+- [ ] Adjust: a selective brush, so the grade lands only on painted areas
 - [ ] Collage: a grid of photos (2 to 9 cells) with inner spacing, outer padding, rounded corners and a background; long-press to swap two photos; a free layout; stitch photos into one long strip
 - [x] Curved text (a bend slider) and gradient text fill
 - [x] Text perspective
 - [x] Bubble styles: pill and double outline
 - [x] Cut-out outlines: solid, glow and offset shadow around the cut-out
 - [x] Shape cut-outs in the crop tool (circle, rounded, heart, star, triangle, diamond)
-- [ ] Cut-out outlines: dotted; a lasso to pick the area
+- [x] Cut-out outlines: dotted
+- [ ] Cut-out outlines: a lasso to pick the area
 - [x] Draw: more pens (neon, dotted, spray, soft)
-- [ ] A CC0 sticker pack
+- [x] A sticker pack of flat own-work art (drawn by scripts/make-stickers.py)
 
 ## Later / maybe
 

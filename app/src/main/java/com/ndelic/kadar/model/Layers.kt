@@ -954,17 +954,36 @@ fun Canvas.drawLayer(layer: Layer, reveal: Reveal? = null) {
  * over [backdrop] stretched to fill it (a blurred photo canvas, [Project.backdrop]), with [frame] banded just inside the edge.
  * The same drawing code backs the on-screen editor, so exports match it.
  */
-fun renderLayers(width: Int, height: Int, background: Int, layers: List<Layer>, scale: Float = 1f, under: Bitmap? = null, backdrop: Bitmap? = null, underAt: RectF? = null, frame: Frame? = null): Bitmap =
+fun renderLayers(width: Int, height: Int, background: Int, layers: List<Layer>, scale: Float = 1f, under: Bitmap? = null, backdrop: Bitmap? = null, underAt: RectF? = null, frame: Frame? = null, dropShadow: Boolean = false): Bitmap =
     Bitmap.createBitmap((width * scale).roundToInt().coerceAtLeast(1), (height * scale).roundToInt().coerceAtLeast(1), Bitmap.Config.ARGB_8888).also { bitmap ->
         Canvas(bitmap).apply {
             drawColor(background)
             scale(scale, scale)
             backdrop?.let { drawBitmap(it, null, RectF(0f, 0f, width.toFloat(), height.toFloat()), bitmapPaint) }
             under?.let { drawBitmap(it, null, underAt ?: fitRect(it.width, it.height, width, height), bitmapPaint) }
+            if (dropShadow) layers.firstOrNull { !it.hidden }?.let { drawLayerShadow(it, width, height) }
             layers.forEach { if (!it.hidden) drawLayer(it) }
             frame?.let { drawFrame(it, width, height) }
         }
     }
+
+/** A soft dark copy of [layer]'s box, for a photo sitting on a bigger canvas (`Project.dropShadow`). */
+fun Canvas.drawLayerShadow(layer: Layer, width: Int, height: Int) {
+    val hw = layer.width / 2f
+    val hh = layer.height / 2f
+    val path = Path()
+    listOf(
+        layer.t.shiftedLocal(-hw, -hh),
+        layer.t.shiftedLocal(hw, -hh),
+        layer.t.shiftedLocal(hw, hh),
+        layer.t.shiftedLocal(-hw, hh),
+    ).forEachIndexed { i, (x, y) -> if (i == 0) path.moveTo(x, y) else path.lineTo(x, y) }
+    path.close()
+    drawPath(path, Paint().apply {
+        color = 0x59000000
+        maskFilter = BlurMaskFilter(minOf(width, height) * 0.04f, BlurMaskFilter.Blur.NORMAL)
+    })
+}
 
 /** A border banded just inside the canvas edge: [width] is its thickness as a share of the canvas's short side. */
 data class Frame(val width: Float, val color: Int)

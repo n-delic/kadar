@@ -145,6 +145,7 @@ import com.ndelic.kadar.model.backdrop
 import com.ndelic.kadar.model.blurBase
 import com.ndelic.kadar.model.defaultTextSize
 import com.ndelic.kadar.model.drawFrame
+import com.ndelic.kadar.model.drawLayerShadow
 import com.ndelic.kadar.model.drawsAt
 import com.ndelic.kadar.model.drawLayer
 import com.ndelic.kadar.model.hasSideHandles
@@ -926,10 +927,11 @@ private fun Stage(
                 }
             }
         }
-        fun DrawScope.drawLayers(group: List<Layer>, after: (android.graphics.Canvas) -> Unit = {}) = drawIntoCanvas { canvas ->
+        fun DrawScope.drawLayers(group: List<Layer>, after: (android.graphics.Canvas) -> Unit = {}, shadow: Layer? = null) = drawIntoCanvas { canvas ->
             val c = canvas.nativeCanvas
             c.save()
             c.scale(scale, scale)
+            shadow?.let { c.drawLayerShadow(it, project.width, project.height) }
             group.forEach { if (animated && videoEnd != null) c.drawLayer(it, it.motionAt(clock.longValue, minOf(it.endMs, videoEnd)), project.height) else c.drawLayer(it) }
             after(c)
             c.restore()
@@ -1183,13 +1185,13 @@ private fun Stage(
                         }
                     },
                 ) {
-                    drawLayers(groups.last()) { c ->
+                    drawLayers(groups.last(), after = { c ->
                         // The frame is content, so it draws over the layers and under the selection.
                         project.frame?.let { c.drawFrame(it, project.width, project.height) }
                         selected?.let { c.drawSelection(it, scale) }
                         if (snaps.x) c.drawLine(cx, 0f, cx, project.height.toFloat(), guidePaint.also { it.strokeWidth = 2 / scale })
                         if (snaps.y) c.drawLine(0f, cy, project.width.toFloat(), cy, guidePaint.also { it.strokeWidth = 2 / scale })
-                    }
+                    }, shadow = if (project.dropShadow) groups.last().firstOrNull() else null)
                     loupe?.let { (at, color) ->
                         // Above the finger, so it stays in sight.
                         val o = at - Offset(0f, 56.dp.toPx() / viewZoom)

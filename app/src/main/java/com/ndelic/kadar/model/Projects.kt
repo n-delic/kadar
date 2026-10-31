@@ -43,6 +43,8 @@ data class Project(
     val photoId: Long? = null,
     /** Photos only: a border banded just inside the canvas edge, or null for none. */
     val frame: Frame? = null,
+    /** Photos only: a soft shadow under the bottom picture, when it doesn't fill the canvas. */
+    val dropShadow: Boolean = false,
 ) {
     /** The canvas cut to [photo]'s picture as placed, every layer kept at its spot on it (the "Original" aspect too). */
     fun fittedTo(photo: ImageLayer): Project {
@@ -177,6 +179,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
             blur = j.optBoolean("blur"),
             photoId = if (j.has("photoId")) j.getLong("photoId") else null,
             frame = j.optJSONObject("frame")?.let { Frame(it.getDouble("width").toFloat(), it.getInt("color")) },
+            dropShadow = j.optBoolean("dropShadow"),
         )
     }
 
@@ -443,6 +446,7 @@ private fun Project.toJson() = JSONObject().apply {
     if (blur) put("blur", true)
     photoId?.let { put("photoId", it) }
     frame?.let { put("frame", JSONObject().put("width", it.width.toDouble()).put("color", it.color)) }
+    if (dropShadow) put("dropShadow", true)
 }
 
 private fun Layer.toJson() = JSONObject().apply {

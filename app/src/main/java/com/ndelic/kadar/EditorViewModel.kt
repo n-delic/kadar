@@ -407,7 +407,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             videoFrameOf = first.uri to first.startMs
         }
         val frame = videoFrame?.let { f -> first?.shaped(f) ?: f }
-        val thumb = renderLayers(project.width, project.height, project.background, project.layers, THUMB_SIZE / max(project.width, project.height), frame, project.backdrop(), frame?.let { project.video?.frameRect(it.width, it.height) }, project.frame)
+        val thumb = renderLayers(project.width, project.height, project.background, project.layers, THUMB_SIZE / max(project.width, project.height), frame, project.backdrop(), frame?.let { project.video?.frameRect(it.width, it.height) }, project.frame, project.dropShadow)
         try {
             saveLock.withLock { withContext(Dispatchers.IO) { store.save(dir, project, thumb) } }
             lastSaved = project
@@ -671,7 +671,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
             if (l.id == video?.id) layerFrame(video, positionMs)?.let { rawFrameLayer(video, it) } ?: l else l
         }
         val frame = frameAt(positionMs)
-        return renderLayers(p.width, p.height, p.background, layers, min(1f, PICK_SIZE / max(p.width, p.height)), frame, underAt = frame?.let { p.video?.frameRect(it.width, it.height) }, frame = p.frame)
+        return renderLayers(p.width, p.height, p.background, layers, min(1f, PICK_SIZE / max(p.width, p.height)), frame, underAt = frame?.let { p.video?.frameRect(it.width, it.height) }, frame = p.frame, dropShadow = p.dropShadow)
     }
 
     /** Video layer [l]'s [frame], cropped like it, as a picture drawn where it shows. */
@@ -875,6 +875,9 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
 
     /** Photos: a border just inside the canvas edge, or none. */
     fun setFrame(frame: Frame?) = updateProject { it.copy(frame = frame) }
+
+    /** Photos: a soft shadow under the bottom picture. */
+    fun setDropShadow(on: Boolean) = updateProject { it.copy(dropShadow = on) }
 
     /** Photos: the canvas shows the bottom picture blurred behind everything, until a color is picked. */
     fun setBlur() = updateProject { it.copy(blur = true) }
@@ -1186,7 +1189,7 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         val shortSide = exportShortSide
         val scale = shortSide?.let { min(1f, it / min(p.width, p.height).toFloat()) } ?: 1f
         val backdrop = p.backdrop()
-        val bitmap = renderLayers(p.width, p.height, p.background, p.layers, scale, backdrop = backdrop, frame = p.frame)
+        val bitmap = renderLayers(p.width, p.height, p.background, p.layers, scale, backdrop = backdrop, frame = p.frame, dropShadow = p.dropShadow)
         if (p.transparent) {
             save(PhotoFormat.Png, bitmap, share)
         } else {

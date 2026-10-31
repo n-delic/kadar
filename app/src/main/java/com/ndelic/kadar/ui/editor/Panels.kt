@@ -180,6 +180,7 @@ fun CanvasPanel(project: Project, defaultExport: ExportSize, vm: EditorViewModel
         project.frame?.let {
             KSlider(R.drawable.ic_border_color, it.width, 0.01f..0.15f, ::percent) { v -> vm.setFrame(project.frame?.copy(width = v)) }
         }
+        KToggle(stringResource(R.string.canvas_shadow), null, project.dropShadow) { vm.setDropShadow(it) }
         ExportSizeRow(project, defaultExport, vm)
     }
 }

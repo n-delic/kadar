@@ -199,6 +199,15 @@
     <string name="keep_pitch">Zadrži visinu glasa</string>
     <string name="keep_pitch_hint">Isključeno daje glas vjeverice / usporeni glas</string>
     <string name="video_sound">Zvuk videa</string>
+    <string name="audio_sfx">Zvučni efekti</string>
+    <string name="sfx_pop">Pop</string>
+    <string name="sfx_click">Klik</string>
+    <string name="sfx_beep">Pip</string>
+    <string name="sfx_boing">Bučanje</string>
+    <string name="sfx_whoosh">Šušnjenje</string>
+    <string name="sfx_boom">Bombardovanje</string>
+    <string name="sfx_riser">N_priviđenje</string>
+    <string name="sfx_sparkle">Cvrkut</string>
     <string name="music">Muzika</string>
     <string name="music_add">Dodaj muziku</string>
     <string name="audio_fades">Pojačavanje i stišavanje</string>

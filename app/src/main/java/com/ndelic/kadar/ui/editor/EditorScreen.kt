@@ -425,7 +425,7 @@ fun EditorScreen(state: EditorUiState, vm: EditorViewModel, onBrowse: () -> Unit
                         Panel.Canvas -> CanvasPanel(project, state.settings.exportSize, vm)
                         Panel.Speed -> video?.let { SpeedPanel(it, clipIndex, vm) }
                         Panel.Audio -> video?.let { v ->
-                            AudioPanel(v, clipIndex, audio, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }, onAddVideoSound = { videoSound.launch(PickVisualMediaRequest(PickVisualMedia.VideoOnly)) }, onDrag = volumes::show) {
+                            AudioPanel(v, clipIndex, audio, vm, onAddMusic = { music.launch(arrayOf("audio/*")) }, onAddVideoSound = { videoSound.launch(PickVisualMediaRequest(PickVisualMedia.VideoOnly)) }, onAddSfx = { name, label -> vm.addSfx(name, label, positionMs) }, onDrag = volumes::show) {
                                 VoiceoverSection(v, state.recordingFromMs, state.speechVoices, positionMs, playing, player, vm, onPlay = { playing = it })
                             }
                         }

@@ -152,6 +152,7 @@ class ProjectStore(private val root: File, private val fonts: () -> List<Font>) 
             project.video?.voices.orEmpty().map { it.file.name } +
             project.video?.segments.orEmpty().filter { it.isImage }.map { File(it.uri.path!!).name } +
             project.video?.segments.orEmpty().filter { !it.isImage }.map { previewCopyFile(dir, it.uri).name } +
+            project.video?.music.orEmpty().mapNotNull { it.uri.path?.let { p -> File(p).name } } +
             listOfNotNull(project.video?.bgImage) + THUMB
         dir.listFiles().orEmpty()
             .filter { (it.name.endsWith(".png") || it.name.endsWith(".jpg") || it.name.endsWith(VOICE_EXTENSION) || it.name.endsWith(SPEECH_EXTENSION) || it.name.startsWith(PREVIEW_COPY_PREFIX)) && it.name !in used }

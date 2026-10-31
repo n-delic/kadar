@@ -132,6 +132,19 @@ fun scaleDown(bitmap: Bitmap, maxSide: Int): Bitmap {
  * [bitmap] mirrored ([flipX], [flipY]) and turned by [degrees] about its center into a new [outW]×[outH] bitmap whose
  * center is ([dx], [dy]) from the turned picture's center; what the picture doesn't cover is transparent.
  */
+/** An audio file's duration in ms (0 when it can't be read). */
+fun audioDuration(context: Context, uri: Uri): Long {
+    val retriever = android.media.MediaMetadataRetriever()
+    return try {
+        retriever.setDataSource(context, uri)
+        (retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION) ?: "0").toLongOrNull() ?: 0L
+    } catch (e: Exception) {
+        0L
+    } finally {
+        retriever.release()
+    }
+}
+
 /** A vertical gradient from [top] to [bottom], as a background picture. */
 fun gradientBitmap(w: Int, h: Int, top: Int, bottom: Int): Bitmap {
     val colors = intArrayOf(top, bottom)

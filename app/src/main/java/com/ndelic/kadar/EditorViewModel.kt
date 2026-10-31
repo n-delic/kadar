@@ -22,6 +22,7 @@ import com.ndelic.kadar.media.displayName
 import com.ndelic.kadar.media.downloadImage
 import com.ndelic.kadar.media.importFont
 import com.ndelic.kadar.media.loadBitmap
+import com.ndelic.kadar.media.audioDuration
 import com.ndelic.kadar.media.gradientBitmap
 import com.ndelic.kadar.media.loadFont
 import com.ndelic.kadar.media.mediaInfo
@@ -1044,6 +1045,19 @@ class EditorViewModel(private val app: Application) : AndroidViewModel(app) {
         if (info.durationMs == 0L) throw UserError(R.string.error_read_audio)
         if (withContext(Dispatchers.IO) { trackMimes(app, uri) }.none { it.startsWith("audio/") }) throw UserError(R.string.error_no_sound)
         updateClip { copy(music = music + Music(uri, name, info.durationMs, part = AudioPart(atMs = audioStartMs(atMs, outputDurationMs)))) }
+        selectAudio(AudioRef(voice = false, index = _uiState.value.project?.video?.music?.lastIndex ?: 0))
+    }
+
+    /** Adds a bundled sound effect at the playhead: copied into the project, a music part exactly as long as the sound. */
+    fun addSfx(name: String, label: String, atMs: Long) = work(R.string.busy_adding_music) {
+        val s = _uiState.value
+        val dir = s.projectDir ?: return@work
+        val file = withContext(Dispatchers.IO) {
+            File(dir, "sfx_${System.nanoTime()}.wav").also { out -> app.assets.open("sfx/$name.wav").use { input -> out.outputStream().use { input.copyTo(it) } } }
+        }
+        val duration = withContext(Dispatchers.IO) { audioDuration(app, Uri.fromFile(file)) }
+        if (duration == 0L) throw UserError(R.string.error_read_audio)
+        updateClip { copy(music = music + Music(Uri.fromFile(file), label, duration, part = AudioPart(atMs = audioStartMs(atMs, outputDurationMs), lengthMs = duration))) }
         selectAudio(AudioRef(voice = false, index = _uiState.value.project?.video?.music?.lastIndex ?: 0))
     }
 

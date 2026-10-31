@@ -255,6 +255,18 @@ fun VideoCanvasPanel(project: Project, clip: VideoClip, defaultExport: ExportSiz
     }
 }
 
+/** The bundled sound effects: the asset's name in `assets/sfx` and its label. */
+private val SFX = listOf(
+    "pop" to R.string.sfx_pop,
+    "click" to R.string.sfx_click,
+    "beep" to R.string.sfx_beep,
+    "boing" to R.string.sfx_boing,
+    "whoosh" to R.string.sfx_whoosh,
+    "boom" to R.string.sfx_boom,
+    "riser" to R.string.sfx_riser,
+    "sparkle" to R.string.sfx_sparkle,
+)
+
 /** The gradient presets, top color to bottom. */
 private val GRADIENTS = listOf(
     0xFF7C4DFF.toInt() to 0xFFFF8A3C.toInt(),
@@ -451,6 +463,7 @@ fun AudioPanel(
     vm: EditorViewModel,
     onAddMusic: () -> Unit,
     onAddVideoSound: () -> Unit,
+    onAddSfx: (String, String) -> Unit,
     onDrag: (VideoClip) -> Unit,
     voiceover: @Composable () -> Unit,
 ) {
@@ -484,6 +497,16 @@ fun AudioPanel(
         PanelLabel(stringResource(R.string.video_sound))
         val onClipDrag = { v: Float, _: Boolean -> onDrag(clip.copy(segments = clip.segments.mapIndexed { i, s -> if (i == index) s.copy(volume = v) else s })) }
         KSlider(R.drawable.ic_volume_up, clip.segments[index].volume, 0f..2f, ::percent, onDrag = onClipDrag) { v -> vm.updateSegment(index) { copy(volume = v) } }
+        PanelLabel(stringResource(R.string.audio_sfx))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(SFX) { (file, labelRes) ->
+                val label = stringResource(labelRes)
+                Box(
+                    Modifier.clip(RoundedCornerShape(10.dp)).background(Ink.raised).border(1.dp, Ink.line, RoundedCornerShape(10.dp))
+                        .clickable { onAddSfx(file, label) }.padding(horizontal = 12.dp, vertical = 8.dp),
+                ) { Text(label, color = Ink.text, fontSize = 13.sp) }
+            }
+        }
         PanelLabel(stringResource(R.string.music))
         ActionRow(R.drawable.ic_add, stringResource(R.string.music_add), onAddMusic)
         ActionRow(R.drawable.ic_movie, stringResource(R.string.video_sound_add), onAddVideoSound)

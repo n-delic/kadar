@@ -201,6 +201,15 @@
     <string name="keep_pitch">Keep voice pitch</string>
     <string name="keep_pitch_hint">Off gives the chipmunk / slow-mo voice</string>
     <string name="video_sound">Video sound</string>
+    <string name="audio_sfx">Sound effects</string>
+    <string name="sfx_pop">Pop</string>
+    <string name="sfx_click">Click</string>
+    <string name="sfx_beep">Beep</string>
+    <string name="sfx_boing">Boing</string>
+    <string name="sfx_whoosh">Whoosh</string>
+    <string name="sfx_boom">Boom</string>
+    <string name="sfx_riser">Riser</string>
+    <string name="sfx_sparkle">Sparkle</string>
     <string name="music">Music</string>
     <string name="music_add">Add music</string>
     <string name="audio_fades">Fade in and out</string>

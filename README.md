@@ -52,13 +52,13 @@ phone.
   resize and draw more onto.
 - **Shapes.** Rectangles, rounded rectangles, ellipses, arrows, stars and lines, with fill and outline.
 - **Text.** A classic meme font, eight more free caption fonts, the system fonts and your own (.ttf or
-  .otf). Fill, gradient, outline, shadow and glow; bold, italic, underline and capitals; curved text;
-  a caption box or a speech, thought, shout, pill or double-outline bubble with a tail you can point;
-  one-tap style presets. Double-tap text to edit it.
+  .otf). Fill, gradient, outline, shadow and glow; bold, italic, underline and capitals; curved text and
+  a perspective slant; a caption box or a speech, thought, shout, pill or double-outline bubble with a
+  tail you can point; one-tap style presets. Double-tap text to edit it.
 - **Snapping.** Layers snap to the center of the canvas and to 0° and 90°, with guide lines.
 - **Canvas.** Original size or 1:1, 4:5, 9:16, 16:9 and more, on a color, a blurred copy of the photo or a
-  transparent background (exported as PNG), with an optional frame around the edge. Start from a photo or
-  a blank canvas.
+  transparent background (exported as PNG), with an optional frame around the edge and a drop shadow under
+  the picture. Start from a photo or a blank canvas.
 - **My stickers.** Save any cut-out and reuse it in every project, and start from the bundled pack of
   flat stickers.
 
@@ -76,15 +76,16 @@ phone.
   split it, long-press to reorder, and hide or lock it from the left. Pinch to zoom in on long videos.
 - **Video over video.** Put more clips on top, picture-in-picture style: move, resize, rotate, crop and
   fade them, start them from the middle, give them their own volume and look, or key out a green screen.
-- **Blur areas.** Blur, pixelate, frost or magnify faces and usernames with a rectangle, ellipse or heart
-  on its own track, each as strong or subtle as you like.
+- **Blur areas.** Blur, pixelate, frost, magnify, triangle-mosaic or halftone faces and usernames with a
+  rectangle, ellipse or heart on its own track, each as strong or subtle as you like.
 - **Animations.** Captions, stickers and shapes fade, pop, zoom or slide in and out, type out letter by
   letter, or wiggle, pulse and bounce.
 - **Music and sound.** Add songs or the sound of another video, move and trim them on their own tracks,
-  set their volume and fades; they loop to fill their part. Record a voiceover from the playhead, or have
-  the phone's offline voice read a line, with higher, deeper, chipmunk or robot voice effects.
+  set their volume (up to 200%) and fades; they loop to fill their part. Sound effects come bundled — tap
+  one and it lands at the playhead. Record a voiceover from the playhead, or have the phone's offline
+  voice read a line, with higher, deeper, chipmunk or robot voice effects.
 - **Canvas.** Turn a landscape clip into 9:16 for reels and stories, 1:1, 4:5 or 1:2, zoom and move the
-  clip inside it, with colored bars, a blurred copy of the video or any picture behind it.
+  clip inside it, with colored bars, a blurred copy of the video, any picture or a gradient behind it.
 - **Filters and adjust** per clip, the same looks as for photos, shown live while you drag.
 - **What you see is what you export.** The preview runs the same edit the exporter does.
 

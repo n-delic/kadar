@@ -152,6 +152,16 @@
 - Fix: shapes start as a round circle, not an oval
 - Fix: the image layer's opacity slider updates live while it drags
 
+## v1.0.0: done
+
+- Video canvas: gradient backgrounds
+- Sound: clips and music boost to 200%
+- Blur areas: triangle mosaic and halftone dots
+- Cut-out outlines: dotted
+- Photo canvas: a drop shadow under the picture
+- Sound: a bundled sound-effect pack added at the playhead
+- Text: a perspective slant
+
 ## Next
 
 Feature parity with the big phone editors, built from how their features behave, never from their code, assets or look (AGENTS.md rules 14 and 15). Offline only: no cloud AI.
@@ -176,11 +186,11 @@ Feature parity with the big phone editors, built from how their features behave,
 - [ ] Speed ramps (presets that slow down or speed up within a clip)
 - [ ] Timed video effects on their own track: slow zoom, jump zoom, shake, glitch, blur, flash, fade to black, film grain
 - [x] Audio: extract the sound of a video, voice effects (higher, deeper, chipmunk, robot), text-to-speech with the phone's offline voices
-- [ ] Audio: a bundled CC0 sound-effect pack (meme sounds), several music tracks
+- [x] A bundled sound-effect pack (8 synthesized sounds added at the playhead); several music tracks
 - [x] Clip in/out animations: fade, zoom in or out, slide, spin, for the entrance and the exit separately
 - [ ] Keyframes for layers and clips (position, scale, rotation, opacity over time)
 - [x] Blur or pixelate part of the video (faces, usernames): a rectangle, ellipse or heart region on its own track, with strength
-- [x] Blur areas: opacity, frosted glass and magnifier looks
+- [x] Blur areas: opacity, frosted glass, magnifier, triangle mosaic and halftone dots
 - [ ] Blur areas: censoring video layers too
 - [x] Green screen: remove a picked color from a video layer, with strength and soft-edge sliders
 - [ ] Video layers: blend modes (multiply, screen, overlay, darken, lighten) and shaped masks (linear, radial, rectangle, heart, star) with a soft edge
@@ -203,7 +213,7 @@ Feature parity with the big phone editors, built from how their features behave,
 - [ ] Clone and stretch/warp brushes, curves, tilt-shift, motion trail
 - [ ] Collage: a grid of photos (2 to 9 cells) with inner spacing, outer padding, rounded corners and a background; long-press to swap two photos; a free layout; stitch photos into one long strip
 - [x] Curved text (a bend slider) and gradient text fill
-- [ ] Text perspective
+- [x] Text perspective
 - [x] Bubble styles: pill and double outline
 - [x] Cut-out outlines: solid, glow and offset shadow around the cut-out
 - [x] Shape cut-outs in the crop tool (circle, rounded, heart, star, triangle, diamond)
